@@ -1,6 +1,5 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:xournalpp/generated/l10n.dart';
 import 'dart:io' show Platform;
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -14,15 +13,15 @@ class EditingToolBar extends StatefulWidget {
   final Function()? getColor;
   final Function()? getWidth;
 
-  const EditingToolBar(
-      {Key? key,
-      this.onNewDeviceMap,
-      this.deviceMap,
-      this.onWidthChange,
-      this.onColorChange,
-      this.getColor,
-      this.getWidth})
-      : super(key: key);
+  const EditingToolBar({
+    Key? key,
+    this.onNewDeviceMap,
+    this.deviceMap,
+    this.onWidthChange,
+    this.onColorChange,
+    this.getColor,
+    this.getWidth,
+  }) : super(key: key);
 
   @override
   EditingToolBarState createState() => EditingToolBarState();
@@ -46,15 +45,52 @@ class EditingToolBarState extends State<EditingToolBar> {
         },
         child: ListView(
           children: [
-            getInkwellButton(EditingTool.STYLUS, FontAwesomeIcons.penAlt, enableSettings: true),
-            getInkwellButton(EditingTool.HIGHLIGHT, FontAwesomeIcons.highlighter, enableSettings: true),
-            getInkwellButton(EditingTool.MOVE, Icons.pan_tool, usePrimaryColor: true),
-            getInkwellButton(EditingTool.TEXT, Icons.keyboard, usePrimaryColor: true),
-            getInkwellButton(EditingTool.LATEX, Icons.science, usePrimaryColor: true),
-            getInkwellButton(EditingTool.ERASER, FontAwesomeIcons.eraser, enableSettings: true, usePrimaryColor: true),
-            getInkwellButton(EditingTool.WHITEOUT, Icons.format_paint, usePrimaryColor: true),
-            getInkwellButton(EditingTool.IMAGE, Icons.add_photo_alternate, usePrimaryColor: true),
-            getInkwellButton(EditingTool.SELECT, Icons.tab_unselected, usePrimaryColor: true),
+            getInkwellButton(
+              EditingTool.STYLUS,
+              FaIcon(FontAwesomeIcons.penClip),
+              enableSettings: true,
+            ),
+            getInkwellButton(
+              EditingTool.HIGHLIGHT,
+              FaIcon(FontAwesomeIcons.highlighter),
+              enableSettings: true,
+            ),
+            getInkwellButton(
+              EditingTool.MOVE,
+              Icon(Icons.pan_tool),
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.TEXT,
+              Icon(Icons.keyboard),
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.LATEX,
+              Icon(Icons.science),
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.ERASER,
+              FaIcon(FontAwesomeIcons.eraser),
+              enableSettings: true,
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.WHITEOUT,
+              Icon(Icons.format_paint),
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.IMAGE,
+              Icon(Icons.add_photo_alternate),
+              usePrimaryColor: true,
+            ),
+            getInkwellButton(
+              EditingTool.SELECT,
+              Icon(Icons.tab_unselected),
+              usePrimaryColor: true,
+            ),
           ],
           shrinkWrap: true,
           scrollDirection: Axis.horizontal,
@@ -71,40 +107,51 @@ class EditingToolBarState extends State<EditingToolBar> {
       barrierLabel: "Barrier",
       barrierDismissible: true,
       pageBuilder: (_, __, ___) {
-        return ToolSettingDialog(width: widget.getWidth!(), color: widget.getColor!(), onColorChange: widget.onColorChange, onWidthChange: widget.onWidthChange);
+        return ToolSettingDialog(
+          width: widget.getWidth!(),
+          color: widget.getColor!(),
+          onColorChange: widget.onColorChange,
+          onWidthChange: widget.onWidthChange,
+        );
       },
     );
   }
 
-  InkWell getInkwellButton(EditingTool tool, IconData icon, {bool enableSettings = false, bool usePrimaryColor = false}) {
+  InkWell getInkwellButton(
+    EditingTool tool,
+    Widget icon, {
+    bool enableSettings = false,
+    bool usePrimaryColor = false,
+  }) {
     return InkWell(
       onLongPress: () {},
       child: FloatingActionButton(
         heroTag: tool,
         onPressed: () {
           // if tool is selected, then show the settings
-          if(enableSettings && getTool() == tool){
+          if (enableSettings && getTool() == tool) {
             showCustomDialog(context);
           } else {
             setState(() => setTool(tool));
             saveDeviceTable();
           }
         },
-        child: FaIcon(icon),
+        child: icon,
         elevation: 6,
-        backgroundColor:
-        getTool() == tool ? (!usePrimaryColor ? widget.getColor!() : null) : Theme.of(context).cardColor,
+        backgroundColor: getTool() == tool
+            ? (!usePrimaryColor ? widget.getColor!() : null)
+            : Theme.of(context).cardColor,
       ),
     );
   }
 
   void initializeTool() {
-    if(getTool() == null) {
+    if (getTool() == null) {
       setTool(EditingTool.STYLUS);
     }
   }
 
-  void setTool(EditingTool tool){
+  void setTool(EditingTool tool) {
     PointerDeviceKind? device = currentDevice;
     if (Platform.isAndroid || Platform.isIOS) {
       device = PointerDeviceKind.stylus;
@@ -120,5 +167,3 @@ class EditingToolBarState extends State<EditingToolBar> {
     return widget.deviceMap![device];
   }
 }
-
-

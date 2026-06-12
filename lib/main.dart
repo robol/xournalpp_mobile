@@ -41,11 +41,12 @@ const double kBodyFontSize = 24 / kFontSizeDivision;
 const double kEmphasisFontSize = 25.2 / kFontSizeDivision;
 
 const TextStyle kHugeFont = TextStyle(
-    fontFamily: 'Open Sans',
-    fontWeight: FontWeight.w800,
-    color: kSecondaryColor,
-    height: 1.4,
-    fontSize: kHugeFontSize);
+  fontFamily: 'Open Sans',
+  fontWeight: FontWeight.w800,
+  color: kSecondaryColor,
+  height: 1.4,
+  fontSize: kHugeFontSize,
+);
 final TextStyle kLargeFont = TextStyle(
   fontFamily: 'Open Sans',
   fontSize: kLargeFontSize,
@@ -53,54 +54,54 @@ final TextStyle kLargeFont = TextStyle(
   height: 1.4,
 );
 const TextStyle kBodyFont = TextStyle(
-    fontFamily: 'Open Sans',
-    fontWeight: FontWeight.w300,
-    height: 1.4,
-    fontSize: kBodyFontSize);
+  fontFamily: 'Open Sans',
+  fontWeight: FontWeight.w300,
+  height: 1.4,
+  fontSize: kBodyFontSize,
+);
 const TextStyle kEmphasisFont = TextStyle(
-    fontFamily: 'Glacial Indifference',
-    fontSize: kEmphasisFontSize,
-    height: 1.22,
-    letterSpacing: 1.8);
+  fontFamily: 'Glacial Indifference',
+  fontSize: kEmphasisFontSize,
+  height: 1.22,
+  letterSpacing: 1.8,
+);
 
 final kTextTheme = TextTheme(
-  headline1: kHugeFont,
-  headline2: kHugeFont,
-  headline3: kLargeFont
+  displayLarge: kHugeFont,
+  displayMedium: kHugeFont,
+  headlineMedium: kLargeFont
       .copyWith(color: kDarkColor)
       .copyWith(fontSize: kLargeFontSize * kFontSizeDivision),
-  headline4: kLargeFont.copyWith(color: kDarkColor),
-  headline5: kLargeFont.copyWith(color: kDarkColor),
-  headline6: kLargeFont.copyWith(color: kDarkColor),
-  bodyText1: kBodyFont,
-  bodyText2: kEmphasisFont,
-  caption: kEmphasisFont,
-  button: kEmphasisFont,
+  headlineSmall: kLargeFont.copyWith(color: kDarkColor),
+  titleLarge: kLargeFont.copyWith(color: kDarkColor),
+  titleMedium: kLargeFont.copyWith(color: kDarkColor),
+  bodyLarge: kBodyFont,
+  bodyMedium: kEmphasisFont,
+  bodySmall: kEmphasisFont,
+  labelLarge: kEmphasisFont,
 );
 
 final kColorScheme = ColorScheme(
   primary: kPrimaryColor,
-  primaryVariant: kPrimaryColorAccent,
   secondary: kSecondaryColor,
-  secondaryVariant: kSecondaryColorAccent,
   surface: kDarkColor!,
-  background: kDarkColor!,
   error: Colors.deepOrange,
   onPrimary: kLightColor,
   onSecondary: kDarkColor!,
   onSurface: kDarkColor!,
-  onBackground: kLightColor,
   onError: kLightColor,
   brightness: Brightness.dark,
 );
 
-final kDialogTheme =
-    DialogTheme(titleTextStyle: kLargeFont.copyWith(color: kLightColor));
+final kDialogTheme = DialogThemeData(
+  titleTextStyle: kLargeFont.copyWith(color: kLightColor),
+);
 
 final kSnackBarTheme = SnackBarThemeData(
-    backgroundColor: kDarkColor,
-    actionTextColor: kSecondaryColorAccent,
-    contentTextStyle: kBodyFont);
+  backgroundColor: kDarkColor,
+  actionTextColor: kSecondaryColorAccent,
+  contentTextStyle: kBodyFont,
+);
 
 class XournalppMobile extends StatelessWidget {
   // This widget is the root of your application.
@@ -118,23 +119,23 @@ class XournalppMobile extends StatelessWidget {
       ],
       supportedLocales: S.delegate.supportedLocales,
       theme: ThemeData(
-          primarySwatch: kPrimaryColor as MaterialColor?,
-          accentColor: kSecondaryColor,
-          fontFamily: 'Open Sans',
-          textTheme: kTextTheme,
-          colorScheme: kColorScheme.copyWith(brightness: Brightness.light),
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-          dialogTheme: kDialogTheme,
-          snackBarTheme: kSnackBarTheme),
+        primarySwatch: kPrimaryColor as MaterialColor?,
+        fontFamily: 'Open Sans',
+        textTheme: kTextTheme,
+        colorScheme: kColorScheme.copyWith(brightness: Brightness.light),
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        dialogTheme: kDialogTheme,
+        snackBarTheme: kSnackBarTheme,
+      ),
       darkTheme: ThemeData(
-          primarySwatch: kPrimaryColor as MaterialColor?,
-          accentColor: kSecondaryColor,
-          fontFamily: 'Open Sans',
-          textTheme: kTextTheme,
-          colorScheme: kColorScheme,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-          dialogTheme: kDialogTheme,
-          snackBarTheme: kSnackBarTheme),
+        primarySwatch: kPrimaryColor as MaterialColor?,
+        fontFamily: 'Open Sans',
+        textTheme: kTextTheme,
+        colorScheme: kColorScheme,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        dialogTheme: kDialogTheme,
+        snackBarTheme: kSnackBarTheme,
+      ),
       home: OpenPage(),
     );
   }

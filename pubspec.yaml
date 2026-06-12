@@ -6,43 +6,41 @@ publish_to: none
 version: 1.1.11+27
 
 environment:
-  sdk: '>=2.12.0 <3.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  file_picker_cross: ^4.5.0
-  katex_flutter: ^4.0.2+26
-  intl: ^0.17.0
-  archive: ^3.1.11
-  xml: ^5.3.1
-  url_launcher: ^6.0.18
-  transparent_image: ^2.0.0
+  file_picker: ^11.0.2
+  flutter_math_fork: ^0.7.4
+  intl: ^0.20.0
+  archive: ^4.0.9
+  xml: ^6.5.0
+  url_launcher: ^6.3.2
 #  catcher: ^0.4.0
-  receive_sharing_intent: ^1.4.5
-  after_layout: ^1.1.0
-  flutter_dropzone: ^3.0.5
-  shared_preferences: ^2.0.12
-  flutter_absolute_path: 1.0.6
-  matrix_gesture_detector: ^0.2.0-nullsafety.1
-  vector_math: ^2.1.1
-  dwds: ^11.5.1
-  flutter_colorpicker: ^1.0.3
-  package_info: ^2.0.2
-  printing: ^5.6.6
-  pdf: ^3.6.5
+  receive_sharing_intent: ^1.8.1
+  flutter_dropzone: ^4.2.1
+  shared_preferences: ^2.5.5
+  vector_math: ^2.2.0
+  flutter_colorpicker: ^1.1.0
+  package_info_plus: ^9.0.1
+  printing: ^5.14.3
+  pdf: ^3.12.0
 #  zefyr: ^0.12.0
 #  notus: ^0.1.5
 
   flutter_localizations:
     sdk: flutter
-  font_awesome_flutter: ^9.2.0
+  font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
   flutter_test:
     sdk:
       flutter
-  flutter_launcher_icons: ^0.9.2
+  flutter_launcher_icons: ^0.14.4
+
+dependency_overrides:
+  file: ^7.0.1
 
 flutter_icons:
    android: true

@@ -1,15 +1,13 @@
 import 'dart:convert';
 import 'dart:ui';
 
-import 'package:after_layout/after_layout.dart';
-import 'package:file_picker_cross/file_picker_cross.dart';
+import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:transparent_image/transparent_image.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
@@ -26,8 +24,7 @@ class OpenPage extends StatefulWidget {
   _OpenPageState createState() => _OpenPageState();
 }
 
-class _OpenPageState extends State<OpenPage>
-    with TickerProviderStateMixin, AfterLayoutMixin {
+class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   bool _loadedRecent = false;
   Set recentFiles = Set();
 
@@ -44,8 +41,13 @@ class _OpenPageState extends State<OpenPage>
   @override
   void initState() {
     _animationController = AnimationController(
-        vsync: this, duration: Duration(milliseconds: 250), value: 0)
-      ..addListener((() => setState(() {})));
+      vsync: this,
+      duration: Duration(milliseconds: 250),
+      value: 0,
+    )..addListener((() => setState(() {})));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) afterFirstLayout(context);
+    });
 
     // trying to load fitting locale
 
@@ -78,57 +80,58 @@ class _OpenPageState extends State<OpenPage>
       });*/
     } catch (e) {}
 
-    SharedPreferences.getInstance().then((prefs) {
-      String? jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
-      if (jsonData != null) {
-        recentFiles = (jsonDecode(jsonData) as List).reversed.toList().toSet();
-      }
-      setState(() {
-        _loadedRecent = true;
-      });
-    }).catchError((e) {
-      print('No SharedPreferences available for this platform.');
-      setState(() {
-        _loadedRecent = true;
-      });
-    });
+    SharedPreferences.getInstance()
+        .then((prefs) {
+          String? jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
+          if (jsonData != null) {
+            recentFiles = (jsonDecode(jsonData) as List).reversed
+                .toList()
+                .toSet();
+          }
+          setState(() {
+            _loadedRecent = true;
+          });
+        })
+        .catchError((e) {
+          print('No SharedPreferences available for this platform.');
+          setState(() {
+            _loadedRecent = true;
+          });
+        });
     super.initState();
   }
 
-  @override
   void afterFirstLayout(BuildContext context) {
+    if (![
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    ].contains(defaultTargetPlatform)) {
+      return;
+    }
     try {
       // For sharing images coming from outside the app while the app is in the memory
-      ReceiveSharingIntent.getMediaStream().listen(
-          (List<SharedMediaFile> value) {
-        setState(() {
-          _sharedFiles = value;
-          receivedShareNotification(value);
-        });
-      }, onError: (err) {
-        print("getIntentDataStream error: $err");
-      });
+      ReceiveSharingIntent.instance.getMediaStream().listen(
+        (List<SharedMediaFile> value) {
+          setState(() {
+            _sharedFiles = value;
+            receivedShareNotification(value);
+          });
+        },
+        onError: (err) {
+          print("getIntentDataStream error: $err");
+        },
+      );
 
       // For sharing images coming from outside the app while the app is closed
-      ReceiveSharingIntent.getInitialMedia()
+      ReceiveSharingIntent.instance
+          .getInitialMedia()
           .then((List<SharedMediaFile> value) {
-        setState(() {
-          _sharedFiles = value;
-          receivedShareNotification(value);
-        });
-      }).catchError((e) {});
-
-      // For sharing or opening urls/text coming from outside the app while the app is in the memory
-      ReceiveSharingIntent.getTextStream().listen((String value) {
-        receivedShareNotification(value);
-      }, onError: (err) {
-        print("getLinkStream error: $err");
-      });
-
-      // For sharing or opening urls/text coming from outside the app while the app is closed
-      ReceiveSharingIntent.getInitialText().then((String? value) {
-        receivedShareNotification(value);
-      }).catchError((e) {});
+            setState(() {
+              _sharedFiles = value;
+              receivedShareNotification(value);
+            });
+          })
+          .catchError((e) {});
     } catch (e) {}
   }
 
@@ -158,65 +161,78 @@ class _OpenPageState extends State<OpenPage>
         ),
       ),
       body: ListView(
-        children: [
-          if (kIsWeb) DropFile(),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Builder(
-              builder: (context) => GestureDetector(
-                onTap: () => XppFile.openAndEdit(context: context),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: Card(
-                    color: Theme.of(context).colorScheme.secondary,
-                    child: DefaultTextStyle.merge(
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSecondary),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.folder,
-                                color:
-                                    Theme.of(context).colorScheme.onSecondary),
-                            Text(S.of(context).open),
-                          ],
+        children:
+            [
+              if (kIsWeb) DropFile(),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Builder(
+                  builder: (context) => GestureDetector(
+                    onTap: () => XppFile.openAndEdit(context: context),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Card(
+                        color: Theme.of(context).colorScheme.secondary,
+                        child: DefaultTextStyle.merge(
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSecondary,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSecondary,
+                                ),
+                                Text(S.of(context).open),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
+              ListTile(
+                leading: Icon(Icons.picture_as_pdf),
+                onTap: () async {
+                  final _file = await XppFile.importPdf(
+                    pdf: await XppPickedFile.importFromStorage(
+                      type: XppFilePickType.custom,
+                      fileExtension: 'pdf',
+                    ),
+                  ); // TODO `.pdf`
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (c) => CanvasPage(file: _file)),
+                  );
+                },
+                title: Text(S.of(context).importPdf),
+              ),
+              ListTile(
+                title: Text(
+                  S.of(context).recentFiles,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+            ]..addAll(
+              _loadedRecent
+                  ? generateRecentFileList(recentFiles, context)
+                  : [Center(child: CircularProgressIndicator())],
             ),
-          ),
-          ListTile(
-            leading: Icon(Icons.picture_as_pdf),
-            onTap: () async {
-              final _file = await XppFile.importPdf(
-                  pdf: await FilePickerCross.importFromStorage(
-                      type: FileTypeCross.custom,
-                      fileExtension: 'pdf')); // TODO `.pdf`
-              Navigator.of(context).push(
-                  MaterialPageRoute(builder: (c) => CanvasPage(file: _file)));
-            },
-            title: Text(S.of(context).importPdf),
-          ),
-          ListTile(
-            title: Text(
-              S.of(context).recentFiles,
-              style: Theme.of(context).textTheme.headline3,
-            ),
-          )
-        ]..addAll(_loadedRecent
-            ? generateRecentFileList(recentFiles, context)
-            : [Center(child: CircularProgressIndicator())]),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
             builder: (context) => CanvasPage(
-                  file: XppFile.empty(background: Theme.of(context).cardColor),
-                ))),
+              file: XppFile.empty(background: Theme.of(context).cardColor),
+            ),
+          ),
+        ),
         label: Text(S.of(context).newNotebook),
         icon: Icon(Icons.note_add),
       ),
@@ -229,14 +245,17 @@ class _OpenPageState extends State<OpenPage>
         data is List &&
             data.isNotEmpty &&
             lastIntentData is List &&
-            data[0].path == lastIntentData[0].path) return;
+            data[0].path == lastIntentData[0].path)
+      return;
     lastIntentData = data;
     if (data is String) {
       /// checking if we were redirected from the web site
       if (data.startsWith('http')) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(S.of(context).youveBeenRedirectedToTheLocalApp),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.of(context).youveBeenRedirectedToTheLocalApp),
+          ),
+        );
         return;
       } else {
         /// seems to be an opened file
@@ -244,77 +263,79 @@ class _OpenPageState extends State<OpenPage>
         /// unfortunately, android needs to copy the file to our own app directory
         /// TODO: don't copy files we can directly read
         print(data);
-        data = [
-          SharedMediaFile(
-              data, base64Encode(kTransparentImage), null, SharedMediaType.FILE)
-        ];
+        data = [SharedMediaFile(path: data, type: SharedMediaType.file)];
         _sharedFiles = data as List<SharedMediaFile>;
       }
     }
     if (data is List && data.isNotEmpty) {
       bool _aborted = false;
       showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-                title: Text(S.of(context).openingFile),
-                content: Text(S.of(context).opening +
-                    ' ${data[0].path.substring(data[0].path.lastIndexOf('/') + 1, data[0].path.lastIndexOf('.'))} ...'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(S.of(context).background),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _aborted = true;
-                    },
-                    child: Text(S.of(context).abort),
-                  )
-                ],
-              ));
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(S.of(context).openingFile),
+          content: Text(
+            S.of(context).opening +
+                ' ${data[0].path.substring(data[0].path.lastIndexOf('/') + 1, data[0].path.lastIndexOf('.'))} ...',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(S.of(context).background),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _aborted = true;
+              },
+              child: Text(S.of(context).abort),
+            ),
+          ],
+        ),
+      );
       try {
-        XppFile file = await XppFile.fromFilePickerCross(
-            openFileByUri(_sharedFiles[0].path, 'xopp'),
-            (percentage) => null,
-            showMissingFileDialog);
+        XppFile file = await XppFile.fromXppPickedFile(
+          openFileByUri(_sharedFiles[0].path, 'xopp'),
+          (percentage) => null,
+          showMissingFileDialog,
+        );
         if (_aborted) return;
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-            builder: (context) => CanvasPage(
-                  file: file,
-                )));
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
+        );
       } catch (e) {
         try {
           final file = await XppFile.importPdf(
-              pdf: openFileByUri(_sharedFiles[0].path, 'pdf'));
+            pdf: openFileByUri(_sharedFiles[0].path, 'pdf'),
+          );
           if (_aborted) return;
-          Navigator.of(context).pushReplacement(MaterialPageRoute(
-              builder: (context) => CanvasPage(
-                    file: file,
-                  )));
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
+          );
         } catch (e) {
           Navigator.of(context).pop();
           showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                    title: Text(S.of(context).errorOpeningFile),
-                    content: SelectableText(S
-                            .of(context)
-                            .imVerySorryButICouldntReadTheFile +
-                        _sharedFiles[0].path +
-                        S.of(context).areYouSureIHaveThePermissionAndAreYou +
-                        '\n${e.toString()}'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Clipboard.setData(
-                              ClipboardData(text: e.toString())),
-                          child: Text(S.of(context).copyErrorMessage)),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(S.of(context).okay),
-                      ),
-                    ],
-                  ));
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(S.of(context).errorOpeningFile),
+              content: SelectableText(
+                S.of(context).imVerySorryButICouldntReadTheFile +
+                    _sharedFiles[0].path +
+                    S.of(context).areYouSureIHaveThePermissionAndAreYou +
+                    '\n${e.toString()}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: e.toString())),
+                  child: Text(S.of(context).copyErrorMessage),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(S.of(context).okay),
+                ),
+              ],
+            ),
+          );
         }
       }
     } else {
@@ -340,24 +361,25 @@ class _OpenPageState extends State<OpenPage>
           ),
           subtitle: Text(
             fileInfo['name'],
-            style: Theme.of(context).textTheme.headline3!.copyWith(
-                color: Theme.of(context).textTheme.bodyText1!.color,
-                fontSize: kEmphasisFontSize * kFontSizeDivision),
+            style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              fontSize: kEmphasisFontSize * kFontSizeDivision,
+            ),
           ),
           trailing: Tooltip(
-            child: Icon(
-              Icons.info_outline,
-            ),
+            child: Icon(Icons.info_outline),
             message: fileInfo['path'],
           ),
           onLongPress: () => showDeleteDialog(fileInfo['path']),
           onTap: () async {
-            XppFile file = await XppFile.fromFilePickerCross(
-                await FilePickerCross.fromInternalPath(path: fileInfo['path']),
-                (percent) {},
-                showMissingFileDialog);
-            Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => CanvasPage(file: file)));
+            XppFile file = await XppFile.fromXppPickedFile(
+              await XppPickedFile.fromInternalPath(path: fileInfo['path']),
+              (percent) {},
+              showMissingFileDialog,
+            );
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
+            );
           },
         );
       } else {
@@ -367,8 +389,9 @@ class _OpenPageState extends State<OpenPage>
           trailing: IconButton(
             icon: Icon(Icons.note_add),
             tooltip: S.of(context).newNotebook,
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (context) => CanvasPage())),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (context) => CanvasPage())),
           ),
         );
       }
@@ -377,35 +400,40 @@ class _OpenPageState extends State<OpenPage>
 
   showDeleteDialog(path) {
     showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: Text(S.of(context).confirmDelete),
-              content: Text(
-                  S.of(context).areYouSureToDeleteTheSelectedFileThisCannot),
-              actions: [
-                TextButton(
-                    onPressed: Navigator.of(context).pop,
-                    child: Text(S.of(context).cancel)),
-                TextButton(
-                    onPressed: () async {
-                      FilePickerCross.delete(path: path);
-                      setState(() {
-                        recentFiles
-                            .removeWhere((element) => element['path'] == path);
-                      });
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(S.of(context).confirmDelete),
+        content: Text(
+          S.of(context).areYouSureToDeleteTheSelectedFileThisCannot,
+        ),
+        actions: [
+          TextButton(
+            onPressed: Navigator.of(context).pop,
+            child: Text(S.of(context).cancel),
+          ),
+          TextButton(
+            onPressed: () async {
+              XppPickedFile.delete(path: path);
+              setState(() {
+                recentFiles.removeWhere((element) => element['path'] == path);
+              });
 
-                      Navigator.of(context).pop();
-                      SharedPreferences.getInstance().then((prefs) {
-                        prefs.setString(PreferencesKeys.kRecentFiles,
-                            jsonEncode(recentFiles.toList()));
-                      });
-                    },
-                    child: Text(S.of(context).delete)),
-              ],
-            ));
+              Navigator.of(context).pop();
+              SharedPreferences.getInstance().then((prefs) {
+                prefs.setString(
+                  PreferencesKeys.kRecentFiles,
+                  jsonEncode(recentFiles.toList()),
+                );
+              });
+            },
+            child: Text(S.of(context).delete),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-Future<FilePickerCross> showMissingFileDialog(String? path) {
+Future<XppPickedFile> showMissingFileDialog(String? path) {
   throw ('Missing file!');
 }
