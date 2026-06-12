@@ -88,13 +88,19 @@ final kColorScheme = ColorScheme(
   error: Colors.deepOrange,
   onPrimary: kLightColor,
   onSecondary: kDarkColor!,
-  onSurface: kDarkColor!,
+  onSurface: kLightColor,
   onError: kLightColor,
   brightness: Brightness.dark,
 );
 
 final kDialogTheme = DialogThemeData(
+  backgroundColor: kDarkColor,
   titleTextStyle: kLargeFont.copyWith(color: kLightColor),
+  contentTextStyle: kBodyFont.copyWith(color: kLightColor),
+);
+
+final kTextButtonTheme = TextButtonThemeData(
+  style: TextButton.styleFrom(foregroundColor: kSecondaryColorAccent),
 );
 
 final kSnackBarTheme = SnackBarThemeData(
@@ -125,6 +131,7 @@ class XournalppMobile extends StatelessWidget {
         colorScheme: kColorScheme.copyWith(brightness: Brightness.light),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         dialogTheme: kDialogTheme,
+        textButtonTheme: kTextButtonTheme,
         snackBarTheme: kSnackBarTheme,
       ),
       darkTheme: ThemeData(
@@ -134,6 +141,7 @@ class XournalppMobile extends StatelessWidget {
         colorScheme: kColorScheme,
         visualDensity: VisualDensity.adaptivePlatformDensity,
         dialogTheme: kDialogTheme,
+        textButtonTheme: kTextButtonTheme,
         snackBarTheme: kSnackBarTheme,
       ),
       home: OpenPage(),

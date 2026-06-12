@@ -45,10 +45,26 @@ class XppPageStackState extends State<XppPageStack>
     children.addAll(page!.layers!.map((e) => XppLayerStack(layer: e)));
     return RepaintBoundary(
       key: pngKey,
-      child: SizedBox(
-        width: page!.pageSize!.width,
-        height: page!.pageSize!.height,
-        child: (Stack(children: children)),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          iconTheme: const IconThemeData(color: Colors.black),
+          textTheme: Theme.of(context).textTheme.apply(
+            bodyColor: Colors.black,
+            displayColor: Colors.black,
+          ),
+          inputDecorationTheme: const InputDecorationTheme(
+            labelStyle: TextStyle(color: Colors.black),
+            helperStyle: TextStyle(color: Colors.black87),
+          ),
+        ),
+        child: DefaultTextStyle(
+          style: const TextStyle(color: Colors.black),
+          child: SizedBox(
+            width: page!.pageSize!.width,
+            height: page!.pageSize!.height,
+            child: Stack(children: children),
+          ),
+        ),
       ),
     );
   }

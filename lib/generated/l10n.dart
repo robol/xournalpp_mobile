@@ -18,8 +18,10 @@ class S {
   static S? _current;
 
   static S get current {
-    assert(_current != null,
-        'No instance of S was loaded. Try to initialize the S delegate before accessing S.current.');
+    assert(
+      _current != null,
+      'No instance of S was loaded. Try to initialize the S delegate before accessing S.current.',
+    );
     return _current!;
   }
 
@@ -41,8 +43,10 @@ class S {
 
   static S of(BuildContext context) {
     final instance = S.maybeOf(context);
-    assert(instance != null,
-        'No instance of S present in the widget tree. Did you add S.delegate in localizationsDelegates?');
+    assert(
+      instance != null,
+      'No instance of S present in the widget tree. Did you add S.delegate in localizationsDelegates?',
+    );
     return instance!;
   }
 
@@ -62,12 +66,7 @@ class S {
 
   /// `Tools`
   String get tools {
-    return Intl.message(
-      'Tools',
-      name: 'tools',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Tools', name: 'tools', desc: '', args: []);
   }
 
   /// `Toolbox not implemented yet.`
@@ -92,32 +91,17 @@ class S {
 
   /// `New title`
   String get newTitle {
-    return Intl.message(
-      'New title',
-      name: 'newTitle',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('New title', name: 'newTitle', desc: '', args: []);
   }
 
   /// `Cancel`
   String get cancel {
-    return Intl.message(
-      'Cancel',
-      name: 'cancel',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Cancel', name: 'cancel', desc: '', args: []);
   }
 
   /// `Apply`
   String get apply {
-    return Intl.message(
-      'Apply',
-      name: 'apply',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Apply', name: 'apply', desc: '', args: []);
   }
 
   /// `official mobile app`
@@ -132,32 +116,17 @@ class S {
 
   /// `Open`
   String get open {
-    return Intl.message(
-      'Open',
-      name: 'open',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Open', name: 'open', desc: '', args: []);
   }
 
   /// `New`
   String get newFile {
-    return Intl.message(
-      'New',
-      name: 'newFile',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('New', name: 'newFile', desc: '', args: []);
   }
 
   /// `Save`
   String get save {
-    return Intl.message(
-      'Save',
-      name: 'save',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Save', name: 'save', desc: '', args: []);
   }
 
   /// ` (not implemented)`
@@ -172,12 +141,7 @@ class S {
 
   /// `About`
   String get about {
-    return Intl.message(
-      'About',
-      name: 'about',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('About', name: 'about', desc: '', args: []);
   }
 
   /// `About Xournal++ Mobile`
@@ -212,22 +176,12 @@ class S {
 
   /// `Source Code`
   String get sourceCode {
-    return Intl.message(
-      'Source Code',
-      name: 'sourceCode',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Source Code', name: 'sourceCode', desc: '', args: []);
   }
 
   /// `Okay`
   String get okay {
-    return Intl.message(
-      'Okay',
-      name: 'okay',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Okay', name: 'okay', desc: '', args: []);
   }
 
   /// `Double tap to change.`
@@ -282,12 +236,7 @@ class S {
 
   /// `Close`
   String get close {
-    return Intl.message(
-      'Close',
-      name: 'close',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Close', name: 'close', desc: '', args: []);
   }
 
   /// `Recent files`
@@ -402,12 +351,7 @@ class S {
 
   /// `Error`
   String get error {
-    return Intl.message(
-      'Error',
-      name: 'error',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Error', name: 'error', desc: '', args: []);
   }
 
   /// `You've been redirected to the local app.`
@@ -422,82 +366,42 @@ class S {
 
   /// `Opening`
   String get opening {
-    return Intl.message(
-      'Opening',
-      name: 'opening',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Opening', name: 'opening', desc: '', args: []);
   }
 
   /// `Background`
   String get background {
-    return Intl.message(
-      'Background',
-      name: 'background',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Background', name: 'background', desc: '', args: []);
   }
 
   /// `Abort`
   String get abort {
-    return Intl.message(
-      'Abort',
-      name: 'abort',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Abort', name: 'abort', desc: '', args: []);
   }
 
   /// `Home`
   String get home {
-    return Intl.message(
-      'Home',
-      name: 'home',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Home', name: 'home', desc: '', args: []);
   }
 
   /// `Tool`
   String get tool {
-    return Intl.message(
-      'Tool',
-      name: 'tool',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Tool', name: 'tool', desc: '', args: []);
   }
 
   /// `Pen`
   String get pen {
-    return Intl.message(
-      'Pen',
-      name: 'pen',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Pen', name: 'pen', desc: '', args: []);
   }
 
   /// `Highlighter`
   String get highlighter {
-    return Intl.message(
-      'Highlighter',
-      name: 'highlighter',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Highlighter', name: 'highlighter', desc: '', args: []);
   }
 
   /// `Move`
   String get move {
-    return Intl.message(
-      'Move',
-      name: 'move',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Move', name: 'move', desc: '', args: []);
   }
 
   /// `Text (not implemented)`
@@ -522,12 +426,7 @@ class S {
 
   /// `Eraser`
   String get eraser {
-    return Intl.message(
-      'Eraser',
-      name: 'eraser',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Eraser', name: 'eraser', desc: '', args: []);
   }
 
   /// `Select (not implemented)`
@@ -562,12 +461,7 @@ class S {
 
   /// `Color`
   String get color {
-    return Intl.message(
-      'Color',
-      name: 'color',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Color', name: 'color', desc: '', args: []);
   }
 
   /// `Whiteout eraser (not implemented)`
@@ -582,12 +476,7 @@ class S {
 
   /// `Add page`
   String get addPage {
-    return Intl.message(
-      'Add page',
-      name: 'addPage',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Add page', name: 'addPage', desc: '', args: []);
   }
 
   /// `There were no more pages. We added one.`
@@ -602,52 +491,27 @@ class S {
 
   /// `PDF`
   String get pdf {
-    return Intl.message(
-      'PDF',
-      name: 'pdf',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('PDF', name: 'pdf', desc: '', args: []);
   }
 
   /// `Image`
   String get image {
-    return Intl.message(
-      'Image',
-      name: 'image',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Image', name: 'image', desc: '', args: []);
   }
 
   /// `Dotted`
   String get dotted {
-    return Intl.message(
-      'Dotted',
-      name: 'dotted',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Dotted', name: 'dotted', desc: '', args: []);
   }
 
   /// `Ruled`
   String get ruled {
-    return Intl.message(
-      'Ruled',
-      name: 'ruled',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Ruled', name: 'ruled', desc: '', args: []);
   }
 
   /// `Graph`
   String get graph {
-    return Intl.message(
-      'Graph',
-      name: 'graph',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Graph', name: 'graph', desc: '', args: []);
   }
 
   /// `Page background`
@@ -662,32 +526,17 @@ class S {
 
   /// `Lined`
   String get lined {
-    return Intl.message(
-      'Lined',
-      name: 'lined',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Lined', name: 'lined', desc: '', args: []);
   }
 
   /// `Delete page`
   String get deletePage {
-    return Intl.message(
-      'Delete page',
-      name: 'deletePage',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Delete page', name: 'deletePage', desc: '', args: []);
   }
 
   /// `Move page`
   String get movePage {
-    return Intl.message(
-      'Move page',
-      name: 'movePage',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Move page', name: 'movePage', desc: '', args: []);
   }
 
   /// `New page index`
@@ -742,12 +591,7 @@ class S {
 
   /// `Save as...`
   String get saveAs {
-    return Intl.message(
-      'Save as...',
-      name: 'saveAs',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Save as...', name: 'saveAs', desc: '', args: []);
   }
 
   /// `Confirm delete`
@@ -772,52 +616,27 @@ class S {
 
   /// `Delete`
   String get delete {
-    return Intl.message(
-      'Delete',
-      name: 'delete',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Delete', name: 'delete', desc: '', args: []);
   }
 
   /// `Storage`
   String get quota {
-    return Intl.message(
-      'Storage',
-      name: 'quota',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Storage', name: 'quota', desc: '', args: []);
   }
 
   /// `used`
   String get used {
-    return Intl.message(
-      'used',
-      name: 'used',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('used', name: 'used', desc: '', args: []);
   }
 
   /// `MB`
   String get mb {
-    return Intl.message(
-      'MB',
-      name: 'mb',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('MB', name: 'mb', desc: '', args: []);
   }
 
   /// `Share page...`
   String get sharePage {
-    return Intl.message(
-      'Share page...',
-      name: 'sharePage',
-      desc: '',
-      args: [],
-    );
+    return Intl.message('Share page...', name: 'sharePage', desc: '', args: []);
   }
 
   /// `Successfully shared`
@@ -842,9 +661,14 @@ class S {
 
   /// `Import PDF`
   String get importPdf {
+    return Intl.message('Import PDF', name: 'importPdf', desc: '', args: []);
+  }
+
+  /// `Could not find the background PDF. Select a new one`
+  String get couldNotFindBackgroundPdfSelectNewOne {
     return Intl.message(
-      'Import PDF',
-      name: 'importPdf',
+      'Could not find the background PDF. Select a new one',
+      name: 'couldNotFindBackgroundPdfSelectNewOne',
       desc: '',
       args: [],
     );

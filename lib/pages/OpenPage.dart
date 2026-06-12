@@ -434,6 +434,59 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   }
 }
 
-Future<XppPickedFile> showMissingFileDialog(String? path) {
-  throw ('Missing file!');
+final Map<String, Future<XppPickedFile>> _missingFileSelections = {};
+
+Future<XppPickedFile> showMissingFileDialog(
+  BuildContext context,
+  String? path,
+) async {
+  final cacheKey = path ?? '__missing_pdf__';
+  final existingSelection = _missingFileSelections[cacheKey];
+  if (existingSelection != null) return existingSelection;
+
+  late Future<XppPickedFile> selection;
+  selection = _pickMissingPdfFile(context, path).catchError((error) {
+    if (identical(_missingFileSelections[cacheKey], selection)) {
+      _missingFileSelections.remove(cacheKey);
+    }
+    throw error;
+  });
+  _missingFileSelections[cacheKey] = selection;
+  return selection;
+}
+
+Future<XppPickedFile> _pickMissingPdfFile(
+  BuildContext context,
+  String? path,
+) async {
+  final shouldPick = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(S.of(context).errorLoadingFile),
+      content: Text(
+        path == null
+            ? S.of(context).couldNotFindBackgroundPdfSelectNewOne
+            : '${S.of(context).couldNotFindBackgroundPdfSelectNewOne}\n$path',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(S.of(context).cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(S.of(context).open),
+        ),
+      ],
+    ),
+  );
+
+  if (shouldPick != true) {
+    throw UnsupportedError('Missing PDF file was not selected.');
+  }
+
+  return XppPickedFile.importFromStorage(
+    type: XppFilePickType.custom,
+    fileExtension: 'pdf',
+  );
 }

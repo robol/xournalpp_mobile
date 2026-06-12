@@ -61,7 +61,10 @@ class XppBackgroundImage extends XppBackground {
   }
 }
 
-typedef Future<XppPickedFile> FileNotAvailableCallback(String? path);
+typedef Future<XppPickedFile> FileNotAvailableCallback(
+  BuildContext context,
+  String? path,
+);
 
 /// page background for a [XppPage] made from a PDF document
 class XppBackgroundPdf extends XppBackground {
@@ -104,6 +107,8 @@ class PDfBackgroundWidget extends StatefulWidget {
 
 class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
+  Future<Uint8List>? _imageFuture;
+
   Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
     final filename = provider.filename;
     if (filename != null && filename.isNotEmpty) {
@@ -115,7 +120,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       }
     }
 
-    final file = await provider.onUnavailable(filename);
+    final file = await provider.onUnavailable(context, filename);
     return pdfImage(file, provider.page);
   }
 
@@ -124,9 +129,10 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     super.build(context);
     final provider = widget.provider;
     if (provider == null) return const SizedBox.shrink();
+    _imageFuture ??= _loadPdfImage(provider);
 
     return FutureBuilder(
-      future: _loadPdfImage(provider),
+      future: _imageFuture,
       builder: (context, AsyncSnapshot<Uint8List> snapshot) {
         if (snapshot.hasData) return Image.memory(snapshot.data!);
         if (snapshot.hasError) return const Icon(Icons.picture_as_pdf);
@@ -137,6 +143,14 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
 
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.provider != oldWidget.provider) {
+      _imageFuture = null;
+    }
+  }
 }
 
 /// page background for a [XppPage] made from a color and a style

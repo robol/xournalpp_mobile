@@ -47,7 +47,7 @@ class XppFile {
         XppPage.empty()
           ..pageSize = size
           ..background = XppBackgroundPdf(
-            onUnavailable: (String? p) async =>
+            onUnavailable: (context, String? p) async =>
                 throw ("$p is not available even though just imported"),
             page: i,
             filename: pdfPath,
@@ -69,7 +69,10 @@ class XppFile {
     );
     XppFile file;
     try {
-      file = await open((percentage) => null, showMissingFileDialog);
+      file = await open(
+        (percentage) => null,
+        (missingContext, path) => showMissingFileDialog(context, path),
+      );
 
       scaffoldMessenger.hideCurrentSnackBar();
       if (!context.mounted) return;

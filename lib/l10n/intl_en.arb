@@ -78,5 +78,6 @@
   "sharePage": "Share page...",
   "successfullyShared": "Successfully shared",
   "openNavigation": "Open navigation",
+  "couldNotFindBackgroundPdfSelectNewOne": "Could not find the background PDF. Select a new one",
   "importPdf": "Import PDF"
 }

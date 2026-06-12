@@ -77,5 +77,6 @@
   "mb": "MB",
   "sharePage": "Compartilhar página...",
   "successfullyShared": "Compartilhado com sucesso",
+  "couldNotFindBackgroundPdfSelectNewOne": "Não foi possível encontrar o PDF de fundo. Selecione um novo",
   "importPdf": "Importar PDF"
 }
