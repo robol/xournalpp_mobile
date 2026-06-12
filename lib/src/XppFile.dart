@@ -60,23 +60,25 @@ class XppFile {
   /// showing a [open] dialog and pushes a [CanvasPage] to the provided [BuildContext]'s [Navigator]
   static void openAndEdit({required BuildContext context}) async {
     //double percentage = 0;
-    ScaffoldFeatureController snackBarController = ScaffoldMessenger.of(context)
-        .showSnackBar(
-          SnackBar(
-            duration: Duration(days: 999),
-            content: Text(S.of(context).loadingFile),
-          ),
-        );
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        duration: Duration(days: 999),
+        content: Text(S.of(context).loadingFile),
+      ),
+    );
     XppFile file;
     try {
       file = await open((percentage) => null, showMissingFileDialog);
 
-      snackBarController.close();
+      scaffoldMessenger.hideCurrentSnackBar();
+      if (!context.mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
       );
     } catch (e) {
-      snackBarController.close();
+      scaffoldMessenger.hideCurrentSnackBar();
+      if (!context.mounted) return;
       showDialog(
         context: context,
         builder: (c) => AlertDialog(

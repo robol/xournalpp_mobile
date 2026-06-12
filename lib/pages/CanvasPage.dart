@@ -227,6 +227,16 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         ],
       ),
       appBar: AppBar(
+        toolbarHeight: kToolbarHeight,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+        actionsIconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+        elevation: 4,
         title: Tooltip(
           message: S.of(context).doubleTapToChange,
           child: GestureDetector(
