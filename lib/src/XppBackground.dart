@@ -106,9 +106,6 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
   Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
     final filename = provider.filename;
-    print(
-      "Rendering PDF background from file: $filename, page ${provider.page}",
-    );
     if (filename != null && filename.isNotEmpty) {
       try {
         final file = await XppPickedFile.fromInternalPath(path: filename);

@@ -61,9 +61,10 @@ class XppPageStackState extends State<XppPageStack>
     RenderRepaintBoundary boundary =
         pngKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
     ui.Image image = await boundary.toImage();
-    ByteData byteData =
-        await (image.toByteData(format: ui.ImageByteFormat.png)
-            as FutureOr<ByteData>);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      throw StateError('Could not encode page preview as PNG.');
+    }
     Uint8List pngBytes = byteData.buffer.asUint8List();
     return pngBytes;
   }
