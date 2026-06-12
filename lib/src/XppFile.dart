@@ -39,7 +39,7 @@ class XppFile {
   /// creates an [XppFile] from a PDF document opened in a [XppPickedFile]
   static Future<XppFile> importPdf({required XppPickedFile pdf}) async {
     final pageCount = await pdfPageCount(pdf);
-    if (pdf.path != null) await pdf.saveToPath(path: pdf.path!);
+    final pdfPath = pdf.path ?? await pdf.saveToTemporaryPath();
     XppFile file = XppFile.empty(title: pdf.fileName)..pages!.clear();
     for (int i = 0; i < pageCount; i++) {
       final size = await pdfPageSize(pdf, i);
@@ -47,12 +47,10 @@ class XppFile {
         XppPage.empty()
           ..pageSize = size
           ..background = XppBackgroundPdf(
-            onUnavailable:
-                ((String p) =>
-                        throw ("$p is not available even though just imported"))
-                    as Future<XppPickedFile> Function(String?),
+            onUnavailable: (String? p) async =>
+                throw ("$p is not available even though just imported"),
             page: i,
-            filename: pdf.path,
+            filename: pdfPath,
           ),
       );
     }

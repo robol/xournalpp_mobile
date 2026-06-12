@@ -103,23 +103,34 @@ class PDfBackgroundWidget extends StatefulWidget {
 
 class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
+  Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
+    final filename = provider.filename;
+    if (filename != null && filename.isNotEmpty) {
+      try {
+        final file = await XppPickedFile.fromInternalPath(path: filename);
+        return pdfImage(file, provider.page);
+      } catch (_) {
+        // Fall through to the missing-file callback below.
+      }
+    }
+
+    final file = await provider.onUnavailable(filename);
+    return pdfImage(file, provider.page);
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final provider = widget.provider;
+    if (provider == null) return const SizedBox.shrink();
+
     return FutureBuilder(
-      future: XppPickedFile.fromInternalPath(path: widget.provider!.filename!)
-          .then((value) {
-            return pdfImage(value, widget.provider!.page);
-          })
-          .catchError(
-            (e) => widget.provider!
-                .onUnavailable(widget.provider!.filename)
-                .then((value) => pdfImage(value, widget.provider!.page)),
-          ),
-      builder: (context, AsyncSnapshot<Uint8List> snapshot) =>
-          (snapshot.hasData)
-          ? Image.memory(snapshot.data!)
-          : Center(child: CircularProgressIndicator()),
+      future: _loadPdfImage(provider),
+      builder: (context, AsyncSnapshot<Uint8List> snapshot) {
+        if (snapshot.hasData) return Image.memory(snapshot.data!);
+        if (snapshot.hasError) return const Icon(Icons.picture_as_pdf);
+        return const Center(child: CircularProgressIndicator());
+      },
     );
   }
 

@@ -35,6 +35,8 @@ class CanvasPage extends StatefulWidget {
 }
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
+  static const int _defaultToolColor = 0xFF607D8B;
+
   XppFile? _file;
 
   int currentPage = 0;
@@ -626,8 +628,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void loadToolSettings() {
     SharedPreferences.getInstance().then((prefs) {
-      toolColor = Color(prefs.getInt(PreferencesKeys.kToolColor)!);
-      toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth)!;
+      toolColor = Color(
+        prefs.getInt(PreferencesKeys.kToolColor) ?? _defaultToolColor,
+      );
+      toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth) ?? toolWidth;
     });
   }
 }

@@ -42,15 +42,15 @@ class XppPageStackState extends State<XppPageStack>
     }
     children.add(background);
 
-    children.addAll(page!.layers!.map((e) => XppLayerStack(
-          layer: e,
-        )));
+    children.addAll(page!.layers!.map((e) => XppLayerStack(layer: e)));
     return RepaintBoundary(
-        key: pngKey,
-        child: SizedBox(
-            width: page!.pageSize!.width,
-            height: page!.pageSize!.height,
-            child: (Stack(children: children))));
+      key: pngKey,
+      child: SizedBox(
+        width: page!.pageSize!.width,
+        height: page!.pageSize!.height,
+        child: (Stack(children: children)),
+      ),
+    );
   }
 
   void setPageData(XppPage pageData) {
@@ -61,8 +61,9 @@ class XppPageStackState extends State<XppPageStack>
     RenderRepaintBoundary boundary =
         pngKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
     ui.Image image = await boundary.toImage();
-    ByteData byteData = await (image.toByteData(format: ui.ImageByteFormat.png)
-        as FutureOr<ByteData>);
+    ByteData byteData =
+        await (image.toByteData(format: ui.ImageByteFormat.png)
+            as FutureOr<ByteData>);
     Uint8List pngBytes = byteData.buffer.asUint8List();
     return pngBytes;
   }
@@ -89,7 +90,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
   Map<XppContent, Widget> renderedContent = {};
   @override
   Widget build(BuildContext context) {
-    List<Widget?> children = [];
+    List<Widget> children = [];
     widget.layer!.content!.forEach((element) {
       if (element == null) return;
       if (!renderedContent.keys.contains(element)) {
@@ -99,10 +100,9 @@ class _XppLayerStackState extends State<XppLayerStack> {
           left: element.getOffset()?.dx ?? 0,
         );
       }
-      children.add(renderedContent[element]);
+      final child = renderedContent[element];
+      if (child != null) children.add(child);
     });
-    return Stack(
-      children: children as List<Widget>,
-    );
+    return Stack(children: children);
   }
 }
