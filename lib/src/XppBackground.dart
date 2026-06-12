@@ -84,11 +84,12 @@ class XppBackgroundPdf extends XppBackground {
 
   @override
   XmlElement toXmlElement() {
-    XmlElement node = XmlElement(XmlName('background'), [
+    final attributes = [
       XmlAttribute(XmlName('type'), 'pdf'),
       XmlAttribute(XmlName('pageno'), page.toString()),
-      XmlAttribute(XmlName('filename'), filename!),
-    ]);
+      if (filename != null) XmlAttribute(XmlName('filename'), filename!),
+    ];
+    XmlElement node = XmlElement(XmlName('background'), attributes);
     return (node);
   }
 }
@@ -105,6 +106,9 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
   Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
     final filename = provider.filename;
+    print(
+      "Rendering PDF background from file: $filename, page ${provider.page}",
+    );
     if (filename != null && filename.isNotEmpty) {
       try {
         final file = await XppPickedFile.fromInternalPath(path: filename);

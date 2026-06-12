@@ -73,8 +73,12 @@ class XppPageStackState extends State<XppPageStack>
 
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {
-    setState(() {});
     super.didUpdateWidget(oldWidget);
+    if (widget.page != oldWidget.page) {
+      setState(() {
+        page = widget.page;
+      });
+    }
   }
 }
 

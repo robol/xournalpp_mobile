@@ -157,6 +157,7 @@ class XppFile {
 
     List<XppPage> pages = [];
     int pageIndex = 0;
+    String? lastPdfBackgroundFilename;
     Iterable<XmlElement> pageElements = documentTree.findElements('page');
     pageElements.forEach((XmlElement pageElement) {
       pageIndex++;
@@ -176,9 +177,13 @@ class XppFile {
             );
             break;
           case "pdf":
+            final filename =
+                backgroundElement.getAttribute('filename') ??
+                lastPdfBackgroundFilename;
+            lastPdfBackgroundFilename = filename;
             background = XppBackgroundPdf(
               onUnavailable: onUnavailable,
-              filename: backgroundElement.getAttribute('filename'),
+              filename: filename,
               page: int.parse(backgroundElement.getAttribute('pageno')!),
             );
             break;
