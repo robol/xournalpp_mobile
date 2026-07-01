@@ -65,6 +65,8 @@ jobs:
         uses: oberhauser-dev/flutter-release-action@v0
         with:
           token: ${{ secrets.FLUTTER_RELEASE_GITHUB_TOKEN }}
+          app-name: 'xournalpp-mobile'
+          dry-run: false
           app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           build-type: ${{ matrix.build-type }}
