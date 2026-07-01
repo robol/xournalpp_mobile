@@ -3,8 +3,11 @@ import 'dart:typed_data';
 
 Future<Uint8List> readFileBytes(String path) => File(path).readAsBytes();
 
-Future<void> writeFileBytes(String path, Uint8List bytes) =>
-    File(path).writeAsBytes(bytes);
+Future<String> writeFileBytes(String path, Uint8List bytes) async {
+  final file = File(path).absolute;
+  await file.writeAsBytes(bytes);
+  return file.path;
+}
 
 Future<void> deleteFile(String path) => File(path).delete();
 

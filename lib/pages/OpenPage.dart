@@ -372,14 +372,36 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           ),
           onLongPress: () => showDeleteDialog(fileInfo['path']),
           onTap: () async {
-            XppFile file = await XppFile.fromXppPickedFile(
-              await XppPickedFile.fromInternalPath(path: fileInfo['path']),
-              (percent) {},
-              showMissingFileDialog,
-            );
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
-            );
+            try {
+              XppFile file = await XppFile.fromXppPickedFile(
+                await XppPickedFile.fromInternalPath(path: fileInfo['path']),
+                (percent) {},
+                showMissingFileDialog,
+              );
+              if (!context.mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      CanvasPage(file: file, filePath: fileInfo['path']),
+                ),
+              );
+            } catch (e) {
+              setState(() {
+                recentFiles.removeWhere(
+                  (element) => element['path'] == fileInfo['path'],
+                );
+              });
+              SharedPreferences.getInstance().then((prefs) {
+                prefs.setString(
+                  PreferencesKeys.kRecentFiles,
+                  jsonEncode(recentFiles.toList()),
+                );
+              });
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(S.of(context).errorOpeningFile)),
+              );
+            }
           },
         );
       } else {

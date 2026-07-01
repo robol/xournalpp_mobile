@@ -39,6 +39,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _defaultToolColor = 0xFF607D8B;
 
   XppFile? _file;
+  String? filePath;
 
   int currentPage = 0;
 
@@ -377,47 +378,48 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _setMetadata() {
     _file = widget.file;
-    //if (widget.filePath != null) filePath = widget.filePath;
+    filePath = widget.filePath;
   }
 
-  Future<void> _showTitleDialog() async {
-    await showDialog(
-      context: context,
-      builder: (context) {
-        TextEditingController titleController = TextEditingController(
-          text: _file!.title,
-        );
-        return AlertDialog(
-          title: Text(S.of(context).setDocumentTitle),
-          content: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 8),
-            child: TextField(
-              autofocus: true,
-              controller: titleController,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: S.of(context).newTitle,
+  Future<bool> _showTitleDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            TextEditingController titleController = TextEditingController(
+              text: _file!.title,
+            );
+            return AlertDialog(
+              title: Text(S.of(context).setDocumentTitle),
+              content: Padding(
+                padding: const EdgeInsets.only(left: 8, right: 8),
+                child: TextField(
+                  autofocus: true,
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: S.of(context).newTitle,
+                  ),
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(S.of(context).cancel),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _file!.title = titleController.text;
-                });
-                Navigator.of(context).pop();
-              },
-              child: Text(S.of(context).apply),
-            ),
-          ],
-        );
-      },
-    );
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(S.of(context).cancel),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _file!.title = titleController.text;
+                    });
+                    Navigator.of(context).pop(true);
+                  },
+                  child: Text(S.of(context).apply),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   void setDefaultDeviceIfNotSet({PointerDeviceKind? kind}) {
@@ -530,15 +532,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
     String fileName =
         await (XppPickedFile(
-              imageBytes,
-              fileExtension: '.png',
-              path:
-                  '/export/' +
-                  (_file?.title ?? S.of(context).newFile) +
-                  ' ${currentPage + 1}' +
-                  '.png',
-            ).exportToStorage()
-            as FutureOr<String>);
+          imageBytes,
+          fileExtension: '.png',
+          path:
+              '/export/' +
+              (_file?.title ?? S.of(context).newFile) +
+              ' ${currentPage + 1}' +
+              '.png',
+        ).exportToStorage()) ??
+        (_file?.title ?? S.of(context).newFile);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(S.of(context).successfullyShared + ' ' + fileName),
@@ -558,26 +560,48 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           ),
         );
     //try {
-    if (_file!.title == null) await _showTitleDialog();
-    String path = _file!.title! + '.xopp';
+    if (_file!.title == null) {
+      final titleApplied = await _showTitleDialog();
+      if (!titleApplied || _file!.title == null) {
+        snackBarController.close();
+        if (mounted) {
+          setState(() {
+            savingFile = false;
+          });
+        }
+        return;
+      }
+    }
+    String path = export
+        ? _file!.title! + '.xopp'
+        : filePath ?? _file!.title! + '.xopp';
     _file!.previewImage = kIsWeb
         ? kTransparentImage
         : await pageListViewKey.currentState!.getPng(0);
     XppPickedFile file = _file!.toXppPickedFile(filePath: path);
-    if (export)
-      file.exportToStorage();
-    else
-      file.saveToPath(path: path);
+    final savedPath = export
+        ? await file.exportToStorage()
+        : await file.saveToPath(path: path);
+    if (savedPath == null) {
+      snackBarController.close();
+      if (mounted) {
+        setState(() {
+          savingFile = false;
+        });
+      }
+      return;
+    }
+    filePath = savedPath;
 
     /// starting async task to save recent files list
     SharedPreferences.getInstance().then((prefs) {
       String jsonData = prefs.getString(PreferencesKeys.kRecentFiles) ?? '[]';
       Set files = (jsonDecode(jsonData) as Iterable).toSet();
-      files.removeWhere((element) => element['path'] == path);
+      files.removeWhere((element) => element['path'] == savedPath);
       files.add({
         'preview': base64Encode(_file!.previewImage!),
         'name': _file!.title,
-        'path': path,
+        'path': savedPath,
       });
       jsonData = jsonEncode(files.toList());
       prefs.setString(PreferencesKeys.kRecentFiles, jsonData);

@@ -71,7 +71,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                   inactiveColor: Theme.of(context).colorScheme.onPrimary,
                   value: this.widget.width,
                   min: 0.1,
-                  max: 30,
+                  max: 8,
                   onChanged: (newWidth) {
                     setState(() {
                       this.widget.width = newWidth;

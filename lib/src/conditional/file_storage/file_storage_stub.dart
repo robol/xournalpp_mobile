@@ -4,7 +4,7 @@ Future<Uint8List> readFileBytes(String path) {
   throw UnsupportedError('Reading local file paths is not supported here.');
 }
 
-Future<void> writeFileBytes(String path, Uint8List bytes) {
+Future<String> writeFileBytes(String path, Uint8List bytes) {
   throw UnsupportedError('Writing local file paths is not supported here.');
 }
 

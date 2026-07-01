@@ -52,16 +52,16 @@ class XppPickedFile {
     );
   }
 
-  Future<String> exportToStorage() async {
+  Future<String?> exportToStorage() async {
     final savedPath = await FilePicker.saveFile(
       fileName: fileName ?? 'xournalpp-export',
       bytes: bytes,
     );
-    return savedPath ?? fileName ?? 'xournalpp-export';
+    return savedPath;
   }
 
-  Future<void> saveToPath({required String path}) async {
-    await writeFileBytes(path, bytes);
+  Future<String> saveToPath({required String path}) async {
+    return writeFileBytes(path, bytes);
   }
 
   Future<String> saveToTemporaryPath() {

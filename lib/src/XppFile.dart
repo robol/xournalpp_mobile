@@ -68,16 +68,20 @@ class XppFile {
       ),
     );
     XppFile file;
+    String? filePath;
     try {
       file = await open(
         (percentage) => null,
         (missingContext, path) => showMissingFileDialog(context, path),
+        onPath: (path) => filePath = path,
       );
 
       scaffoldMessenger.hideCurrentSnackBar();
       if (!context.mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
+        MaterialPageRoute(
+          builder: (context) => CanvasPage(file: file, filePath: filePath),
+        ),
       );
     } catch (e) {
       scaffoldMessenger.hideCurrentSnackBar();
@@ -101,13 +105,15 @@ class XppFile {
   /// showing a file picker, decoding and parsing to [XppFile]
   static Future<XppFile> open(
     Function(double) percentageCallback,
-    FileNotAvailableCallback onUnavailable,
-  ) async {
+    FileNotAvailableCallback onUnavailable, {
+    void Function(String?)? onPath,
+  }) async {
     /// showing a [XppPickedFile]
     XppPickedFile rawFile = await XppPickedFile.importFromStorage(
       type: XppFilePickType.custom,
       fileExtension: 'xopp',
     );
+    onPath?.call(rawFile.path);
 
     /// decoding by [fromXppPickedFile]
     XppFile file = await fromXppPickedFile(
