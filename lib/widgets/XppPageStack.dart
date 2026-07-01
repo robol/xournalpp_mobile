@@ -40,7 +40,8 @@ class XppPageStackState extends State<XppPageStack>
       _lastKnownBackground = page!.background;
       background = page!.background!.render();
     }
-    children.add(background);
+    children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
+    children.add(Positioned.fill(child: background));
 
     children.addAll(page!.layers!.map((e) => XppLayerStack(layer: e)));
     return RepaintBoundary(
@@ -62,7 +63,7 @@ class XppPageStackState extends State<XppPageStack>
           child: SizedBox(
             width: page!.pageSize!.width,
             height: page!.pageSize!.height,
-            child: Stack(children: children),
+            child: Stack(fit: StackFit.expand, children: children),
           ),
         ),
       ),
@@ -112,8 +113,10 @@ class _XppLayerStackState extends State<XppLayerStack> {
   @override
   Widget build(BuildContext context) {
     List<Widget> children = [];
+
     widget.layer!.content!.forEach((element) {
       if (element == null) return;
+
       if (!renderedContent.keys.contains(element)) {
         renderedContent[element] = Positioned(
           child: element.render(),

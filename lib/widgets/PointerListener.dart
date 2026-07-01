@@ -54,13 +54,15 @@ class PointerListenerState extends State<PointerListener> {
   bool drawingEnabled = true;
 
   List<XppStrokePoint> points = [];
-  List<List<XppStrokePoint>> previewChunks = [];
+  List<_PreviewPictureChunk> previewChunks = [];
   List<XppStrokePoint> activePreviewPoints = [];
 
   XppStrokeTool tool = XppStrokeTool.PEN;
 
   final ValueNotifier<int> _strokeRepaint = ValueNotifier<int>(0);
   final ValueNotifier<Rect?> _activePreviewBounds = ValueNotifier<Rect?>(null);
+  final List<Picture> _activePreviewPictureDependencies = [];
+  Picture? _activePreviewPicture;
 
   Map<int, DateTime> pointerTimestamps = Map();
 
@@ -137,17 +139,11 @@ class PointerListenerState extends State<PointerListener> {
           children: [
             widget.child!,
             ...previewChunks.map((chunk) {
-              final bounds = getStrokeBounds(chunk);
               return Positioned.fromRect(
-                rect: bounds,
+                rect: chunk.bounds,
                 child: RepaintBoundary(
                   child: CustomPaint(
-                    foregroundPainter: XppStrokePainter(
-                      points: chunk,
-                      color: widget.color,
-                      topLeft: bounds.topLeft,
-                      smoothPressure: tool == XppStrokeTool.PEN,
-                    ),
+                    foregroundPainter: _PreviewPicturePainter(chunk.picture),
                   ),
                 ),
               );
@@ -155,7 +151,7 @@ class PointerListenerState extends State<PointerListener> {
             ValueListenableBuilder<Rect?>(
               valueListenable: _activePreviewBounds,
               builder: (context, bounds, child) {
-                if (bounds == null || activePreviewPoints.isEmpty) {
+                if (bounds == null || _activePreviewPicture == null) {
                   return SizedBox.shrink();
                 }
 
@@ -163,11 +159,8 @@ class PointerListenerState extends State<PointerListener> {
                   rect: bounds,
                   child: RepaintBoundary(
                     child: CustomPaint(
-                      foregroundPainter: XppStrokePainter(
-                        points: activePreviewPoints,
-                        color: widget.color,
-                        topLeft: bounds.topLeft,
-                        smoothPressure: tool == XppStrokeTool.PEN,
+                      foregroundPainter: _PreviewPicturePainter.active(
+                        pictureProvider: () => _activePreviewPicture,
                         repaint: _strokeRepaint,
                       ),
                     ),
@@ -224,51 +217,76 @@ class PointerListenerState extends State<PointerListener> {
     );
     points.add(point);
     activePreviewPoints.add(point);
+    _recordActivePreviewPoint();
 
     if (activePreviewPoints.length >= _previewChunkPointCount) {
       final lastPoint = activePreviewPoints.last;
       setState(() {
-        previewChunks.add(List.from(activePreviewPoints));
+        final picture = _activePreviewPicture;
+        final bounds = _activePreviewBounds.value;
+        if (picture != null && bounds != null) {
+          previewChunks.add(_PreviewPictureChunk(picture, bounds));
+          _activePreviewPictureDependencies.remove(picture);
+        }
         activePreviewPoints = [lastPoint];
-        _activePreviewBounds.value = getStrokeBounds(activePreviewPoints);
+        _activePreviewPicture = null;
+        _activePreviewBounds.value = null;
+        _recordActivePreviewPoint();
       });
       return;
     }
 
-    _activePreviewBounds.value = getStrokeBounds(activePreviewPoints);
     _strokeRepaint.value++;
   }
 
   void resetPreview({bool rebuild = false}) {
+    for (final chunk in previewChunks) {
+      chunk.dispose();
+    }
+    for (final picture in _activePreviewPictureDependencies) {
+      picture.dispose();
+    }
     previewChunks.clear();
+    _activePreviewPictureDependencies.clear();
     activePreviewPoints.clear();
+    _activePreviewPicture = null;
     _activePreviewBounds.value = null;
 
     if (rebuild) setState(() {});
   }
 
-  Rect getStrokeBounds(List<XppStrokePoint> strokePoints) {
-    final firstPoint = strokePoints.first;
-    double left = firstPoint.x!;
-    double top = firstPoint.y!;
-    double right = firstPoint.x!;
-    double bottom = firstPoint.y!;
-    double maxWidth = firstPoint.width ?? 1;
+  void _recordActivePreviewPoint() {
+    if (activePreviewPoints.isEmpty) return;
 
-    for (final point in strokePoints) {
-      final x = point.x!;
-      final y = point.y!;
-      final width = point.width ?? 1;
+    final previousPicture = _activePreviewPicture;
+    final previousBounds = _activePreviewBounds.value;
+    final bounds = XppStrokeBounds.fromPoints(activePreviewPoints).rect;
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
 
-      if (x < left) left = x;
-      if (x > right) right = x;
-      if (y < top) top = y;
-      if (y > bottom) bottom = y;
-      if (width > maxWidth) maxWidth = width;
+    if (previousPicture != null && previousBounds != null) {
+      canvas.save();
+      canvas.translate(
+        previousBounds.left - bounds.left,
+        previousBounds.top - bounds.top,
+      );
+      canvas.drawPicture(previousPicture);
+      canvas.restore();
     }
 
-    final padding = (maxWidth / 2) + 2;
-    return Rect.fromLTRB(left, top, right, bottom).inflate(padding);
+    final newPoints = activePreviewPoints.length == 1
+        ? activePreviewPoints
+        : activePreviewPoints.sublist(activePreviewPoints.length - 2);
+    XppStrokePainter(
+      points: newPoints,
+      color: widget.color,
+      topLeft: bounds.topLeft,
+      smoothPressure: false,
+    ).paint(canvas, bounds.size);
+
+    _activePreviewPicture = recorder.endRecording();
+    _activePreviewPictureDependencies.add(_activePreviewPicture!);
+    _activePreviewBounds.value = bounds;
   }
 
   void notifyDeviceChange(PointerEvent data) {
@@ -338,8 +356,46 @@ class PointerListenerState extends State<PointerListener> {
 
   @override
   void dispose() {
+    resetPreview();
     _strokeRepaint.dispose();
     _activePreviewBounds.dispose();
     super.dispose();
+  }
+}
+
+class _PreviewPictureChunk {
+  final Picture picture;
+  final Rect bounds;
+
+  _PreviewPictureChunk(this.picture, this.bounds);
+
+  void dispose() => picture.dispose();
+}
+
+class _PreviewPicturePainter extends CustomPainter {
+  final Picture? picture;
+  final Picture? Function()? pictureProvider;
+
+  _PreviewPicturePainter(this.picture, {Listenable? repaint})
+    : pictureProvider = null,
+      super(repaint: repaint);
+
+  _PreviewPicturePainter.active({
+    required this.pictureProvider,
+    Listenable? repaint,
+  }) : picture = null,
+       super(repaint: repaint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final currentPicture = pictureProvider?.call() ?? picture;
+    if (currentPicture == null) return;
+    canvas.drawPicture(currentPicture);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PreviewPicturePainter oldDelegate) {
+    return oldDelegate.picture != picture ||
+        oldDelegate.pictureProvider != pictureProvider;
   }
 }

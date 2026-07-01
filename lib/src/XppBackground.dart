@@ -35,7 +35,7 @@ class XppBackgroundImage extends XppBackground {
 
   @override
   Widget render() {
-    return (Container());
+    return Container(color: Colors.white);
   }
 
   @override
@@ -256,7 +256,11 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
   XppBackgroundSolidPlain({this.color, this.size});
   @override
   Widget render() {
-    return (Container(width: size!.width, height: size!.height, color: color));
+    return Container(
+      width: size!.width,
+      height: size!.height,
+      color: color ?? Colors.white,
+    );
   }
 
   @override
@@ -268,7 +272,7 @@ class _NoXppBackground extends XppBackground {
   XppBackgroundType? type = XppBackgroundType.NONE;
 
   @override
-  Widget render() => Container();
+  Widget render() => Container(color: Colors.white);
 
   @override
   XmlElement toXmlElement() {

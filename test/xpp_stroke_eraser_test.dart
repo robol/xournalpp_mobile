@@ -23,4 +23,16 @@ void main() {
     expect(firstStroke.points!.map((point) => point.x), [0]);
     expect(secondStroke.points!.map((point) => point.x), [20]);
   });
+
+  test('stroke offset includes render padding', () {
+    final stroke = XppStrokePen(
+      points: [
+        XppStrokePoint(x: 20, y: 30, width: 10),
+        XppStrokePoint(x: 40, y: 50, width: 6),
+      ],
+    );
+
+    expect(stroke.getOffset(), const Offset(13, 23));
+    expect(stroke.bottomRight, const Offset(47, 57));
+  });
 }

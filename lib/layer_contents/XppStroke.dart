@@ -6,6 +6,8 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 abstract class XppStroke extends XppContent {
+  static const int _renderChunkPointCount = 24;
+
   XppStroke({
     this.tool = XppStrokeTool.PEN,
     this.points,
@@ -21,32 +23,12 @@ abstract class XppStroke extends XppContent {
   @override
   Offset getOffset() {
     if (points!.isEmpty) return Offset(0, 0);
-    double? x = points![0].x;
-    // finding smallest x point
-    points!.forEach((point) {
-      if (point.x! < x!) x = point.x;
-    });
-    double y = points![0].y!;
-    // finding smallest y point
-    points!.forEach((point) {
-      if (point.y! < y) x = point.y;
-    });
-    return (Offset(x!, y));
+    return XppStrokeBounds.fromPoints(points!).rect.topLeft;
   }
 
   Offset get bottomRight {
     if (points!.isEmpty) return Offset(0, 0);
-    double? x = points![0].x;
-    // finding largest x point
-    points!.forEach((point) {
-      if (point.x! > x!) x = point.x;
-    });
-    double y = points![0].y!;
-    // finding largest y point
-    points!.forEach((point) {
-      if (point.y! > y) x = point.y;
-    });
-    return (Offset(x!, y));
+    return XppStrokeBounds.fromPoints(points!).rect.bottomRight;
   }
 
   @override
@@ -55,25 +37,55 @@ abstract class XppStroke extends XppContent {
       return XppPageContentWidget(child: (Container()));
     }
     Color? colorToUse = color;
-    if (tool == XppStrokeTool.ERASER) color = Colors.white;
+    if (tool == XppStrokeTool.ERASER) colorToUse = Colors.white;
     if (tool == XppStrokeTool.HIGHLIGHTER) {
-      color = color!.withOpacity(.5);
+      colorToUse = color!.withValues(alpha: .5);
     }
+    final strokeBounds = XppStrokeBounds.fromPoints(points!);
+    final chunks = _chunkPoints(points!);
     return XppPageContentWidget(
-      child: CustomPaint(
-        size: Size(
-          bottomRight.dx - getOffset().dx,
-          bottomRight.dy - getOffset().dy,
-        ),
-        foregroundPainter: XppStrokePainter(
-          points: points,
-          color: colorToUse,
-          topLeft: getOffset(),
-          smoothPressure: tool == XppStrokeTool.PEN,
+      child: SizedBox(
+        width: strokeBounds.rect.width,
+        height: strokeBounds.rect.height,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: chunks.map((chunk) {
+            final bounds = XppStrokeBounds.fromPoints(chunk);
+            final localRect = bounds.rect.shift(-strokeBounds.rect.topLeft);
+            return Positioned.fromRect(
+              rect: localRect,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  foregroundPainter: XppStrokePainter(
+                    points: chunk,
+                    color: colorToUse,
+                    topLeft: bounds.rect.topLeft,
+                    smoothPressure: tool == XppStrokeTool.PEN,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
       tool: EditingTool.STYLUS,
     );
+  }
+
+  List<List<XppStrokePoint>> _chunkPoints(List<XppStrokePoint> points) {
+    if (points.length <= _renderChunkPointCount) return [points];
+
+    final chunks = <List<XppStrokePoint>>[];
+    for (
+      int start = 0;
+      start < points.length;
+      start += _renderChunkPointCount
+    ) {
+      final end = (start + _renderChunkPointCount).clamp(0, points.length);
+      final chunkStart = start == 0 ? start : start - 1;
+      chunks.add(points.sublist(chunkStart, end));
+    }
+    return chunks;
   }
 
   @override
@@ -340,4 +352,36 @@ class XppStrokePoint {
   XppStrokePoint({this.x, this.y, this.width});
 
   Offset get offset => Offset(x!, y!);
+}
+
+class XppStrokeBounds {
+  final Rect rect;
+
+  XppStrokeBounds._(this.rect);
+
+  factory XppStrokeBounds.fromPoints(List<XppStrokePoint> points) {
+    final firstPoint = points.first;
+    double left = firstPoint.x!;
+    double top = firstPoint.y!;
+    double right = firstPoint.x!;
+    double bottom = firstPoint.y!;
+    double maxWidth = firstPoint.width ?? 1;
+
+    for (final point in points) {
+      final x = point.x!;
+      final y = point.y!;
+      final width = point.width ?? 1;
+
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (width > maxWidth) maxWidth = width;
+    }
+
+    final padding = (maxWidth / 2) + 2;
+    return XppStrokeBounds._(
+      Rect.fromLTRB(left, top, right, bottom).inflate(padding),
+    );
+  }
 }
