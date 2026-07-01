@@ -13,6 +13,7 @@ import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector4;
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
@@ -120,34 +121,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                               .removeLast();
                         },
                         filterEraser: ({Offset? coordinates, double? radius}) {
-                          // if we would execute the removal instantly, we would destroy the order of the strokes
-                          List<Function> removalFunctions = [];
-                          _file!.pages![currentPage].layers![0].content!
-                              .forEach((stroke) {
-                                final delta = stroke!.eraseWhere(
-                                  coordinates: coordinates,
-                                  radius: radius,
-                                );
-                                if (!delta.affected) return;
-
-                                removalFunctions.add(() {
-                                  final int index = _file!
-                                      .pages![currentPage]
-                                      .layers![0]
-                                      .content!
-                                      .indexOf(stroke);
-                                  _file!.pages![currentPage].layers![0].content!
-                                      .removeAt(index);
-                                  _file!.pages![currentPage].layers![0].content!
-                                      .insertAll(index, delta.newContent);
-                                });
-                              });
-                          if (removalFunctions.isNotEmpty) {
-                            removalFunctions.forEach((element) {
-                              element();
-                            });
-                            setState(() {});
-                          }
+                          _eraseContentAt(
+                            coordinates: coordinates,
+                            radius: radius,
+                          );
                         },
                         onNewContent: (newContent) {
                           /// TODO: manage layers
@@ -501,6 +478,39 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       }
       setState(() {});
     }
+  }
+
+  void _eraseContentAt({Offset? coordinates, double? radius}) {
+    if (coordinates == null || radius == null) return;
+
+    final layer = _file!.pages![currentPage].layers![0];
+    final List<XppContent?> updatedContent = [];
+    bool erasedAnything = false;
+
+    for (final content in layer.content!) {
+      if (content == null) {
+        updatedContent.add(null);
+        continue;
+      }
+
+      final delta = content.eraseWhere(
+        coordinates: coordinates,
+        radius: radius,
+      );
+
+      if (delta.affected) {
+        erasedAnything = true;
+        updatedContent.addAll(delta.newContent);
+      } else {
+        updatedContent.add(content);
+      }
+    }
+
+    if (!erasedAnything) return;
+
+    layer.content = updatedContent;
+    _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    setState(() {});
   }
 
   void shareScreenshot() async {

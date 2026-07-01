@@ -1,0 +1,84 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+
+import 'conditional/file_storage/file_storage_stub.dart'
+    if (dart.library.io) 'conditional/file_storage/file_storage_io.dart';
+
+enum XppFilePickType { custom, image }
+
+class XppPickedFile {
+  XppPickedFile(this.bytes, {this.path, this.fileExtension, String? fileName})
+    : fileName = fileName ?? _basename(path);
+
+  final Uint8List bytes;
+  final String? path;
+  final String? fileExtension;
+  final String? fileName;
+
+  Uint8List toUint8List() => bytes;
+
+  static Future<XppPickedFile> importFromStorage({
+    required XppFilePickType type,
+    String? fileExtension,
+  }) async {
+    final result = await FilePicker.pickFiles(
+      type: type == XppFilePickType.image ? FileType.image : FileType.custom,
+      allowedExtensions: type == XppFilePickType.custom && fileExtension != null
+          ? [fileExtension.replaceFirst('.', '')]
+          : null,
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file == null) throw UnsupportedError('No file selected.');
+    final bytes =
+        file.bytes ??
+        (file.path == null ? null : await readFileBytes(file.path!));
+    if (bytes == null) throw UnsupportedError('Could not read selected file.');
+    return XppPickedFile(
+      bytes,
+      path: file.path,
+      fileName: file.name,
+      fileExtension: file.extension,
+    );
+  }
+
+  static Future<XppPickedFile> fromInternalPath({required String path}) async {
+    return XppPickedFile(
+      await readFileBytes(path),
+      path: path,
+      fileName: _basename(path),
+      fileExtension: _extension(path),
+    );
+  }
+
+  Future<String> exportToStorage() async {
+    final savedPath = await FilePicker.saveFile(
+      fileName: fileName ?? 'xournalpp-export',
+      bytes: bytes,
+    );
+    return savedPath ?? fileName ?? 'xournalpp-export';
+  }
+
+  Future<void> saveToPath({required String path}) async {
+    await writeFileBytes(path, bytes);
+  }
+
+  Future<String> saveToTemporaryPath() {
+    return writeTemporaryFile(bytes, fileName: fileName);
+  }
+
+  static Future<void> delete({required String path}) => deleteFile(path);
+
+  static String? _basename(String? path) {
+    if (path == null || path.isEmpty) return null;
+    return path.split(RegExp(r'[/\\]')).last;
+  }
+
+  static String? _extension(String? path) {
+    final name = _basename(path);
+    final dot = name?.lastIndexOf('.') ?? -1;
+    if (name == null || dot < 0 || dot == name.length - 1) return null;
+    return name.substring(dot + 1);
+  }
+}
