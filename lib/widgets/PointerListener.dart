@@ -22,6 +22,8 @@ class PointerListener extends StatefulWidget {
   @required
   final double? strokeWidth;
   @required
+  final double? eraserWidth;
+  @required
   final Color? color;
   @required
   final Function({Offset? coordinates, double? radius})? filterEraser;
@@ -36,6 +38,7 @@ class PointerListener extends StatefulWidget {
     this.translationMatrix,
     this.onDeviceChange,
     this.strokeWidth,
+    this.eraserWidth,
     this.color,
     this.filterEraser,
     this.removeLastContent,
@@ -46,45 +49,39 @@ class PointerListener extends StatefulWidget {
 }
 
 class PointerListenerState extends State<PointerListener> {
+  static const int _previewChunkPointCount = 24;
+
   bool drawingEnabled = true;
 
   List<XppStrokePoint> points = [];
+  List<List<XppStrokePoint>> previewChunks = [];
+  List<XppStrokePoint> activePreviewPoints = [];
 
-  late XppStrokeTool tool;
+  XppStrokeTool tool = XppStrokeTool.PEN;
+
+  final ValueNotifier<int> _strokeRepaint = ValueNotifier<int>(0);
+  final ValueNotifier<Rect?> _activePreviewBounds = ValueNotifier<Rect?>(null);
 
   Map<int, DateTime> pointerTimestamps = Map();
 
   bool poppedContentForCurrentPointer = false;
 
+  PointerDeviceKind? _lastNotifiedDeviceKind;
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       onHover: (event) {
-        widget.onDeviceChange!(device: event.device, kind: event.kind);
+        notifyDeviceChange(event);
       },
       opaque: false,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
           if (_detectTwoFingerGesture(data)) return;
-          widget.onDeviceChange!(device: data.device, kind: data.kind);
+          notifyDeviceChange(data);
           if (!drawingEnabled) return;
-          if (isPen(data) || isHighlighter(data)) {
-            double? width = (data.pressure == 0
-                ? widget.strokeWidth
-                : data.pressure * widget.strokeWidth!);
-
-            //A highlighter should not change its width
-            if (isHighlighter(data)) width = widget.strokeWidth;
-            points.add(
-              XppStrokePoint(
-                x: data.localPosition.dx,
-                y: data.localPosition.dy,
-                width: width,
-              ),
-            );
-            setState(() {});
-          }
+          if (isPen(data) || isHighlighter(data)) addStrokePoint(data);
 
           if (isEraser(data)) eraseAt(data);
         },
@@ -94,7 +91,11 @@ class PointerListenerState extends State<PointerListener> {
           setState(() {
             tool = getToolFromPointer(data);
           });
-          widget.onDeviceChange!(device: data.device, kind: data.kind);
+          notifyDeviceChange(data);
+          if (drawingEnabled && (isPen(data) || isHighlighter(data))) {
+            resetPreview();
+            addStrokePoint(data);
+          }
           if (drawingEnabled && isEraser(data)) eraseAt(data);
           if (isLaTeX(data)) {
             XppTexImage.edit(
@@ -117,31 +118,63 @@ class PointerListenerState extends State<PointerListener> {
           if (!poppedContentForCurrentPointer) saveStroke(tool);
           poppedContentForCurrentPointer = false;
           points.clear();
+          resetPreview(rebuild: true);
+          _strokeRepaint.value++;
         },
         onPointerCancel: (data) {
           points.clear();
           poppedContentForCurrentPointer = false;
+          resetPreview(rebuild: true);
+          _strokeRepaint.value++;
         },
         onPointerSignal: (data) {
           setState(() {
             tool = getToolFromPointer(data);
           });
-          widget.onDeviceChange!(device: data.device, kind: data.kind);
+          notifyDeviceChange(data);
         },
         child: Stack(
           children: [
             widget.child!,
-            if (points.length > 0)
-              CustomPaint(
-                /*size: Size(
-        bottomRight.dx - getOffset().dx, bottomRight.dy - getOffset().dy),*/
-                foregroundPainter: XppStrokePainter(
-                  points: points,
-                  color: widget.color,
-                  topLeft: Offset(0, 0),
-                  smoothPressure: tool == XppStrokeTool.PEN,
+            ...previewChunks.map((chunk) {
+              final bounds = getStrokeBounds(chunk);
+              return Positioned.fromRect(
+                rect: bounds,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    foregroundPainter: XppStrokePainter(
+                      points: chunk,
+                      color: widget.color,
+                      topLeft: bounds.topLeft,
+                      smoothPressure: tool == XppStrokeTool.PEN,
+                    ),
+                  ),
                 ),
-              ),
+              );
+            }),
+            ValueListenableBuilder<Rect?>(
+              valueListenable: _activePreviewBounds,
+              builder: (context, bounds, child) {
+                if (bounds == null || activePreviewPoints.isEmpty) {
+                  return SizedBox.shrink();
+                }
+
+                return Positioned.fromRect(
+                  rect: bounds,
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      foregroundPainter: XppStrokePainter(
+                        points: activePreviewPoints,
+                        color: widget.color,
+                        topLeft: bounds.topLeft,
+                        smoothPressure: tool == XppStrokeTool.PEN,
+                        repaint: _strokeRepaint,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -153,9 +186,9 @@ class PointerListenerState extends State<PointerListener> {
   //   key.currentState.clearPoints();
 
   void clearPoints() {
-    setState(() {
-      points.clear();
-    });
+    points.clear();
+    resetPreview(rebuild: true);
+    _strokeRepaint.value++;
   }
 
   void saveStroke(XppStrokeTool tool) {
@@ -172,8 +205,78 @@ class PointerListenerState extends State<PointerListener> {
   void eraseAt(PointerEvent data) {
     widget.filterEraser!(
       coordinates: Offset(data.localPosition.dx, data.localPosition.dy),
-      radius: widget.strokeWidth,
+      radius: widget.eraserWidth,
     );
+  }
+
+  void addStrokePoint(PointerEvent data) {
+    double? width = (data.pressure == 0
+        ? widget.strokeWidth
+        : data.pressure * widget.strokeWidth!);
+
+    //A highlighter should not change its width
+    if (isHighlighter(data)) width = widget.strokeWidth;
+
+    final point = XppStrokePoint(
+      x: data.localPosition.dx,
+      y: data.localPosition.dy,
+      width: width,
+    );
+    points.add(point);
+    activePreviewPoints.add(point);
+
+    if (activePreviewPoints.length >= _previewChunkPointCount) {
+      final lastPoint = activePreviewPoints.last;
+      setState(() {
+        previewChunks.add(List.from(activePreviewPoints));
+        activePreviewPoints = [lastPoint];
+        _activePreviewBounds.value = getStrokeBounds(activePreviewPoints);
+      });
+      return;
+    }
+
+    _activePreviewBounds.value = getStrokeBounds(activePreviewPoints);
+    _strokeRepaint.value++;
+  }
+
+  void resetPreview({bool rebuild = false}) {
+    previewChunks.clear();
+    activePreviewPoints.clear();
+    _activePreviewBounds.value = null;
+
+    if (rebuild) setState(() {});
+  }
+
+  Rect getStrokeBounds(List<XppStrokePoint> strokePoints) {
+    final firstPoint = strokePoints.first;
+    double left = firstPoint.x!;
+    double top = firstPoint.y!;
+    double right = firstPoint.x!;
+    double bottom = firstPoint.y!;
+    double maxWidth = firstPoint.width ?? 1;
+
+    for (final point in strokePoints) {
+      final x = point.x!;
+      final y = point.y!;
+      final width = point.width ?? 1;
+
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (width > maxWidth) maxWidth = width;
+    }
+
+    final padding = (maxWidth / 2) + 2;
+    return Rect.fromLTRB(left, top, right, bottom).inflate(padding);
+  }
+
+  void notifyDeviceChange(PointerEvent data) {
+    final deviceToolKnown = widget.toolData.keys.contains(data.kind);
+    if (_lastNotifiedDeviceKind == data.kind && deviceToolKnown) return;
+
+    _lastNotifiedDeviceKind = data.kind;
+    widget.onDeviceChange!(device: data.device, kind: data.kind);
   }
 
   bool isPen(PointerEvent data) {
@@ -215,6 +318,8 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   bool _detectTwoFingerGesture(PointerEvent data, {bool shouldPop = false}) {
+    if (data.kind != PointerDeviceKind.touch) return false;
+
     // detecting two-finger gestures
     final timestamp = DateTime.now();
     bool foundCloseOffset = false;
@@ -229,5 +334,12 @@ class PointerListenerState extends State<PointerListener> {
     }
     pointerTimestamps[data.device] = timestamp;
     return foundCloseOffset;
+  }
+
+  @override
+  void dispose() {
+    _strokeRepaint.dispose();
+    _activePreviewBounds.dispose();
+    super.dispose();
   }
 }

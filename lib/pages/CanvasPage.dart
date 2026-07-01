@@ -44,6 +44,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Color toolColor = Colors.blueGrey;
   double toolWidth = 5;
+  double eraserWidth = 20;
 
   TransformationController _zoomController = TransformationController();
 
@@ -104,18 +105,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         translationMatrix: _zoomController.value,
                         toolData: _toolData,
                         strokeWidth: toolWidth,
+                        eraserWidth: eraserWidth,
                         color: toolColor,
-                        onDeviceChange:
-                            ({int? device, PointerDeviceKind? kind}) {
-                              //_currentDevice = device;
-                              setDefaultDeviceIfNotSet(kind: kind);
-                              _currentDevice = kind;
-                              _editingToolbarKey.currentState!.setState(() {
-                                _editingToolbarKey.currentState!.currentDevice =
-                                    kind;
-                                _setZoomableState();
-                              });
-                            },
+                        onDeviceChange: _handleDeviceChange,
                         removeLastContent: () {
                           _file!.pages![currentPage].layers![0].content!
                               .removeLast();
@@ -263,13 +255,17 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             deviceMap: _toolData,
             getColor: getColor,
             getWidth: getWidth,
-            onWidthChange: (newWidth) {
-              rememberToolSettings();
+            onWidthChange: (newWidth, tool) {
               setState(() {
-                toolWidth =
-                    newWidth *
-                    2; // average pressure is 0.5, so multiplying by 2
+                if (tool == EditingTool.ERASER) {
+                  eraserWidth = newWidth * 2;
+                } else {
+                  toolWidth =
+                      newWidth *
+                      2; // average pressure is 0.5, so multiplying by 2
+                }
               });
+              rememberToolSettings();
             },
             onColorChange: (newColor) {
               rememberToolSettings();
@@ -446,6 +442,21 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       }
       _toolData[kind] = tool;
     }
+  }
+
+  void _handleDeviceChange({int? device, PointerDeviceKind? kind}) {
+    final hadDeviceTool = _toolData.keys.contains(kind);
+    final deviceChanged = _currentDevice != kind;
+
+    setDefaultDeviceIfNotSet(kind: kind);
+
+    if (!deviceChanged && hadDeviceTool) return;
+
+    _currentDevice = kind;
+    _editingToolbarKey.currentState!.setState(() {
+      _editingToolbarKey.currentState!.currentDevice = kind;
+      _setZoomableState();
+    });
   }
 
   void _setZoomableState() {
@@ -633,9 +644,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     return toolColor;
   }
 
-  double getWidth() {
+  double getWidth(EditingTool? tool) {
     // average pressure is 0.5, so divide by 2
     // see L266
+    if (tool == EditingTool.ERASER) {
+      return eraserWidth / 2;
+    }
     return toolWidth / 2;
   }
 
@@ -643,6 +657,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt(PreferencesKeys.kToolColor, toolColor.value);
       prefs.setDouble(PreferencesKeys.kToolWidth, toolWidth);
+      prefs.setDouble(PreferencesKeys.kEraserWidth, eraserWidth);
     });
   }
 
@@ -652,6 +667,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         prefs.getInt(PreferencesKeys.kToolColor) ?? _defaultToolColor,
       );
       toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth) ?? toolWidth;
+      eraserWidth =
+          prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
     });
   }
 }

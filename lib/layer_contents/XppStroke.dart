@@ -6,11 +6,12 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 abstract class XppStroke extends XppContent {
-  XppStroke(
-      {this.tool = XppStrokeTool.PEN,
-      this.points,
-      this.color,
-      this.editingTool});
+  XppStroke({
+    this.tool = XppStrokeTool.PEN,
+    this.points,
+    this.color,
+    this.editingTool,
+  });
 
   XppStrokeTool tool;
   List<XppStrokePoint>? points;
@@ -61,12 +62,15 @@ abstract class XppStroke extends XppContent {
     return XppPageContentWidget(
       child: CustomPaint(
         size: Size(
-            bottomRight.dx - getOffset().dx, bottomRight.dy - getOffset().dy),
+          bottomRight.dx - getOffset().dx,
+          bottomRight.dy - getOffset().dy,
+        ),
         foregroundPainter: XppStrokePainter(
-            points: points,
-            color: colorToUse,
-            topLeft: getOffset(),
-            smoothPressure: tool == XppStrokeTool.PEN),
+          points: points,
+          color: colorToUse,
+          topLeft: getOffset(),
+          smoothPressure: tool == XppStrokeTool.PEN,
+        ),
       ),
       tool: EditingTool.STYLUS,
     );
@@ -86,15 +90,22 @@ abstract class XppStroke extends XppContent {
         toolString = 'eraser';
         break;
     }
-    XmlElement node = XmlElement(XmlName('stroke'), [
-      XmlAttribute(XmlName('tool'), toolString),
-      XmlAttribute(XmlName('color'), color!.toHexTriplet()),
-      XmlAttribute(
-          XmlName('width'), points!.map((e) => e.width.toString()).join(' ')),
-    ], [
-      XmlText(
-          points!.map((e) => e.x.toString() + ' ' + e.y.toString()).join(' '))
-    ]);
+    XmlElement node = XmlElement(
+      XmlName('stroke'),
+      [
+        XmlAttribute(XmlName('tool'), toolString),
+        XmlAttribute(XmlName('color'), color!.toHexTriplet()),
+        XmlAttribute(
+          XmlName('width'),
+          points!.map((e) => e.width.toString()).join(' '),
+        ),
+      ],
+      [
+        XmlText(
+          points!.map((e) => e.x.toString() + ' ' + e.y.toString()).join(' '),
+        ),
+      ],
+    );
     return node;
   }
 
@@ -125,7 +136,10 @@ abstract class XppStroke extends XppContent {
       }
     }
     return XppContentEraseData(
-        affected: true, delete: newStrokes.isEmpty, newContent: newStrokes);
+      affected: true,
+      delete: newStrokes.isEmpty,
+      newContent: newStrokes,
+    );
   }
 
   @override
@@ -143,16 +157,20 @@ abstract class XppStroke extends XppContent {
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points});
 
   bool _shouldRemovePoint(
-      XppStrokePoint element, Offset coordinates, double radius) {
+    XppStrokePoint element,
+    Offset coordinates,
+    double radius,
+  ) {
     return ((element.x! - coordinates.dx).abs() <
             (element.width! + radius) / 2 &&
         (element.y! - coordinates.dy).abs() < (element.width! + radius) / 2);
   }
 
-  static XppStroke byTool(
-      {required XppStrokeTool tool,
-      List<XppStrokePoint>? points,
-      Color? color}) {
+  static XppStroke byTool({
+    required XppStrokeTool tool,
+    List<XppStrokePoint>? points,
+    Color? color,
+  }) {
     XppStroke? stroke;
     switch (tool) {
       case XppStrokeTool.PEN:
@@ -176,11 +194,12 @@ class XppStrokePen extends XppStroke {
 
   EditingTool? editingTool;
   XppStrokePen({this.points, this.color})
-      : super(
-            points: points,
-            color: color,
-            tool: XppStrokeTool.PEN,
-            editingTool: EditingTool.STYLUS);
+    : super(
+        points: points,
+        color: color,
+        tool: XppStrokeTool.PEN,
+        editingTool: EditingTool.STYLUS,
+      );
 
   @override
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points}) {
@@ -195,11 +214,12 @@ class XppStrokeWhiteout extends XppStroke {
 
   EditingTool? editingTool;
   XppStrokeWhiteout({this.points, this.color})
-      : super(
-            points: points,
-            color: color,
-            tool: XppStrokeTool.ERASER,
-            editingTool: EditingTool.WHITEOUT);
+    : super(
+        points: points,
+        color: color,
+        tool: XppStrokeTool.ERASER,
+        editingTool: EditingTool.WHITEOUT,
+      );
 
   @override
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points}) {
@@ -214,11 +234,12 @@ class XppStrokeHighlight extends XppStroke {
 
   EditingTool? editingTool;
   XppStrokeHighlight({this.points, this.color})
-      : super(
-            points: points,
-            color: color,
-            tool: XppStrokeTool.HIGHLIGHTER,
-            editingTool: EditingTool.HIGHLIGHT);
+    : super(
+        points: points,
+        color: color,
+        tool: XppStrokeTool.HIGHLIGHTER,
+        editingTool: EditingTool.HIGHLIGHT,
+      );
 
   @override
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points}) {
@@ -241,7 +262,8 @@ class XppStrokePainter extends CustomPainter {
     this.color,
     this.topLeft,
     this.smoothPressure,
-  });
+    Listenable? repaint,
+  }) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -250,14 +272,15 @@ class XppStrokePainter extends CustomPainter {
       var paint = Paint()
         ..color = color!
         ..strokeWidth = points![0].width ?? 5
-        ..style = PaintingStyle.stroke
+        ..style = PaintingStyle.fill
         ..strokeCap = StrokeCap.round;
 
-      var path = Path();
       Offset offset = points![0].offset;
-      path.moveTo(offset.dx - topLeft!.dx, offset.dy - topLeft!.dy);
-      path.lineTo(offset.dx - topLeft!.dx, offset.dy - topLeft!.dy);
-      canvas.drawPath(path, paint);
+      canvas.drawCircle(
+        Offset(offset.dx - topLeft!.dx, offset.dy - topLeft!.dy),
+        paint.strokeWidth / 2,
+        paint,
+      );
     }
     if (smoothPressure!) {
       for (int i = 1; i < points!.length; i++) {
@@ -267,19 +290,22 @@ class XppStrokePainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeCap = StrokeCap.round;
 
-        var path = Path();
-        path.moveTo(points![i - 1].offset.dx - topLeft!.dx,
-            points![i - 1].offset.dy - topLeft!.dy);
-        Offset offset = points![i].offset;
-        path.lineTo(offset.dx - topLeft!.dx, offset.dy - topLeft!.dy);
-        canvas.drawPath(path, paint);
+        final start = points![i - 1].offset;
+        final end = points![i].offset;
+        canvas.drawLine(
+          Offset(start.dx - topLeft!.dx, start.dy - topLeft!.dy),
+          Offset(end.dx - topLeft!.dx, end.dy - topLeft!.dy),
+          paint,
+        );
       }
     } else {
       double width = 0;
 
       var path = Path();
-      path.moveTo(points![0].offset.dx - topLeft!.dx,
-          points![0].offset.dy - topLeft!.dy);
+      path.moveTo(
+        points![0].offset.dx - topLeft!.dx,
+        points![0].offset.dy - topLeft!.dy,
+      );
       for (int i = 1; i < points!.length; i++) {
         Offset offset = points![i].offset;
         path.lineTo(offset.dx - topLeft!.dx, offset.dy - topLeft!.dy);
@@ -296,16 +322,15 @@ class XppStrokePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) {
-    return true; //!((oldDelegate is XppStrokePainter) && oldDelegate.points == points);
+  bool shouldRepaint(covariant XppStrokePainter oldDelegate) {
+    return oldDelegate.points != points ||
+        oldDelegate.color != color ||
+        oldDelegate.topLeft != topLeft ||
+        oldDelegate.smoothPressure != smoothPressure;
   }
 }
 
-enum XppStrokeTool {
-  PEN,
-  HIGHLIGHTER,
-  ERASER,
-}
+enum XppStrokeTool { PEN, HIGHLIGHTER, ERASER }
 
 class XppStrokePoint {
   final double? x;

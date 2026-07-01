@@ -7,11 +7,11 @@ import 'package:xournalpp/widgets/ToolSettingDialog.dart';
 
 class EditingToolBar extends StatefulWidget {
   final Function(Map<PointerDeviceKind?, EditingTool>?)? onNewDeviceMap;
-  final Function(double newWidth)? onWidthChange;
+  final Function(double newWidth, EditingTool? tool)? onWidthChange;
   final Map<PointerDeviceKind?, EditingTool>? deviceMap;
   final Function(Color)? onColorChange;
   final Function()? getColor;
-  final Function()? getWidth;
+  final Function(EditingTool? tool)? getWidth;
 
   const EditingToolBar({
     Key? key,
@@ -108,10 +108,12 @@ class EditingToolBarState extends State<EditingToolBar> {
       barrierDismissible: true,
       pageBuilder: (_, __, ___) {
         return ToolSettingDialog(
-          width: widget.getWidth!(),
+          width: widget.getWidth!(getTool()),
           color: widget.getColor!(),
           onColorChange: widget.onColorChange,
-          onWidthChange: widget.onWidthChange,
+          onWidthChange: (newWidth) =>
+              widget.onWidthChange!(newWidth, getTool()),
+          enableColor: getTool() != EditingTool.ERASER,
         );
       },
     );

@@ -9,6 +9,7 @@ class ToolSettingDialog extends StatefulWidget {
   Object? S;
   Color color;
   FloatingActionButton? pickerButton;
+  final bool enableColor;
 
   ToolSettingDialog({
     Key? key,
@@ -17,6 +18,7 @@ class ToolSettingDialog extends StatefulWidget {
     this.onColorChange,
     this.onWidthChange,
     this.S,
+    this.enableColor = true,
   }) : super(key: key);
 
   @override
@@ -78,39 +80,41 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                   },
                 ),
               ),
-              Container(
-                child: Text(
-                  S.of(context).selectColor,
-                  style: TextStyle(color: Colors.black),
+              if (widget.enableColor)
+                Container(
+                  child: Text(
+                    S.of(context).selectColor,
+                    style: TextStyle(color: Colors.black),
+                  ),
                 ),
-              ),
-              Container(
-                height: 64,
-                margin: EdgeInsets.only(
-                  left: 0.0,
-                  top: 5.0,
-                  right: 0.0,
-                  bottom: 0.0,
+              if (widget.enableColor)
+                Container(
+                  height: 64,
+                  margin: EdgeInsets.only(
+                    left: 0.0,
+                    top: 5.0,
+                    right: 0.0,
+                    bottom: 0.0,
+                  ),
+                  child: ListView(
+                    // This next line does the trick.
+                    scrollDirection: Axis.horizontal,
+                    children: <Widget>[
+                      getColorFab("Colorfab1", Colors.black),
+                      getColorFab("Colorfab2", Colors.grey),
+                      getColorFab("Colorfab3", Color(0xFF336699)),
+                      getColorFab("Colorfab4", Colors.white),
+                      getColorFab("Colorfab5", Color(0xFFe67300)),
+                      getColorFab(
+                        "Colorfab6",
+                        Color(0xFFB30000),
+                      ), //for whatever reason, this is not rgba but argb
+                      getColorFab("Colorfab7", Color(0xFF009933)),
+                      getColorFab("Colorfab8", Color(0xFF000099)),
+                      getColorPicker(),
+                    ],
+                  ),
                 ),
-                child: ListView(
-                  // This next line does the trick.
-                  scrollDirection: Axis.horizontal,
-                  children: <Widget>[
-                    getColorFab("Colorfab1", Colors.black),
-                    getColorFab("Colorfab2", Colors.grey),
-                    getColorFab("Colorfab3", Color(0xFF336699)),
-                    getColorFab("Colorfab4", Colors.white),
-                    getColorFab("Colorfab5", Color(0xFFe67300)),
-                    getColorFab(
-                      "Colorfab6",
-                      Color(0xFFB30000),
-                    ), //for whatever reason, this is not rgba but argb
-                    getColorFab("Colorfab7", Color(0xFF009933)),
-                    getColorFab("Colorfab8", Color(0xFF000099)),
-                    getColorPicker(),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
