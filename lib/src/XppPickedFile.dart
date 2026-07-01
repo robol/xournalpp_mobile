@@ -32,6 +32,12 @@ class XppPickedFile {
     final file = result?.files.single;
     if (file == null) throw UnsupportedError('No file selected.');
     final path = file.identifier ?? file.path;
+    if (path != null) {
+      await persistDocumentAccess(
+        path,
+        writable: type == XppFilePickType.custom,
+      );
+    }
     final bytes =
         file.bytes ?? (path == null ? null : await readFileBytes(path));
     if (bytes == null) throw UnsupportedError('Could not read selected file.');

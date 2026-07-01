@@ -44,6 +44,15 @@ class MainActivity: FlutterActivity() {
                         }
                         writeDocument(Uri.parse(uri), bytes, result)
                     }
+                    "persistDocumentAccess" -> {
+                        val uri = call.argument<String>("uri")
+                        val writable = call.argument<Boolean>("writable") ?: false
+                        if (uri == null) {
+                            result.error("missing_uri", "No document URI was provided.", null)
+                            return@setMethodCallHandler
+                        }
+                        persistDocumentAccess(Uri.parse(uri), writable, result)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -95,6 +104,32 @@ class MainActivity: FlutterActivity() {
             result.success(null)
         } catch (error: Exception) {
             result.error("write_failed", error.message, uri.toString())
+        }
+    }
+
+    private fun persistDocumentAccess(uri: Uri, writable: Boolean, result: MethodChannel.Result) {
+        val readFlag = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        val requestedFlags = if (writable) {
+            readFlag or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        } else {
+            readFlag
+        }
+
+        try {
+            contentResolver.takePersistableUriPermission(uri, requestedFlags)
+            result.success(true)
+        } catch (_: SecurityException) {
+            if (!writable) {
+                result.success(false)
+                return
+            }
+
+            try {
+                contentResolver.takePersistableUriPermission(uri, readFlag)
+                result.success(true)
+            } catch (_: SecurityException) {
+                result.success(false)
+            }
         }
     }
 

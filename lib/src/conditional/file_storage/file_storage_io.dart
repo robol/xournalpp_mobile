@@ -45,6 +45,17 @@ Future<String?> saveDocumentBytes(Uint8List bytes, {String? fileName}) async {
   });
 }
 
+Future<bool> persistDocumentAccess(String path, {bool writable = false}) async {
+  final documentUri = _androidDocumentUriForPath(path);
+  if (documentUri == null) return false;
+
+  return await _storageChannel.invokeMethod<bool>('persistDocumentAccess', {
+        'uri': documentUri,
+        'writable': writable,
+      }) ??
+      false;
+}
+
 Future<void> deleteFile(String path) => File(path).delete();
 
 Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {

@@ -405,7 +405,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               });
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(S.of(context).errorOpeningFile)),
+                SnackBar(content: Text(S.of(context).errorOpeningFile + e.toString())),
               );
             }
           },

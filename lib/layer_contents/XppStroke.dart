@@ -6,7 +6,7 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 abstract class XppStroke extends XppContent {
-  static const int _renderChunkPointCount = 24;
+  static const int _renderChunkPointCount = 128;
 
   XppStroke({
     this.tool = XppStrokeTool.PEN,

@@ -12,6 +12,10 @@ Future<String?> saveDocumentBytes(Uint8List bytes, {String? fileName}) async {
   return null;
 }
 
+Future<bool> persistDocumentAccess(String path, {bool writable = false}) async {
+  return false;
+}
+
 Future<void> deleteFile(String path) {
   throw UnsupportedError('Deleting local file paths is not supported here.');
 }
