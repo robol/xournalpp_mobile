@@ -10,7 +10,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
-import 'package:vector_math/vector_math_64.dart' show Vector4;
+import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppLayer.dart';
@@ -37,6 +37,7 @@ class CanvasPage extends StatefulWidget {
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _defaultToolColor = 0xFF607D8B;
+  static const double _fitWidthHorizontalMargin = 50;
 
   XppFile? _file;
   String? filePath;
@@ -310,9 +311,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   if (_file!.pages!.length >= currentPage)
                     currentPage = _file!.pages!.length - 1;
                   if (_file!.pages!.isEmpty) {
-                    _file!.pages!.add(
-                      XppPage.empty(background: Colors.white),
-                    );
+                    _file!.pages!.add(XppPage.empty(background: Colors.white));
                     currentPage = 0;
 
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -500,18 +499,37 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _fitPageToWidth() {
-    final renderObject = _zoomableKey.currentContext?.findRenderObject();
-    final viewportSize = renderObject is RenderBox
-        ? renderObject.size
-        : MediaQuery.of(context).size;
-    final pageRatio = _file!.pages![currentPage].pageSize!.ratio;
-    final viewportRatio = viewportSize.width / viewportSize.height;
-    final fittedPageWidth = viewportRatio > pageRatio
-        ? viewportSize.height * pageRatio
-        : viewportSize.width;
+    final viewportObject = _zoomableKey.currentContext?.findRenderObject();
+    final pageObject = _pageStackKey.currentContext?.findRenderObject();
+    if (viewportObject is! RenderBox || pageObject is! RenderBox) return;
 
-    if (fittedPageWidth <= 0) return;
-    _setScale(viewportSize.width / fittedPageWidth);
+    final pageLeft = pageObject.localToGlobal(Offset.zero).dx;
+    final pageRight = pageObject
+        .localToGlobal(Offset(pageObject.size.width, 0))
+        .dx;
+    final currentPageWidth = (pageRight - pageLeft).abs();
+    final currentScale = _zoomController.value.getMaxScaleOnAxis();
+    if (currentPageWidth <= 0 || currentScale <= 0) return;
+
+    final unzoomedPageWidth = currentPageWidth / currentScale;
+    final targetWidth = max(
+      1.0,
+      viewportObject.size.width - _fitWidthHorizontalMargin * 2,
+    );
+    final targetScale = max(0.1, min(5.0, targetWidth / unzoomedPageWidth));
+    final centeredTransform = Matrix4.identity()
+      ..setDiagonal(Vector4(targetScale, targetScale, 1, 1))
+      ..setTranslation(
+        Vector3(
+          viewportObject.size.width * (1 - targetScale) / 2,
+          viewportObject.size.height * (1 - targetScale) / 2,
+          0,
+        ),
+      );
+
+    pageScale = targetScale;
+    _animateTransformation(centeredTransform);
+    setState(() {});
   }
 
   void _eraseContentAt({Offset? coordinates, double? radius}) {

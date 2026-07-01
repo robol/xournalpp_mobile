@@ -156,7 +156,9 @@ class EditingToolBarState extends State<EditingToolBar> {
   void setTool(EditingTool tool) {
     PointerDeviceKind? device = currentDevice;
     if (Platform.isAndroid || Platform.isIOS) {
-      device = PointerDeviceKind.stylus;
+      widget.deviceMap![PointerDeviceKind.touch] = tool;
+      widget.deviceMap![PointerDeviceKind.stylus] = tool;
+      return;
     }
     widget.deviceMap![device] = tool;
   }
