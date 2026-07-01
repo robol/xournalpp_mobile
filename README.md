@@ -122,14 +122,6 @@ Contributions that preserve the spirit of the original work while improving comp
 
 ---
 
-## `.xopp` file format
-
-Xournal++ documents use the `.xopp` format. Useful background information can be found in the Xournal documentation:
-
-http://www-math.mit.edu/~auroux/software/xournal/manual.html#file-format
-
----
-
 ## Roadmap
 
 Possible next steps include:
