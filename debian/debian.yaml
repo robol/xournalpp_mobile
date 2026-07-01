@@ -1,0 +1,12 @@
+flutter_app:
+  command: xournalpp-mobile
+  arch: x64
+  parent: /usr/local/lib
+  nonInteractive: true
+
+control:
+  Package: xournalpp-mobile
+  Architecture: amd64
+  Priority: optional
+  Maintainer: Leonardo Robol <leo@robol.it>
+  Description: Infinitely take notes, sketch and learn

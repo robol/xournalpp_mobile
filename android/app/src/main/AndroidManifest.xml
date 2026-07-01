@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="online.xournal.mobile">
+    package="it.robol.xournal.mobile">
     <application
         android:label="Xournal++"
         android:icon="@mipmap/ic_launcher">

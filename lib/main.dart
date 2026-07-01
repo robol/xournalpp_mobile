@@ -17,7 +17,7 @@ void main() {
 
   /// Release configuration. Same as above, but once user accepts dialog, user will be prompted to send email with crash to support.
   CatcherOptions releaseOptions = CatcherOptions(DialogReportMode(), [
-    EmailManualHandler(["the-one@with-the-braid.cf"])
+    EmailManualHandler(["leo@robol.it"])
   ]);
 
   /// STEP 2. Pass your root widget (MyApp) along with Catcher configuration:
