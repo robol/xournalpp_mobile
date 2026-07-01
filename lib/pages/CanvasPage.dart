@@ -167,6 +167,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         this._setScale(pageScale + 0.1);
                       },
                     ),
+                    IconButton(
+                      icon: Icon(Icons.fit_screen),
+                      color: Theme.of(context).primaryColor,
+                      tooltip: 'Fit width',
+                      onPressed: _fitPageToWidth,
+                    ),
                     SizedBox(
                       height: 128,
                       child: RotatedBox(
@@ -491,6 +497,21 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       }
       setState(() {});
     }
+  }
+
+  void _fitPageToWidth() {
+    final renderObject = _zoomableKey.currentContext?.findRenderObject();
+    final viewportSize = renderObject is RenderBox
+        ? renderObject.size
+        : MediaQuery.of(context).size;
+    final pageRatio = _file!.pages![currentPage].pageSize!.ratio;
+    final viewportRatio = viewportSize.width / viewportSize.height;
+    final fittedPageWidth = viewportRatio > pageRatio
+        ? viewportSize.height * pageRatio
+        : viewportSize.width;
+
+    if (fittedPageWidth <= 0) return;
+    _setScale(viewportSize.width / fittedPageWidth);
   }
 
   void _eraseContentAt({Offset? coordinates, double? radius}) {
