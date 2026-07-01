@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 import 'package:xournalpp/generated/l10n.dart';
@@ -115,10 +116,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         eraserWidth: eraserWidth,
                         color: toolColor,
                         onDeviceChange: _handleDeviceChange,
-                        removeLastContent: () {
-                          _file!.pages![currentPage].layers![0].content!
-                              .removeLast();
-                        },
                         filterEraser: ({Offset? coordinates, double? radius}) {
                           _eraseContentAt(
                             coordinates: coordinates,
@@ -134,10 +131,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             },
                         onNewContent: (newContent) {
                           /// TODO: manage layers
-                          _file!.pages![currentPage].layers![0].content =
-                              new List.from(
-                                _file!.pages![currentPage].layers![0].content!,
-                              )..add(newContent);
+                          setState(() {
+                            _file!
+                                .pages![currentPage]
+                                .layers![0]
+                                .content = new List.from(
+                              _file!.pages![currentPage].layers![0].content!,
+                            )..add(newContent);
+                          });
                           _eraserIndex?.add(newContent);
 
                           _pageStackKey.currentState!.setPageData(
@@ -236,6 +237,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.undo),
+            onPressed: _canUndoLastStroke ? _undoLastStroke : null,
+            tooltip: 'Undo last stroke',
+          ),
           savingFile
               ? Center(
                   child: Padding(
@@ -555,6 +561,30 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _eraseContentAt({Offset? coordinates, double? radius}) {
     if (coordinates == null) return;
     _eraseContentAlongPath(coordinates: [coordinates], radius: radius);
+  }
+
+  bool get _canUndoLastStroke {
+    final content = _file?.pages?[currentPage].layers?[0].content;
+    return content?.any((item) => item is XppStroke) ?? false;
+  }
+
+  void _undoLastStroke() {
+    final page = _file!.pages![currentPage];
+    final layer = page.layers![0];
+    final content = layer.content;
+    if (content == null || content.isEmpty) return;
+
+    final strokeIndex = content.lastIndexWhere((item) => item is XppStroke);
+    if (strokeIndex == -1) return;
+
+    final removedContent = content[strokeIndex];
+    setState(() {
+      layer.content = List<XppContent?>.from(content)..removeAt(strokeIndex);
+      if (removedContent != null) {
+        _eraserIndex?.remove(removedContent);
+      }
+    });
+    _pageStackKey.currentState!.setPageData(page);
   }
 
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
