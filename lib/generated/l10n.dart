@@ -673,6 +673,15 @@ class S {
       args: [],
     );
   }
+
+  String get forkedBy {
+    return Intl.message(
+      'This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work.',
+      name: 'forkedBy',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

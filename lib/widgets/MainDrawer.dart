@@ -34,20 +34,9 @@ class _MainDrawerState extends State<MainDrawer> {
               mainAxisAlignment: MainAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Semantics(
-                  // unnecessary information for screen readers etc.
-                  hidden: true,
-                  child: UserAccountsDrawerHeader(
-                    accountName: Text(
-                      'Xournal++',
-                      style: Theme.of(context).textTheme.displayLarge,
-                    ),
-                    accountEmail: Text(
-                      S.of(context).mobileEditionUnofficial,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    currentAccountPicture: Image.asset('assets/xournalpp.png'),
-                  ),
+                Image.asset(
+                  'assets/xournalpp_horizontal_icon.png',
+                  fit: BoxFit.cover,
                 ),
                 ListTile(
                   leading: Icon(Icons.home),
@@ -67,9 +56,7 @@ class _MainDrawerState extends State<MainDrawer> {
                   onTap: () => Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (context) => CanvasPage(
-                        file: XppFile.empty(
-                          background: Colors.white,
-                        ),
+                        file: XppFile.empty(background: Colors.white),
                       ),
                     ),
                   ),
@@ -97,28 +84,29 @@ class _MainDrawerState extends State<MainDrawer> {
                     applicationLegalese: 'Powered by TestApp.schule',
                     children: [
                       Image.asset('assets/feature-banner.png', scale: 2),
-                      if (!(Theme.of(context).platform == TargetPlatform.iOS) &&
-                          !(Theme.of(context).platform == TargetPlatform.macOS))
-                        ElevatedButton.icon(
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12, bottom: 8),
+                        child: OutlinedButton(
                           onPressed: () => launchUrl(
-                            Uri.parse('https://buymeacoff.ee/braid'),
+                            Uri.parse('https://github.com/xournalpp/xournalpp'),
                           ),
-                          icon: Icon(Icons.emoji_food_beverage),
-                          label: Text('Buy me a cup of tea'),
+                          child: Text(S.of(context).aboutXournal),
                         ),
-                      OutlinedButton(
-                        onPressed: () => launchUrl(
-                          Uri.parse('https://github.com/xournalpp/xournalpp'),
-                        ),
-                        child: Text(S.of(context).aboutXournal),
                       ),
-                      OutlinedButton(
-                        onPressed: () => launchUrl(
-                          Uri.parse(
-                            'https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile',
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: OutlinedButton(
+                          onPressed: () => launchUrl(
+                            Uri.parse(
+                              'https://gitlab.com/robol/xournalpp_mobile',
+                            ),
                           ),
+                          child: Text(S.of(context).sourceCode),
                         ),
-                        child: Text(S.of(context).sourceCode),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(S.of(context).forkedBy),
                       ),
                     ],
                   ),
