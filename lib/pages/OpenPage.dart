@@ -229,7 +229,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => CanvasPage(
-              file: XppFile.empty(background: Theme.of(context).cardColor),
+              file: XppFile.empty(background: Colors.white),
             ),
           ),
         ),

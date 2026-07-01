@@ -311,7 +311,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                     currentPage = _file!.pages!.length - 1;
                   if (_file!.pages!.isEmpty) {
                     _file!.pages!.add(
-                      XppPage.empty(background: Theme.of(context).cardColor),
+                      XppPage.empty(background: Colors.white),
                     );
                     currentPage = 0;
 
@@ -337,7 +337,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   currentPage++;
                   _file!.pages!.insert(
                     currentPage,
-                    XppPage.empty(background: Theme.of(context).cardColor),
+                    XppPage.empty(background: Colors.white),
                   );
 
                   _pageStackKey.currentState!.setPageData(

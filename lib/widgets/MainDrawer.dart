@@ -68,7 +68,7 @@ class _MainDrawerState extends State<MainDrawer> {
                     MaterialPageRoute(
                       builder: (context) => CanvasPage(
                         file: XppFile.empty(
-                          background: Theme.of(context).cardColor,
+                          background: Colors.white,
                         ),
                       ),
                     ),

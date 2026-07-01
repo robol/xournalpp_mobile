@@ -25,9 +25,18 @@ Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {
 
 Future<File> _writableFileForPath(String path) async {
   final file = File(path);
-  if (file.isAbsolute || !Platform.isAndroid) return file.absolute;
+  if (!Platform.isAndroid) return file.absolute;
+  if (file.isAbsolute && file.parent.path != '/') return file;
 
   final directory = await getApplicationDocumentsDirectory();
-  final safeName = path.replaceAll(RegExp(r'[/\\]'), '_');
+  final safeName = _safeFileName(path);
   return File('${directory.path}/$safeName');
+}
+
+String _safeFileName(String path) {
+  final parts = path
+      .split(RegExp(r'[/\\]'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  return parts.isEmpty ? 'xournalpp-file' : parts.last;
 }

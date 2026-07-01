@@ -26,7 +26,7 @@ void main() {
   runApp(XournalppMobile());
 }
 
-const Color kPrimaryColor = Colors.deepPurple;
+const Color kPrimaryColor = Colors.lightBlue;
 const Color kPrimaryColorAccent = Colors.deepPurpleAccent;
 const Color kSecondaryColor = Colors.pink;
 const Color kSecondaryColorAccent = Colors.pinkAccent;
