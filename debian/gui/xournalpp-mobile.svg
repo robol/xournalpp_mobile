@@ -1,0 +1,105 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Xournal++ Modern Android Icon</title>
+  <desc>A light-blue rounded app icon with a notebook page, binder rings, hand-drawn X++ mark, and stylus.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="180" y1="150" x2="850" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ED8FF"/>
+      <stop offset="0.55" stop-color="#63BEF5"/>
+      <stop offset="1" stop-color="#42A5F5"/>
+    </linearGradient>
+    <linearGradient id="spine" x1="260" y1="260" x2="360" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E9DF2"/>
+      <stop offset="1" stop-color="#0D7FD5"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="360" y1="260" x2="760" y2="790" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4FBFF"/>
+    </linearGradient>
+    <linearGradient id="pen" x1="684" y1="390" x2="830" y2="830" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34424A"/>
+      <stop offset="0.45" stop-color="#111A20"/>
+      <stop offset="1" stop-color="#2B353C"/>
+    </linearGradient>
+    <filter id="softShadow" x="120" y="120" width="820" height="840" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="28" flood-color="#0E5E9C" flood-opacity="0.22"/>
+    </filter>
+    <filter id="smallShadow" x="180" y="190" width="720" height="710" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#164B78" flood-opacity="0.20"/>
+    </filter>
+    <filter id="penShadow" x="560" y="310" width="330" height="610" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="-10" dy="18" stdDeviation="12" flood-color="#0B2335" flood-opacity="0.28"/>
+    </filter>
+    <clipPath id="pageClip">
+      <rect x="282" y="252" width="570" height="588" rx="62"/>
+    </clipPath>
+  </defs>
+
+  <!-- App tile -->
+  <rect x="122" y="122" width="780" height="780" rx="170" fill="url(#bg)" filter="url(#softShadow)"/>
+  <rect x="154" y="154" width="716" height="716" rx="144" fill="white" opacity="0.05"/>
+
+  <!-- Back page -->
+  <g filter="url(#smallShadow)">
+    <rect x="330" y="284" width="536" height="580" rx="62" fill="#DFF3FF" opacity="0.9"/>
+    <rect x="308" y="266" width="536" height="580" rx="62" fill="#BFE8FF" opacity="0.72"/>
+  </g>
+
+  <!-- Main notebook -->
+  <g filter="url(#smallShadow)">
+    <rect x="252" y="232" width="596" height="594" rx="66" fill="url(#paper)"/>
+    <rect x="252" y="232" width="118" height="594" rx="66" fill="url(#spine)"/>
+    <path d="M370 232H318C281.5 232 252 261.5 252 298V760C252 796.5 281.5 826 318 826H370V232Z" fill="url(#spine)"/>
+    <path d="M370 232H318C281.5 232 252 261.5 252 298V760C252 796.5 281.5 826 318 826H370" stroke="#0872C4" stroke-width="2" opacity="0.35"/>
+  </g>
+
+  <!-- Notebook ruled lines -->
+  <g clip-path="url(#pageClip)" opacity="0.82">
+    <line x1="398" y1="340" x2="808" y2="340" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+    <line x1="398" y1="418" x2="808" y2="418" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+    <line x1="398" y1="496" x2="808" y2="496" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+    <line x1="398" y1="574" x2="808" y2="574" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+    <line x1="398" y1="652" x2="808" y2="652" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+    <line x1="398" y1="730" x2="808" y2="730" stroke="#B9E4FF" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Binder rings -->
+  <g>
+    <circle cx="320" cy="350" r="22" fill="#075C9E" opacity="0.55"/>
+    <circle cx="320" cy="464" r="22" fill="#075C9E" opacity="0.55"/>
+    <circle cx="320" cy="578" r="22" fill="#075C9E" opacity="0.55"/>
+    <circle cx="320" cy="692" r="22" fill="#075C9E" opacity="0.55"/>
+    <path d="M232 350H318" stroke="#F4FBFF" stroke-width="22" stroke-linecap="round"/>
+    <path d="M232 464H318" stroke="#F4FBFF" stroke-width="22" stroke-linecap="round"/>
+    <path d="M232 578H318" stroke="#F4FBFF" stroke-width="22" stroke-linecap="round"/>
+    <path d="M232 692H318" stroke="#F4FBFF" stroke-width="22" stroke-linecap="round"/>
+  </g>
+
+  <!-- Hand-drawn X++ mark -->
+  <g stroke="#1976D2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M488 406C520 477 552 553 600 675" stroke-width="48"/>
+    <path d="M655 386C598 455 541 532 462 704" stroke-width="48"/>
+    <path d="M474 688C468 701 460 716 456 730" stroke-width="9" opacity="0.85"/>
+    <path d="M611 651C619 671 627 691 637 708" stroke-width="9" opacity="0.8"/>
+    <path d="M630 558H696" stroke-width="26"/>
+    <path d="M663 525V591" stroke-width="26"/>
+    <path d="M730 558H796" stroke-width="26"/>
+    <path d="M763 525V591" stroke-width="26"/>
+    <path d="M626 558C644 552 680 565 699 556" stroke-width="7" opacity="0.9"/>
+    <path d="M726 558C745 552 780 565 800 556" stroke-width="7" opacity="0.9"/>
+  </g>
+
+  <!-- Stylus -->
+  <g filter="url(#penShadow)" transform="rotate(27 708 614)">
+    <rect x="670" y="378" width="72" height="430" rx="36" fill="url(#pen)"/>
+    <rect x="678" y="420" width="56" height="34" rx="17" fill="#76CFFF"/>
+    <rect x="724" y="520" width="13" height="102" rx="6.5" fill="#6F8793" opacity="0.9"/>
+    <path d="M679 782H733L722 836C720 846 712 854 706 854C700 854 692 846 690 836L679 782Z" fill="#222D34"/>
+    <path d="M700 852L706 884L712 852" stroke="#D7E6EF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="706" cy="394" rx="35" ry="28" fill="#26343B"/>
+    <path d="M684 378C698 363 724 366 736 382" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- Subtle foreground shine -->
+  <path d="M190 280C210 205 267 174 356 164H676C762 164 826 197 855 270" stroke="white" stroke-width="18" stroke-linecap="round" opacity="0.14"/>
+</svg>
