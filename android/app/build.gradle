@@ -33,7 +33,7 @@ def hasReleaseSigningConfig = keystoreProperties['storeFile'] &&
         keystoreProperties['keyPassword']
 
 android {
-    namespace 'online.xournal.mobile'
+    namespace 'it.robol.xournal.mobile'
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -46,7 +46,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "online.xournal.mobile"
+        applicationId "it.robol.xournal.mobile"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()

@@ -372,7 +372,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = online.xournal.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = it.robol.xournal.mobile;
 				PRODUCT_NAME = "Xournal++ Mobile";
 				PROVISIONING_PROFILE_SPECIFIER = ThinkPad;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -512,7 +512,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = online.xournal.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = it.robol.xournal.mobile;
 				PRODUCT_NAME = "Xournal++ Mobile";
 				PROVISIONING_PROFILE_SPECIFIER = ThinkPad;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -546,7 +546,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Flutter",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = online.xournal.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = it.robol.xournal.mobile;
 				PRODUCT_NAME = "Xournal++ Mobile";
 				PROVISIONING_PROFILE_SPECIFIER = ThinkPad;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";

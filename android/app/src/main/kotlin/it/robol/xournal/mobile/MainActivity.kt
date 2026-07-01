@@ -1,4 +1,4 @@
-package online.xournal.mobile
+package it.robol.xournal.mobile
 
 import android.app.Activity
 import android.content.Intent
@@ -8,7 +8,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
-    private val storageChannel = "online.xournal.mobile/storage"
+    private val storageChannel = "it.robol.xournal.mobile/storage"
     private val createDocumentRequestCode = 49317
     private var pendingCreateResult: MethodChannel.Result? = null
     private var pendingCreateBytes: ByteArray? = null

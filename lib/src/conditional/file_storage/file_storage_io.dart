@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-const _storageChannel = MethodChannel('online.xournal.mobile/storage');
+const _storageChannel = MethodChannel('it.robol.xournal.mobile/storage');
 
 Future<Uint8List> readFileBytes(String path) async {
   final documentUri = _androidDocumentUriForPath(path);

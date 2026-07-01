@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(runner LANGUAGES CXX)
 
 set(BINARY_NAME "xournalpp-mobile")
-set(APPLICATION_ID "online.xournal.mobile")
+set(APPLICATION_ID "it.robol.xournal.mobile")
 
 cmake_policy(SET CMP0063 NEW)
 
