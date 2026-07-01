@@ -95,6 +95,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 //print(details);
                 setState(() => pageScale = _zoomController.value.entry(0, 0));
               },
+              onTransformationChanged: () {
+                setState(() => pageScale = _zoomController.value.entry(0, 0));
+              },
               child: Center(
                 child: Card(
                   elevation: 12,
