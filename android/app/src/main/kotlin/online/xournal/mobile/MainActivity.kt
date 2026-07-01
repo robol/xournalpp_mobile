@@ -69,7 +69,7 @@ class MainActivity: FlutterActivity() {
 
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/octet-stream"
+            type = "application/x-xopp"
             putExtra(Intent.EXTRA_TITLE, fileName)
             addFlags(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or

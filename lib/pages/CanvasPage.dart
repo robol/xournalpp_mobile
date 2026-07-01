@@ -64,6 +64,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   bool savingFile = false;
 
+  _EraserContentIndex? _eraserIndex;
+
   Animation<Matrix4>? _animationReset;
   late AnimationController _controllerReset;
 
@@ -123,12 +125,20 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             radius: radius,
                           );
                         },
+                        filterEraserPath:
+                            ({List<Offset>? coordinates, double? radius}) {
+                              _eraseContentAlongPath(
+                                coordinates: coordinates,
+                                radius: radius,
+                              );
+                            },
                         onNewContent: (newContent) {
                           /// TODO: manage layers
                           _file!.pages![currentPage].layers![0].content =
                               new List.from(
                                 _file!.pages![currentPage].layers![0].content!,
                               )..add(newContent);
+                          _eraserIndex?.add(newContent);
 
                           _pageStackKey.currentState!.setPageData(
                             _file!.pages![currentPage],
@@ -305,13 +315,17 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 key: pageListViewKey,
                 pages: _file!.pages,
                 onPageChange: (newPage) {
-                  setState(() => currentPage = newPage);
+                  setState(() {
+                    currentPage = newPage;
+                    _invalidateEraserIndex();
+                  });
                   _pageStackKey.currentState!.setPageData(
                     _file!.pages![currentPage],
                   );
                 },
                 onPageDelete: (deletedIndex) => setState(() {
                   _file!.pages!.removeAt(deletedIndex);
+                  _invalidateEraserIndex();
                   if (_file!.pages!.length >= currentPage)
                     currentPage = _file!.pages!.length - 1;
                   if (_file!.pages!.isEmpty) {
@@ -331,6 +345,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   final page = _file!.pages![initialIndex];
                   _file!.pages!.removeAt(initialIndex);
                   _file!.pages!.insert(movedTo - 1, page);
+                  _invalidateEraserIndex();
                 }),
                 currentPage: currentPage,
               ),
@@ -338,6 +353,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 heroTag: 'AddXppPage',
                 onPressed: () => setState(() {
                   currentPage++;
+                  _invalidateEraserIndex();
                   _file!.pages!.insert(
                     currentPage,
                     XppPage.empty(background: Colors.white),
@@ -537,9 +553,25 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _eraseContentAt({Offset? coordinates, double? radius}) {
-    if (coordinates == null || radius == null) return;
+    if (coordinates == null) return;
+    _eraseContentAlongPath(coordinates: [coordinates], radius: radius);
+  }
+
+  void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
+    if (coordinates == null || coordinates.isEmpty || radius == null) return;
 
     final layer = _file!.pages![currentPage].layers![0];
+    final eraserIndex = _eraserIndexForLayer(layer);
+    final eraseCandidates = <XppContent>{};
+    for (final coordinate in coordinates) {
+      final eraserRect = Rect.fromCircle(
+        center: coordinate,
+        radius: radius / 2,
+      );
+      eraseCandidates.addAll(eraserIndex.query(eraserRect));
+    }
+    if (eraseCandidates.isEmpty) return;
+
     final List<XppContent?> updatedContent = [];
     bool erasedAnything = false;
 
@@ -549,13 +581,23 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         continue;
       }
 
-      final delta = content.eraseWhere(
+      if (!eraseCandidates.contains(content)) {
+        updatedContent.add(content);
+        continue;
+      }
+
+      final delta = _eraseContentWithPath(
+        content: content,
         coordinates: coordinates,
         radius: radius,
       );
 
       if (delta.affected) {
         erasedAnything = true;
+        eraserIndex.remove(content);
+        for (final newContent in delta.newContent) {
+          eraserIndex.add(newContent);
+        }
         updatedContent.addAll(delta.newContent);
       } else {
         updatedContent.add(content);
@@ -567,6 +609,50 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     layer.content = updatedContent;
     _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
     setState(() {});
+  }
+
+  XppContentEraseData _eraseContentWithPath({
+    required XppContent content,
+    required List<Offset> coordinates,
+    required double radius,
+  }) {
+    var remainingContent = <XppContent>[content];
+    var affected = false;
+
+    for (final coordinate in coordinates) {
+      if (remainingContent.isEmpty) break;
+
+      final nextContent = <XppContent>[];
+      for (final currentContent in remainingContent) {
+        final delta = currentContent.eraseWhere(
+          coordinates: coordinate,
+          radius: radius,
+        );
+        if (delta.affected) {
+          affected = true;
+          nextContent.addAll(delta.newContent);
+        } else {
+          nextContent.add(currentContent);
+        }
+      }
+      remainingContent = nextContent;
+    }
+
+    if (!affected) return XppContentEraseData();
+
+    return XppContentEraseData(
+      affected: true,
+      delete: remainingContent.isEmpty,
+      newContent: remainingContent,
+    );
+  }
+
+  _EraserContentIndex _eraserIndexForLayer(XppLayer layer) {
+    return _eraserIndex ??= _EraserContentIndex.fromContent(layer.content);
+  }
+
+  void _invalidateEraserIndex() {
+    _eraserIndex = null;
   }
 
   void shareScreenshot() async {
@@ -744,4 +830,87 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
     });
   }
+}
+
+class _EraserContentIndex {
+  static const double _cellSize = 96;
+
+  final Map<_EraserIndexCell, Set<XppContent>> _cellContent = {};
+  final Map<XppContent, Set<_EraserIndexCell>> _contentCells = {};
+
+  _EraserContentIndex.fromContent(Iterable<XppContent?>? content) {
+    if (content == null) return;
+    for (final item in content) {
+      add(item);
+    }
+  }
+
+  void add(XppContent? content) {
+    final bounds = content?.eraseBounds;
+    if (content == null || bounds == null || bounds.isEmpty) return;
+
+    final cells = _cellsForRect(bounds);
+    _contentCells[content] = cells;
+    for (final cell in cells) {
+      (_cellContent[cell] ??= <XppContent>{}).add(content);
+    }
+  }
+
+  void remove(XppContent content) {
+    final cells = _contentCells.remove(content);
+    if (cells == null) return;
+
+    for (final cell in cells) {
+      final contentForCell = _cellContent[cell];
+      if (contentForCell == null) continue;
+      contentForCell.remove(content);
+      if (contentForCell.isEmpty) _cellContent.remove(cell);
+    }
+  }
+
+  Set<XppContent> query(Rect rect) {
+    final candidates = <XppContent>{};
+    final hitSlop = rect.width / 2;
+    for (final cell in _cellsForRect(rect)) {
+      final contentForCell = _cellContent[cell];
+      if (contentForCell == null) continue;
+      for (final content in contentForCell) {
+        final bounds = content.eraseBounds;
+        if (bounds != null && bounds.inflate(hitSlop).contains(rect.center)) {
+          candidates.add(content);
+        }
+      }
+    }
+    return candidates;
+  }
+
+  Set<_EraserIndexCell> _cellsForRect(Rect rect) {
+    final left = (rect.left / _cellSize).floor();
+    final right = (rect.right / _cellSize).floor();
+    final top = (rect.top / _cellSize).floor();
+    final bottom = (rect.bottom / _cellSize).floor();
+    final cells = <_EraserIndexCell>{};
+
+    for (var x = left; x <= right; x++) {
+      for (var y = top; y <= bottom; y++) {
+        cells.add(_EraserIndexCell(x, y));
+      }
+    }
+    return cells;
+  }
+}
+
+class _EraserIndexCell {
+  final int x;
+  final int y;
+
+  const _EraserIndexCell(this.x, this.y);
+
+  @override
+  bool operator ==(Object other) {
+    return other is _EraserIndexCell && other.x == x && other.y == y;
+  }
+
+  @override
+  int get hashCode => Object.hash(x, y);
 }

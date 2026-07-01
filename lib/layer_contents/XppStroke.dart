@@ -19,16 +19,23 @@ abstract class XppStroke extends XppContent {
   List<XppStrokePoint>? points;
   Color? color;
   EditingTool? editingTool;
+  XppStrokeBounds? _cachedBounds;
 
   @override
   Offset getOffset() {
     if (points!.isEmpty) return Offset(0, 0);
-    return XppStrokeBounds.fromPoints(points!).rect.topLeft;
+    return _strokeBounds.rect.topLeft;
   }
 
   Offset get bottomRight {
     if (points!.isEmpty) return Offset(0, 0);
-    return XppStrokeBounds.fromPoints(points!).rect.bottomRight;
+    return _strokeBounds.rect.bottomRight;
+  }
+
+  @override
+  Rect? get eraseBounds {
+    if (points!.isEmpty) return null;
+    return _strokeBounds.rect;
   }
 
   @override
@@ -41,7 +48,7 @@ abstract class XppStroke extends XppContent {
     if (tool == XppStrokeTool.HIGHLIGHTER) {
       colorToUse = color!.withValues(alpha: .5);
     }
-    final strokeBounds = XppStrokeBounds.fromPoints(points!);
+    final strokeBounds = _strokeBounds;
     final chunks = _chunkPoints(points!);
     return XppPageContentWidget(
       child: SizedBox(
@@ -121,32 +128,38 @@ abstract class XppStroke extends XppContent {
     return node;
   }
 
-  bool _shouldErase({Offset? coordinates, double? radius}) {
-    bool erase = false;
-    points!.forEach((element) {
-      if (_shouldRemovePoint(element, coordinates!, radius!)) erase = true;
-    });
-    return (erase);
-  }
-
   @override
   XppContentEraseData eraseWhere({Offset? coordinates, double? radius}) {
-    if (!_shouldErase(coordinates: coordinates, radius: radius))
+    if (coordinates == null || radius == null || points!.isEmpty) {
       return XppContentEraseData();
-    List<XppStroke> newStrokes = [];
-    bool lastPointRemoved = true;
-    for (int i = 0; i < points!.length; i++) {
-      if (_shouldRemovePoint(points![i], coordinates!, radius!)) {
-        lastPointRemoved = true;
-      } else {
-        if (lastPointRemoved) {
-          newStrokes.add(newStroke(color: color, points: [points![i]]));
-        } else {
-          newStrokes.last.points!.add(points![i]);
-        }
-        lastPointRemoved = false;
-      }
     }
+    if (!_mightErase(coordinates: coordinates, radius: radius)) {
+      return XppContentEraseData();
+    }
+
+    List<XppStroke> newStrokes = [];
+    List<XppStrokePoint> currentSegment = [];
+    bool removedAnyPoint = false;
+
+    for (final point in points!) {
+      if (_shouldRemovePoint(point, coordinates, radius)) {
+        removedAnyPoint = true;
+        if (currentSegment.isNotEmpty) {
+          newStrokes.add(newStroke(color: color, points: currentSegment));
+          currentSegment = [];
+        }
+        continue;
+      }
+
+      currentSegment.add(point);
+    }
+
+    if (!removedAnyPoint) return XppContentEraseData();
+
+    if (currentSegment.isNotEmpty) {
+      newStrokes.add(newStroke(color: color, points: currentSegment));
+    }
+
     return XppContentEraseData(
       affected: true,
       delete: newStrokes.isEmpty,
@@ -167,6 +180,14 @@ abstract class XppStroke extends XppContent {
   }
 
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points});
+
+  XppStrokeBounds get _strokeBounds {
+    return _cachedBounds ??= XppStrokeBounds.fromPoints(points!);
+  }
+
+  bool _mightErase({required Offset coordinates, required double radius}) {
+    return _strokeBounds.rect.inflate(radius / 2).contains(coordinates);
+  }
 
   bool _shouldRemovePoint(
     XppStrokePoint element,

@@ -12,11 +12,16 @@ class XppLayer {
   static XppLayer empty() => XppLayer(content: []);
 
   XmlElement toXmlElement() => XmlElement(
-      XmlName('layer'), const [], content!.map((e) => e!.toXmlElement()));
+    XmlName('layer'),
+    const [],
+    content!.map((e) => e!.toXmlElement()),
+  );
 }
 
 abstract class XppContent {
   Offset? getOffset();
+
+  Rect? get eraseBounds => null;
 
   XppPageContentWidget render();
 
@@ -36,6 +41,9 @@ class XppContentEraseData {
   final bool delete;
   final List<XppContent> newContent;
 
-  XppContentEraseData(
-      {this.affected = false, this.delete = false, this.newContent = const []});
+  XppContentEraseData({
+    this.affected = false,
+    this.delete = false,
+    this.newContent = const [],
+  });
 }

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
@@ -27,6 +28,7 @@ class PointerListener extends StatefulWidget {
   final Color? color;
   @required
   final Function({Offset? coordinates, double? radius})? filterEraser;
+  final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   @required
   final Function()? removeLastContent;
 
@@ -41,6 +43,7 @@ class PointerListener extends StatefulWidget {
     this.eraserWidth,
     this.color,
     this.filterEraser,
+    this.filterEraserPath,
     this.removeLastContent,
   }) : super(key: key);
 
@@ -50,16 +53,22 @@ class PointerListener extends StatefulWidget {
 
 class PointerListenerState extends State<PointerListener> {
   static const int _previewChunkPointCount = 24;
+  static const double _maxStrokePointSpacing = 1.5;
+  static const int _maxInterpolatedPointsPerEvent = 32;
+  static const int _smoothingIterations = 1;
 
   bool drawingEnabled = true;
 
   List<XppStrokePoint> points = [];
+  List<XppStrokePoint> rawPoints = [];
   List<_PreviewPictureChunk> previewChunks = [];
   List<XppStrokePoint> activePreviewPoints = [];
+  List<Offset> eraserPreviewPoints = [];
 
   XppStrokeTool tool = XppStrokeTool.PEN;
 
   final ValueNotifier<int> _strokeRepaint = ValueNotifier<int>(0);
+  final ValueNotifier<int> _eraserRepaint = ValueNotifier<int>(0);
   final ValueNotifier<Rect?> _activePreviewBounds = ValueNotifier<Rect?>(null);
   final List<Picture> _activePreviewPictureDependencies = [];
   Picture? _activePreviewPicture;
@@ -67,6 +76,7 @@ class PointerListenerState extends State<PointerListener> {
   Map<int, DateTime> pointerTimestamps = Map();
 
   bool poppedContentForCurrentPointer = false;
+  Offset? _lastErasePosition;
 
   PointerDeviceKind? _lastNotifiedDeviceKind;
 
@@ -98,7 +108,11 @@ class PointerListenerState extends State<PointerListener> {
             resetPreview();
             addStrokePoint(data);
           }
-          if (drawingEnabled && isEraser(data)) eraseAt(data);
+          if (drawingEnabled && isEraser(data)) {
+            _lastErasePosition = null;
+            resetEraserPreview();
+            eraseAt(data);
+          }
           if (isLaTeX(data)) {
             XppTexImage.edit(
               context: context,
@@ -117,15 +131,25 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
-          if (!poppedContentForCurrentPointer) saveStroke(tool);
+          if (tool == XppStrokeTool.ERASER) {
+            applyEraserPath();
+          } else if (!poppedContentForCurrentPointer) {
+            saveStroke(tool);
+          }
           poppedContentForCurrentPointer = false;
+          _lastErasePosition = null;
+          resetEraserPreview();
+          rawPoints.clear();
           points.clear();
           resetPreview(rebuild: true);
           _strokeRepaint.value++;
         },
         onPointerCancel: (data) {
+          rawPoints.clear();
           points.clear();
           poppedContentForCurrentPointer = false;
+          _lastErasePosition = null;
+          resetEraserPreview();
           resetPreview(rebuild: true);
           _strokeRepaint.value++;
         },
@@ -168,6 +192,19 @@ class PointerListenerState extends State<PointerListener> {
                 );
               },
             ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    foregroundPainter: _EraserPreviewPainter(
+                      pointsProvider: () => eraserPreviewPoints,
+                      radiusProvider: () => widget.eraserWidth ?? 1,
+                      repaint: _eraserRepaint,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -179,16 +216,19 @@ class PointerListenerState extends State<PointerListener> {
   //   key.currentState.clearPoints();
 
   void clearPoints() {
+    rawPoints.clear();
     points.clear();
+    resetEraserPreview();
     resetPreview(rebuild: true);
     _strokeRepaint.value++;
   }
 
   void saveStroke(XppStrokeTool tool) {
-    if (points.isNotEmpty) {
+    final strokePoints = _smoothedStrokePoints();
+    if (strokePoints.isNotEmpty) {
       XppStroke stroke = XppStroke.byTool(
         tool: tool,
-        points: List.from(points),
+        points: strokePoints,
         color: widget.color,
       );
       widget.onNewContent!(stroke);
@@ -196,10 +236,38 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void eraseAt(PointerEvent data) {
-    widget.filterEraser!(
-      coordinates: Offset(data.localPosition.dx, data.localPosition.dy),
-      radius: widget.eraserWidth,
-    );
+    final position = Offset(data.localPosition.dx, data.localPosition.dy);
+    final minDistance = max(1.0, (widget.eraserWidth ?? 1) * 0.25);
+    final previousPosition = _lastErasePosition;
+    if (previousPosition != null &&
+        (position - previousPosition).distance < minDistance) {
+      return;
+    }
+
+    _lastErasePosition = position;
+    eraserPreviewPoints.add(position);
+    _eraserRepaint.value++;
+  }
+
+  void applyEraserPath() {
+    if (eraserPreviewPoints.isEmpty) return;
+
+    final coordinates = List<Offset>.from(eraserPreviewPoints);
+    final erasePath = widget.filterEraserPath;
+    if (erasePath != null) {
+      erasePath(coordinates: coordinates, radius: widget.eraserWidth);
+      return;
+    }
+
+    for (final coordinate in coordinates) {
+      widget.filterEraser!(coordinates: coordinate, radius: widget.eraserWidth);
+    }
+  }
+
+  void resetEraserPreview() {
+    if (eraserPreviewPoints.isEmpty) return;
+    eraserPreviewPoints.clear();
+    _eraserRepaint.value++;
   }
 
   void addStrokePoint(PointerEvent data) {
@@ -215,6 +283,32 @@ class PointerListenerState extends State<PointerListener> {
       y: data.localPosition.dy,
       width: width,
     );
+    rawPoints.add(point);
+
+    if (points.isEmpty) {
+      _appendStrokePoint(point);
+      return;
+    }
+
+    _appendInterpolatedStrokePoints(points.last, point);
+  }
+
+  void _appendInterpolatedStrokePoints(
+    XppStrokePoint start,
+    XppStrokePoint end,
+  ) {
+    final distance = (end.offset - start.offset).distance;
+    final steps = min(
+      _maxInterpolatedPointsPerEvent,
+      max(1, (distance / _maxStrokePointSpacing).ceil()),
+    );
+
+    for (var i = 1; i <= steps; i++) {
+      _appendStrokePoint(_lerpStrokePoint(start, end, i / steps));
+    }
+  }
+
+  void _appendStrokePoint(XppStrokePoint point) {
     points.add(point);
     activePreviewPoints.add(point);
     _recordActivePreviewPoint();
@@ -237,6 +331,59 @@ class PointerListenerState extends State<PointerListener> {
     }
 
     _strokeRepaint.value++;
+  }
+
+  List<XppStrokePoint> _smoothedStrokePoints() {
+    if (rawPoints.length < 3) return List<XppStrokePoint>.from(points);
+
+    var smoothed = List<XppStrokePoint>.from(rawPoints);
+    for (var i = 0; i < _smoothingIterations; i++) {
+      smoothed = _chaikinSmooth(smoothed);
+    }
+
+    return _densifyStrokePoints(smoothed);
+  }
+
+  List<XppStrokePoint> _chaikinSmooth(List<XppStrokePoint> source) {
+    if (source.length < 3) return source;
+
+    final smoothed = <XppStrokePoint>[source.first];
+    for (var i = 0; i < source.length - 1; i++) {
+      final start = source[i];
+      final end = source[i + 1];
+      smoothed.add(_lerpStrokePoint(start, end, 0.25));
+      smoothed.add(_lerpStrokePoint(start, end, 0.75));
+    }
+    smoothed.add(source.last);
+    return smoothed;
+  }
+
+  List<XppStrokePoint> _densifyStrokePoints(List<XppStrokePoint> source) {
+    if (source.length < 2) return source;
+
+    final dense = <XppStrokePoint>[source.first];
+    for (var i = 1; i < source.length; i++) {
+      final start = dense.last;
+      final end = source[i];
+      final distance = (end.offset - start.offset).distance;
+      final steps = max(1, (distance / _maxStrokePointSpacing).ceil());
+      for (var step = 1; step <= steps; step++) {
+        dense.add(_lerpStrokePoint(start, end, step / steps));
+      }
+    }
+    return dense;
+  }
+
+  XppStrokePoint _lerpStrokePoint(
+    XppStrokePoint start,
+    XppStrokePoint end,
+    double t,
+  ) {
+    return XppStrokePoint(
+      x: lerpDouble(start.x!, end.x!, t),
+      y: lerpDouble(start.y!, end.y!, t),
+      width: lerpDouble(start.width!, end.width!, t),
+    );
   }
 
   void resetPreview({bool rebuild = false}) {
@@ -358,6 +505,7 @@ class PointerListenerState extends State<PointerListener> {
   void dispose() {
     resetPreview();
     _strokeRepaint.dispose();
+    _eraserRepaint.dispose();
     _activePreviewBounds.dispose();
     super.dispose();
   }
@@ -397,5 +545,46 @@ class _PreviewPicturePainter extends CustomPainter {
   bool shouldRepaint(covariant _PreviewPicturePainter oldDelegate) {
     return oldDelegate.picture != picture ||
         oldDelegate.pictureProvider != pictureProvider;
+  }
+}
+
+class _EraserPreviewPainter extends CustomPainter {
+  final List<Offset> Function() pointsProvider;
+  final double Function() radiusProvider;
+
+  _EraserPreviewPainter({
+    required this.pointsProvider,
+    required this.radiusProvider,
+    Listenable? repaint,
+  }) : super(repaint: repaint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final points = pointsProvider();
+    if (points.isEmpty) return;
+
+    final paint = Paint()
+      ..color = Colors.redAccent.withValues(alpha: 0.28)
+      ..strokeWidth = radiusProvider()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    if (points.length == 1) {
+      canvas.drawCircle(points.first, paint.strokeWidth / 2, paint);
+      return;
+    }
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _EraserPreviewPainter oldDelegate) {
+    return oldDelegate.pointsProvider != pointsProvider ||
+        oldDelegate.radiusProvider != radiusProvider;
   }
 }

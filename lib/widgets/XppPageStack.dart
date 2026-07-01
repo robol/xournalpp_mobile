@@ -193,9 +193,12 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   int? _requestedSignature;
   int? _cachedSignature;
   double _imagePixelRatio = 1;
+  Size? _imagePageSize;
   List<int> _cachedStrokeIdentities = const [];
   int _generation = 0;
   Timer? _rasterizeTimer;
+  bool _rasterizationInProgress = false;
+  bool _rasterizeAfterCurrent = false;
 
   @override
   void didChangeDependencies() {
@@ -212,7 +215,10 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   @override
   Widget build(BuildContext context) {
     final image = _image;
-    final cachedPrefixLength = _cachedPrefixLength();
+    final cachedPrefixLength = _cachedPrefixLength(
+      pageSize: widget.pageSize,
+      pixelRatio: _rasterPixelRatio(),
+    );
 
     if (image == null || cachedPrefixLength == null) {
       return CustomPaint(
@@ -257,7 +263,21 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
 
     _requestedSignature = signature;
     final generation = ++_generation;
+    if (_rasterizationInProgress) {
+      _rasterizeAfterCurrent = true;
+      _rasterizeTimer?.cancel();
+      return;
+    }
+
     final strokes = List<XppStroke>.unmodifiable(widget.strokes);
+    final cachedPrefixLength = _cachedPrefixLength(
+      pageSize: widget.pageSize,
+      pixelRatio: pixelRatio,
+    );
+    final baseImage =
+        cachedPrefixLength == null || cachedPrefixLength >= strokes.length
+        ? null
+        : _image;
 
     _rasterizeTimer?.cancel();
     _rasterizeTimer = Timer(const Duration(milliseconds: 120), () {
@@ -269,6 +289,8 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
           pixelRatio,
           signature,
           generation,
+          baseImage,
+          cachedPrefixLength,
         );
       }, Priority.idle);
     });
@@ -280,32 +302,60 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     double pixelRatio,
     int signature,
     int generation,
+    ui.Image? baseImage,
+    int? cachedPrefixLength,
   ) {
-    _rasterize(strokes, pageSize, pixelRatio).then((image) {
+    _rasterizationInProgress = true;
+    _rasterize(
+      strokes,
+      pageSize,
+      pixelRatio,
+      baseImage: baseImage,
+      cachedPrefixLength: cachedPrefixLength,
+    ).then((image) {
+      _rasterizationInProgress = false;
       if (!mounted || generation != _generation) {
         image.dispose();
+        _rerasterizeIfRequested();
         return;
       }
 
       setState(() {
-        _image?.dispose();
+        if (_image != image) _image?.dispose();
         _image = image;
         _imagePixelRatio = pixelRatio;
+        _imagePageSize = pageSize;
         _cachedSignature = signature;
         _cachedStrokeIdentities = strokes.map(identityHashCode).toList();
       });
+      _rerasterizeIfRequested();
     });
+  }
+
+  void _rerasterizeIfRequested() {
+    if (!_rasterizeAfterCurrent) return;
+    _rasterizeAfterCurrent = false;
+    _requestedSignature = null;
+    _rasterizeIfNeeded();
   }
 
   Future<ui.Image> _rasterize(
     List<XppStroke> strokes,
     Size pageSize,
-    double pixelRatio,
-  ) async {
+    double pixelRatio, {
+    ui.Image? baseImage,
+    int? cachedPrefixLength,
+  }) async {
+    final tailStart = baseImage == null ? 0 : cachedPrefixLength ?? 0;
+    if (tailStart >= strokes.length) return baseImage!;
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    if (baseImage != null) {
+      canvas.drawImage(baseImage, Offset.zero, Paint());
+    }
     canvas.scale(pixelRatio);
-    _paintStrokes(canvas, strokes);
+    _paintStrokes(canvas, strokes.skip(tailStart));
     final picture = recorder.endRecording();
     final width = (pageSize.width * pixelRatio).ceil().clamp(1, 100000);
     final height = (pageSize.height * pixelRatio).ceil().clamp(1, 100000);
@@ -327,8 +377,10 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     );
   }
 
-  int? _cachedPrefixLength() {
+  int? _cachedPrefixLength({Size? pageSize, double? pixelRatio}) {
     if (_cachedSignature == null) return null;
+    if (pageSize != null && _imagePageSize != pageSize) return null;
+    if (pixelRatio != null && _imagePixelRatio != pixelRatio) return null;
     if (_cachedStrokeIdentities.length > widget.strokes.length) return null;
 
     for (var i = 0; i < _cachedStrokeIdentities.length; i++) {
@@ -372,7 +424,7 @@ class _StrokeRunVectorPainter extends CustomPainter {
   }
 }
 
-void _paintStrokes(Canvas canvas, List<XppStroke> strokes) {
+void _paintStrokes(Canvas canvas, Iterable<XppStroke> strokes) {
   for (final stroke in strokes) {
     final points = stroke.points;
     if (points == null || points.isEmpty) continue;

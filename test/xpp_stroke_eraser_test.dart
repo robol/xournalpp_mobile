@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
@@ -35,6 +37,17 @@ void main() {
 
     expect(stroke.getOffset(), const Offset(13, 23));
     expect(stroke.bottomRight, const Offset(47, 57));
+  });
+
+  test('stroke exposes cached erase bounds', () {
+    final stroke = XppStrokePen(
+      points: [
+        XppStrokePoint(x: 20, y: 30, width: 10),
+        XppStrokePoint(x: 40, y: 50, width: 6),
+      ],
+    );
+
+    expect(stroke.eraseBounds, const Rect.fromLTRB(13, 23, 47, 57));
   });
 
   test('solid background without a color serializes as white', () {

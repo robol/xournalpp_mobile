@@ -442,7 +442,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     if (modified == null) return '';
 
     final locale = Localizations.localeOf(context).toString();
-    return 'Last modified on: ${DateFormat.yMd(locale).add_Hm().format(modified)}';
+    return 'Last modified: ${DateFormat.yMd(locale).add_Hm().format(modified)}';
   }
 
   showDeleteDialog(path) {
