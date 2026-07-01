@@ -88,10 +88,8 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                           Text(S.of(context).color),
                         ],
                       ),
-                      onTap: () async => widget.onBackgroundChange!(
-                        XppBackgroundSolidPlain(
-                          color: await pickBackgroundColor(),
-                        ),
+                      onTap: () async => _changeBackgroundWithColor(
+                        (color) => XppBackgroundSolidPlain(color: color),
                       ),
                     ),
                   ),
@@ -109,10 +107,8 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                           Text(S.of(context).lined),
                         ],
                       ),
-                      onTap: () async => widget.onBackgroundChange!(
-                        XppBackgroundSolidLined(
-                          color: await pickBackgroundColor(),
-                        ),
+                      onTap: () async => _changeBackgroundWithColor(
+                        (color) => XppBackgroundSolidLined(color: color),
                       ),
                     ),
                   ),
@@ -130,10 +126,8 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                           Text(S.of(context).ruled),
                         ],
                       ),
-                      onTap: () async => widget.onBackgroundChange!(
-                        XppBackgroundSolidRuled(
-                          color: await pickBackgroundColor(),
-                        ),
+                      onTap: () async => _changeBackgroundWithColor(
+                        (color) => XppBackgroundSolidRuled(color: color),
                       ),
                     ),
                   ),
@@ -151,10 +145,8 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                           Text(S.of(context).graph),
                         ],
                       ),
-                      onTap: () async => widget.onBackgroundChange!(
-                        XppBackgroundSolidGraph(
-                          color: await pickBackgroundColor(),
-                        ),
+                      onTap: () async => _changeBackgroundWithColor(
+                        (color) => XppBackgroundSolidGraph(color: color),
                       ),
                     ),
                   ),
@@ -172,10 +164,8 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                           Text(S.of(context).dotted),
                         ],
                       ),
-                      onTap: () async => widget.onBackgroundChange!(
-                        XppBackgroundSolidDot(
-                          color: await pickBackgroundColor(),
-                        ),
+                      onTap: () async => _changeBackgroundWithColor(
+                        (color) => XppBackgroundSolidDot(color: color),
                       ),
                     ),
                   ),
@@ -220,6 +210,14 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
       ),
     ),
   );
+
+  Future<void> _changeBackgroundWithColor(
+    XppBackground Function(Color color) createBackground,
+  ) async {
+    final color = await pickBackgroundColor();
+    if (color == null) return;
+    widget.onBackgroundChange!(createBackground(color));
+  }
 }
 
 enum EditingTool {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
+import 'package:xournalpp/src/XppBackground.dart';
 
 void main() {
   test('eraseWhere splits a stroke around erased points', () {
@@ -34,5 +35,13 @@ void main() {
 
     expect(stroke.getOffset(), const Offset(13, 23));
     expect(stroke.bottomRight, const Offset(47, 57));
+  });
+
+  test('solid background without a color serializes as white', () {
+    final background = XppBackgroundSolidPlain();
+
+    final element = background.toXmlElement();
+
+    expect(element.getAttribute('color'), '#FFFFFFFF');
   });
 }

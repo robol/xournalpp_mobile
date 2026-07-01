@@ -162,7 +162,7 @@ abstract class XppBackgroundSolid extends XppBackground {
   XmlElement generateXmlElement(String style) {
     XmlElement node = XmlElement(XmlName('background'), [
       XmlAttribute(XmlName('type'), 'solid'),
-      XmlAttribute(XmlName('color'), color!.toHexTriplet()),
+      XmlAttribute(XmlName('color'), (color ?? Colors.white).toHexTriplet()),
       XmlAttribute(XmlName('style'), style),
     ]);
     return (node);
