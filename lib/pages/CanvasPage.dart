@@ -140,6 +140,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             /// to communicate from [PointerListener] to [XppPageStack]
                             key: _pageStackKey,
                             page: _file!.pages![currentPage],
+                            rasterScale: pageScale,
                           ),
                         ),
                       ),

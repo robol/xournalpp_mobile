@@ -13,8 +13,10 @@ import 'package:xournalpp/src/XppPage.dart';
 
 class XppPageStack extends StatefulWidget {
   final XppPage? page;
+  final double rasterScale;
 
-  const XppPageStack({Key? key, this.page}) : super(key: key);
+  const XppPageStack({Key? key, this.page, this.rasterScale = 1})
+    : super(key: key);
 
   @override
   XppPageStackState createState() => XppPageStackState();
@@ -48,7 +50,11 @@ class XppPageStackState extends State<XppPageStack>
 
     children.addAll(
       page!.layers!.map(
-        (e) => XppLayerStack(layer: e, pageSize: page!.pageSize!.toSize()),
+        (e) => XppLayerStack(
+          layer: e,
+          pageSize: page!.pageSize!.toSize(),
+          rasterScale: widget.rasterScale,
+        ),
       ),
     );
     return RepaintBoundary(
@@ -110,9 +116,14 @@ class XppPageStackState extends State<XppPageStack>
 class XppLayerStack extends StatefulWidget {
   final XppLayer? layer;
   final Size pageSize;
+  final double rasterScale;
 
-  const XppLayerStack({Key? key, this.layer, required this.pageSize})
-    : super(key: key);
+  const XppLayerStack({
+    Key? key,
+    this.layer,
+    required this.pageSize,
+    required this.rasterScale,
+  }) : super(key: key);
   @override
   _XppLayerStackState createState() => _XppLayerStackState();
 }
@@ -131,6 +142,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
           child: _RasterizedStrokeRun(
             strokes: List<XppStroke>.unmodifiable(pendingStrokes),
             pageSize: widget.pageSize,
+            rasterScale: widget.rasterScale,
           ),
         ),
       );
@@ -164,8 +176,13 @@ class _XppLayerStackState extends State<XppLayerStack> {
 class _RasterizedStrokeRun extends StatefulWidget {
   final List<XppStroke> strokes;
   final Size pageSize;
+  final double rasterScale;
 
-  const _RasterizedStrokeRun({required this.strokes, required this.pageSize});
+  const _RasterizedStrokeRun({
+    required this.strokes,
+    required this.pageSize,
+    required this.rasterScale,
+  });
 
   @override
   State<_RasterizedStrokeRun> createState() => _RasterizedStrokeRunState();
@@ -324,7 +341,10 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
 
   double _rasterPixelRatio() {
     final mediaQueryRatio = MediaQuery.maybeDevicePixelRatioOf(context);
-    return max(1, mediaQueryRatio ?? View.of(context).devicePixelRatio);
+    final devicePixelRatio =
+        mediaQueryRatio ?? View.of(context).devicePixelRatio;
+    final effectiveScale = max(1.0, widget.rasterScale);
+    return (devicePixelRatio * effectiveScale).clamp(1.0, 6.0);
   }
 
   @override
