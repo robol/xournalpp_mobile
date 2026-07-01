@@ -1,6 +1,6 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:io' show Platform;
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:xournalpp/widgets/ToolSettingDialog.dart';
@@ -155,7 +155,7 @@ class EditingToolBarState extends State<EditingToolBar> {
 
   void setTool(EditingTool tool) {
     PointerDeviceKind? device = currentDevice;
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (_usesUnifiedTouchTool) {
       widget.deviceMap![PointerDeviceKind.touch] = tool;
       widget.deviceMap![PointerDeviceKind.stylus] = tool;
       return;
@@ -165,9 +165,14 @@ class EditingToolBarState extends State<EditingToolBar> {
 
   EditingTool? getTool() {
     PointerDeviceKind? device = currentDevice;
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (_usesUnifiedTouchTool) {
       device = PointerDeviceKind.stylus;
     }
     return widget.deviceMap![device];
+  }
+
+  bool get _usesUnifiedTouchTool {
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
   }
 }
