@@ -1,145 +1,200 @@
 # <img src="assets/xournalpp-adaptive.png" width="64" style="height: auto;"/> Xournal++ Mobile
 
-***Warning:*** *Xournal++ Mobile is currently in early development and **not** yet stable. Use with caution!*
+[![Current version](https://img.shields.io/badge/dynamic/yaml?label=Current%20version\&query=version\&url=https%3A%2F%2Fraw.githubusercontent.com%2Frobol%2Fxournalpp_mobile%2Fmaster%2Fpubspec.yaml\&style=for-the-badge\&logo=flutter\&logoColor=white)](https://github.com/robol/xournalpp_mobile)
+[![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue?style=for-the-badge)](LICENSE)
 
-[![Current version](https://img.shields.io/badge/dynamic/yaml?label=Current%20version&query=version&url=https%3A%2F%2Fgitlab.com%2FTheOneWithTheBraid%2Fxournalpp_mobile%2Fraw%2Fmaster%2Fpubspec.yaml%3Finline%3Dfalse&style=for-the-badge&logo=flutter&logoColor=white)](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/tags) [![Bitrise build](https://img.shields.io/bitrise/dd58f8fe5b4bf6c0?style=for-the-badge&token=Ihrbr8U0mqFlVBOocwtnQA&logo=bitrise&logoColor=white)](https://app.bitrise.io/app/dd58f8fe5b4bf6c0) [![Gitlab pipeline status](https://img.shields.io/gitlab/pipeline/TheOneWithTheBraid/xournalpp_mobile/master?style=for-the-badge&logo=gitlab&logoColor=white)](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/pipelines) [![Google Play](https://img.shields.io/endpoint?color=689f38&url=https%3A%2F%2Fplayshields.herokuapp.com%2Fplay%3Fi%3Donline.xournal.mobile%26l%3DGoogle-Play%26m%3D%24version&style=for-the-badge&logo=google-play&logoColor=white)](https://play.google.com/store/apps/details?id=online.xournal.mobile) [![Snap Store](https://img.shields.io/badge/Get%20it%20from%20the-Snap%20Store-%230e8620?style=for-the-badge&logo=snapcraft&logoColor=white)](https://snapcraft.io/xournalpp-mobile)
+**Xournal++ Mobile** is an experimental Flutter-based mobile and web companion for working with Xournal++ `.xopp` documents.
 
-A port of the main features of Xournal++ to various Flutter platforms like Android, iOS and the Web.
+This repository is a revived and modernized fork of the original **Xournal++ Mobile** project by [TheOneWithTheBraid](https://github.com/TheOneWithTheBraid), which was later mirrored under the [xournalpp/xournalpp_mobile](https://github.com/xournalpp/xournalpp_mobile) organization and is now archived/unmaintained.
 
-![Feature banner](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/raw/master/assets/feature-banner.svg)
+The original codebase was already a remarkably capable and well-thought-out implementation: it supported much of the `.xopp` file format, rendered complex document contents, and provided a strong foundation for bringing Xournal++ documents to Flutter-supported platforms. This fork exists because that work was valuable enough to preserve and continue.
 
-## Try it out
+This version ports the project to a modern Flutter/Dart toolchain and includes a first working prototype together with a number of compatibility fixes.
 
-***Mission completed:** We can now render strokes, images and text and LaTeX!. We thereby support the full `.xopp` file format.* :tada:
+> **Status:** early prototype. It works, but it is not yet production-ready. Please keep backups of important documents.
 
-- Web
-  - [Open web app](https://xournal.online/)
-  - [Access via TOR](http://xournaltdtf7ygqxg3qik4tdg476smkukogil74t6oxqiwdnumy53hqd.onion/)
-- Android
-  - [Download in Google Play](https://play.google.com/store/apps/details?id=online.xournal.mobile)
-  - [Download APK](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/jobs/artifacts/master/browse?job=build%3Aapk)
-- Windows
-  - [Build for Windows](#desktop-support)
-- Linux
-  - [Download for Debian](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/jobs/artifacts/master/browse?job=build%3Adebian)
-  - [Download for generic Linux](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/jobs/artifacts/master/download?job=build%3Alinux)
-  - [Download from the Snap Store](https://snapcraft.io/xournalpp-mobile)
+---
 
-```shell
-sudo snap install xournalpp-mobile
-```
+## What is this?
 
-### Visible parts already working
+Xournal++ Mobile aims to bring core Xournal++ document viewing and editing features to Flutter-supported platforms, especially mobile devices and the web.
 
-- [x] Read the document title
-- [x] Read and display the number of pages
-- [x] Create thumbnails of the pages for the navigation bar
-- [x] Smooth fade in after thumbnail rendering
-- [x] Render images on the canvas
-- [x] Render text on the canvas
-- [x] Strokes
-- [x] Highlighter
-- [x] LaTeX
-- [x] Recent files list
-- [ ] Whiteout eraser
-- [x] Saving
-- [x] Basic editing
-- [x] Basic PDF rendering
+The goal is not to replace the desktop [Xournal++](https://github.com/xournalpp/xournalpp) application, but to make `.xopp` documents easier to open, inspect, annotate, and edit on devices where the desktop app is not available or convenient.
 
-## Known issues
+---
 
-- **Immense memory consumption**: *If you open immense files, you get immense memory consumption. That's logic. Usually, Xournal++ Mobile takes twice the file size plus around 50MB for itself.*
-- But **why** does it take twice the memory?: *No idea. ¯\\\_(ツ)_/¯*
-- **The snap does not start on Linux when using wayland**: *Please set the environment variable `DISABLE_WAYLAND=1` before you start Xournal++ Mobile.*
+## Current status
+
+This fork currently provides a first working prototype after updating the original codebase to modern Flutter.
+
+A substantial part of the functionality comes from the excellent original implementation. The current work focuses on making that code build and run again with current Flutter/Dart versions, while gradually fixing compatibility issues and improving the app.
+
+Working or partially working areas include:
+
+* Opening `.xopp` documents
+* Rendering pages
+* Rendering strokes
+* Rendering images
+* Rendering text
+* Rendering highlights
+* Rendering LaTeX content
+* Basic PDF rendering support
+* Basic editing functionality
+* Saving support
+* Recent files support
+* Modernized Flutter/Dart dependencies
+* Fixes required to make the project build and run again
+
+Some features are still incomplete, fragile, or need more testing.
+
+---
+
+## Supported platforms
+
+The project is built with Flutter and contains platform folders for:
+
+* Android
+* iOS
+* Web
+* Linux
+* macOS
+* Windows
+
+Android, iOS, and web are the main targets for this revival effort. Desktop platforms may build, but they are not yet the primary focus.
+
+---
 
 ## Getting started
 
-### Prepare
+Install Flutter first:
 
-> You would like to contribute? Please check out issues to solve [here](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile/-/issues) or get our `// TODO:`s [here](https://gitlab.com/search?search=TODO&project_id=20056916)!
-
-*The **GitHub** repository is only a mirrored repository. Please only contribute to the [original repository on **GitLab**](https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile).*
-
-Get your information about the `.xopp` file format at http://www-math.mit.edu/~auroux/software/xournal/manual.html#file-format .
-
-Install Flutter first. See [flutter.dev](https://flutter.dev/docs/get-started/install) for more details.
-
-```shell
-# Run Flutter doctor to check whether the installation was successful
+```shell id="e93l18"
 flutter doctor
 ```
 
-### Get the sources and run
+Clone this repository:
 
-Connect any Android or iOS device.
-
-```shell
-git clone https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile.git
+```shell id="m326tn"
+git clone https://github.com/robol/xournalpp_mobile.git
 cd xournalpp_mobile
-flutter run --no-sound-null-safety
 ```
 
-### Test for the web
+Fetch dependencies:
 
-If you want to test for the web, please run:
-
-```shell
-flutter channel beta
-flutter upgrade
-flutter config --enable-web
-flutter run -d web --release --no-sound-null-safety # unfortunately, the debug flavour will result an empty screen
+```shell id="vamxsu"
+flutter pub get
 ```
 
-### Desktop support
+Run on a connected device or emulator:
 
-Linux is perfectly supported by Xournal++ Mobile and you can get prebuilt binaries [above](#try-it-out) or install from [Snap Store](https://snapcraft.io/xournalpp-mobile).
-
-Windows is supported and tested too, but there are unfortunately no prebuilt binaries available. Execute the following commands to build them yourself.
-
-If you want to test for Linux, Windows or macOS, please run:
-
-```shell
-flutter channel master
-flutter upgrade
-flutter config --enable-linux-desktop # or --enable-macos-desktop or --enable-windows-desktop
-flutter run -d linux --no-sound-null-safety # or macos or windows
+```shell id="k8rkv1"
+flutter run
 ```
 
-## Colors and Typography
+Run on the web:
 
-### Colors
+```shell id="zfpzd8"
+flutter run -d chrome
+```
 
-Our primary color is the Material DeepPurple. I simply prefer a colorful application over an old-fashioned gray GTK+ application.
+Build an Android APK:
 
-`#673ab7` / `rgb(103, 58, 183)` / `CMYK(44%, 68%, 0%, 28%)` / `hsl(261°, 51%, 48%)`
+```shell id="8kxedm"
+flutter build apk
+```
 
-The accent color is Material Pink.
+---
 
-`#e91e63` / `rgb(233, 30, 99)` / `CMYK(0%, 87%, 58%, 9%)`/ `hsl(340°, 81%, 51%)`
+## Development notes
 
-The light color is White.
+This fork removes the need for the old `--no-sound-null-safety` workflow and targets a modern Dart/Flutter environment.
 
-`#ffffff` / `rgb(255, 255, 255)` / `CMYK(0%, 0%, 0%, 0%)`/ `hsl(0°, 0%, 100%)`
+The project currently uses Dart SDK constraints compatible with Dart 3:
 
-The dark color is Material Blue Grey 900.
+```yaml id="7278iu"
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+```
 
-`#263238` / `rgb(38, 50, 56)` / `CMYK(32%, 11%, 0%, 78%)`/ `hsl(200°, 19%, 18%)`
+Because this is a revived codebase, expect some older architectural decisions, TODOs, and rough edges to remain. That said, the original project was already much more complete than a simple proof of concept: many of the hard parts of parsing, representing, and rendering Xournal++ documents were already handled thoughtfully.
 
-### Fonts
+Contributions that preserve the spirit of the original work while improving compatibility, maintainability, performance, and mobile usability are welcome.
 
-- Display Text: Open Sans Extra Bold *(800)* `Apache 2.0`, *accent color* or *light color*
-- Title and Heading: Open Sans Regular *(400)* `Apache 2.0`, *light color*
-- Emphasis: Glacial Indifference Regular *(400)* `SIL Open Font License`, *light color*, *UPPERCASE*
-- Body: Open Sans Light *(300)* `Apache 2.0`, *light color*
+---
 
-## Misc
+## `.xopp` file format
 
-*Like this project? [Buy me a Coffee](https://buymeacoff.ee/braid).*
+Xournal++ documents use the `.xopp` format. Useful background information can be found in the Xournal documentation:
 
-This software is powered by the education software [TestApp](https://testapp.schule) — **Learning. Easily.**
+http://www-math.mit.edu/~auroux/software/xournal/manual.html#file-format
 
-[![TestApp banner](https://gitlab.com/testapp-system/testapp-flutter/-/raw/mobile/assets/Google%20Play%20EN.png)](https://testapp.schule)
+---
 
-## Legal notes
+## Roadmap
 
-This project is licensed under the terms and conditions of the EUPL-1.2 found in [LICENSE](LICENSE).
+Possible next steps include:
+
+* Improve stability when opening large documents
+* Improve memory usage
+* Better touch and stylus handling
+* More reliable save/export behavior
+* Better mobile UI and navigation
+* Improve platform-specific file opening and sharing
+* Add automated builds
+* Add tests for `.xopp` parsing and rendering
+* Prepare installable preview builds
+
+---
+
+## Known limitations
+
+* This is an early prototype.
+* Large documents may consume a lot of memory.
+* Some `.xopp` files may not render perfectly.
+* Editing support is still basic.
+* Platform-specific behavior may differ between Android, iOS, web, and desktop.
+* Store builds are not currently provided by this fork.
+
+Please test with copies of your documents, not your only copy.
+
+---
+
+## Relationship to the original project
+
+This project is based on the original **Xournal++ Mobile** project by [TheOneWithTheBraid](https://github.com/TheOneWithTheBraid).
+
+Original project locations include:
+
+* https://gitlab.com/TheOneWithTheBraid/xournalpp_mobile
+* https://github.com/xournalpp/xournalpp_mobile
+
+The original project deserves substantial credit. It already implemented a large amount of the difficult work required to read, display, and interact with Xournal++ documents in Flutter. In particular, its support for the `.xopp` format, page rendering, strokes, text, images, LaTeX, thumbnails, saving, and early editing made this revival possible.
+
+This fork continues from that foundation after the original repository became unmaintained. The main goal is to preserve the original effort, make it usable again on modern Flutter, and continue improving it from there.
+
+All credit for the initial idea, architecture, and original implementation goes to the original author and contributors.
+
+---
+
+## Contributing
+
+Contributions are welcome, especially in these areas:
+
+* Flutter modernization
+* Android and iOS fixes
+* Web support
+* `.xopp` parsing/rendering correctness
+* Performance and memory usage
+* UI/UX improvements
+* Tests and sample documents
+* Documentation
+
+Before making large changes, please open an issue or discussion so the direction can be coordinated.
+
+---
+
+## License
+
+This project is licensed under the terms of the **European Union Public Licence v1.2**.
+
+See [LICENSE](LICENSE) for details.
