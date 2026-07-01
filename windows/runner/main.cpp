@@ -22,7 +22,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   RunLoop run_loop;
 
   flutter::DartProject project(L"data");
-  FlutterWindow window(&run_loop, project);
+  FlutterWindow window(project);
   Win32Window::Point origin(kFlutterWindowOriginX, kFlutterWindowOriginY);
   Win32Window::Size size(kFlutterWindowWidth, kFlutterWindowHeight);
   if (!window.CreateAndShow(kFlutterWindowTitle, origin, size)) {

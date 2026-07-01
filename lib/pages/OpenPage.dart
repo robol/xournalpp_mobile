@@ -357,7 +357,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           isThreeLine: true,
           title: Text(
             displayName,
-            style: Theme.of(context).textTheme.bodyLarge!,
+            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+              fontWeight: FontWeight.bold, fontSize: kLargeFontSize
+            ),
           ),
           leading: AspectRatio(
             aspectRatio: 1,

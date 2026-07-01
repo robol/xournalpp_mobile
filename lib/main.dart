@@ -76,9 +76,9 @@ final kTextTheme = TextTheme(
   titleLarge: kLargeFont.copyWith(color: kDarkColor),
   titleMedium: kLargeFont.copyWith(color: kDarkColor),
   bodyLarge: kBodyFont,
-  bodyMedium: kEmphasisFont,
-  bodySmall: kEmphasisFont,
-  labelLarge: kEmphasisFont,
+  bodyMedium: kBodyFont,
+  bodySmall: kBodyFont,
+  labelLarge: kBodyFont,
 );
 
 final kColorScheme = ColorScheme(
