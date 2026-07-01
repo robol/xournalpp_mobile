@@ -1,4 +1,4 @@
-# <img src="assets/xournalpp-adaptive.png" width="64" style="height: auto;"/> Xournal++ Mobile
+# <img src="assets/xournalpp.png" width="64" style="height: auto;"/> Xournal++ Mobile
 
 [![Current version](https://img.shields.io/badge/dynamic/yaml?label=Current%20version\&query=version\&url=https%3A%2F%2Fraw.githubusercontent.com%2Frobol%2Fxournalpp_mobile%2Fmaster%2Fpubspec.yaml\&style=for-the-badge\&logo=flutter\&logoColor=white)](https://github.com/robol/xournalpp_mobile)
 [![License: EUPL-1.2](https://img.shields.io/badge/License-EUPL--1.2-blue?style=for-the-badge)](LICENSE)
