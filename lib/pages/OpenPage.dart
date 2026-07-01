@@ -349,7 +349,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         Map fileInfo = files.toList()[index];
         return ListTile(
           isThreeLine: true,
-          title: Container(),
+          title: Text(
+            fileInfo['name'],
+            style: Theme.of(context).textTheme.bodyLarge!,
+          ),
           leading: AspectRatio(
             aspectRatio: 1,
             child: Container(
@@ -360,11 +363,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             ),
           ),
           subtitle: Text(
-            fileInfo['name'],
-            style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-              color: Theme.of(context).textTheme.bodyLarge!.color,
-              fontSize: kEmphasisFontSize * kFontSizeDivision,
-            ),
+            fileInfo['path'],
+            style: Theme.of(context).textTheme.bodySmall!,
           ),
           trailing: Tooltip(
             child: Icon(Icons.info_outline),
