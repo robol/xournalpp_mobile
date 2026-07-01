@@ -648,6 +648,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         'preview': base64Encode(_file!.previewImage!),
         'name': _file!.title,
         'path': savedPath,
+        'modified': DateTime.now().toIso8601String(),
       });
       jsonData = jsonEncode(files.toList());
       prefs.setString(PreferencesKeys.kRecentFiles, jsonData);

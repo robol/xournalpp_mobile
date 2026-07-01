@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/generated/l10n.dart';
@@ -348,6 +349,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         Map fileInfo = files.toList()[index];
         final displayName = _decodeFileInfoForDisplay(fileInfo['name']);
         final displayPath = _decodeFileInfoForDisplay(fileInfo['path']);
+        final displayModified = _formatModifiedForDisplay(
+          context,
+          fileInfo['modified'],
+        );
         return ListTile(
           isThreeLine: true,
           title: Text(
@@ -364,7 +369,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             ),
           ),
           subtitle: Text(
-            displayPath,
+            displayModified,
             style: Theme.of(context).textTheme.bodySmall!,
           ),
           trailing: Tooltip(
@@ -428,6 +433,16 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     } on FormatException {
       return text;
     }
+  }
+
+  String _formatModifiedForDisplay(BuildContext context, Object? value) {
+    if (value == null) return '';
+
+    final modified = DateTime.tryParse(value.toString())?.toLocal();
+    if (modified == null) return '';
+
+    final locale = Localizations.localeOf(context).toString();
+    return 'Last modified on: ${DateFormat.yMd(locale).add_Hm().format(modified)}';
   }
 
   showDeleteDialog(path) {
