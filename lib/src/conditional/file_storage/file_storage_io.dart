@@ -1,14 +1,48 @@
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-Future<Uint8List> readFileBytes(String path) => File(path).readAsBytes();
+const _storageChannel = MethodChannel('online.xournal.mobile/storage');
+
+Future<Uint8List> readFileBytes(String path) async {
+  final documentUri = _androidDocumentUriForPath(path);
+  if (documentUri != null) {
+    final bytes = await _storageChannel.invokeMethod<Uint8List>(
+      'readDocument',
+      {'uri': documentUri},
+    );
+    if (bytes == null) {
+      throw FileSystemException('Could not read document', path);
+    }
+    return bytes;
+  }
+
+  return File(path).readAsBytes();
+}
 
 Future<String> writeFileBytes(String path, Uint8List bytes) async {
+  final documentUri = _androidDocumentUriForPath(path);
+  if (documentUri != null) {
+    await _storageChannel.invokeMethod<void>('writeDocument', {
+      'uri': documentUri,
+      'bytes': bytes,
+    });
+    return path;
+  }
+
   final file = await _writableFileForPath(path);
   await file.writeAsBytes(bytes);
   return file.path;
+}
+
+Future<String?> saveDocumentBytes(Uint8List bytes, {String? fileName}) async {
+  if (!Platform.isAndroid) return null;
+
+  return _storageChannel.invokeMethod<String>('createDocument', {
+    'fileName': fileName ?? 'xournalpp-export',
+    'bytes': bytes,
+  });
 }
 
 Future<void> deleteFile(String path) => File(path).delete();
@@ -26,7 +60,9 @@ Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {
 Future<File> _writableFileForPath(String path) async {
   final file = File(path);
   if (!Platform.isAndroid) return file.absolute;
-  if (file.isAbsolute && file.parent.path != '/') return file;
+  if (file.isAbsolute && file.parent.path != '/') {
+    return file;
+  }
 
   final directory = await getApplicationDocumentsDirectory();
   final safeName = _safeFileName(path);
@@ -39,4 +75,25 @@ String _safeFileName(String path) {
       .where((part) => part.isNotEmpty)
       .toList();
   return parts.isEmpty ? 'xournalpp-file' : parts.last;
+}
+
+String? _androidDocumentUriForPath(String path) {
+  if (!Platform.isAndroid) return null;
+  if (path.startsWith('content://')) return path;
+
+  const marker = 'primary:';
+  final markerIndex = path.indexOf(marker);
+  if (markerIndex < 0) return null;
+
+  var documentId = path.substring(markerIndex).replaceAll('\\', '/');
+  while (documentId.startsWith('/')) {
+    documentId = documentId.substring(1);
+  }
+  if (documentId == marker) return null;
+
+  return Uri(
+    scheme: 'content',
+    host: 'com.android.externalstorage.documents',
+    pathSegments: ['document', documentId],
+  ).toString();
 }

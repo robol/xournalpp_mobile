@@ -31,13 +31,13 @@ class XppPickedFile {
     );
     final file = result?.files.single;
     if (file == null) throw UnsupportedError('No file selected.');
+    final path = file.identifier ?? file.path;
     final bytes =
-        file.bytes ??
-        (file.path == null ? null : await readFileBytes(file.path!));
+        file.bytes ?? (path == null ? null : await readFileBytes(path));
     if (bytes == null) throw UnsupportedError('Could not read selected file.');
     return XppPickedFile(
       bytes,
-      path: file.path,
+      path: path,
       fileName: file.name,
       fileExtension: file.extension,
     );
@@ -53,6 +53,12 @@ class XppPickedFile {
   }
 
   Future<String?> exportToStorage() async {
+    final savedDocumentPath = await saveDocumentBytes(
+      bytes,
+      fileName: fileName ?? 'xournalpp-export',
+    );
+    if (savedDocumentPath != null) return savedDocumentPath;
+
     final savedPath = await FilePicker.saveFile(
       fileName: fileName ?? 'xournalpp-export',
       bytes: bytes,
@@ -72,7 +78,7 @@ class XppPickedFile {
 
   static String? _basename(String? path) {
     if (path == null || path.isEmpty) return null;
-    return path.split(RegExp(r'[/\\]')).last;
+    return _decodePathForDisplay(path).split(RegExp(r'[/\\]')).last;
   }
 
   static String? _extension(String? path) {
@@ -80,5 +86,13 @@ class XppPickedFile {
     final dot = name?.lastIndexOf('.') ?? -1;
     if (name == null || dot < 0 || dot == name.length - 1) return null;
     return name.substring(dot + 1);
+  }
+
+  static String _decodePathForDisplay(String path) {
+    try {
+      return Uri.decodeFull(path);
+    } on FormatException {
+      return path;
+    }
   }
 }

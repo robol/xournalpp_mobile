@@ -138,7 +138,9 @@ class XppFile {
     if (percentageCallback == null) percentageCallback = (percentage) {};
 
     /// extracting the document title
-    final rawTitle = rawFile.path ?? rawFile.fileName ?? 'Untitled';
+    final rawTitle = _decodePathForFileName(
+      rawFile.path ?? rawFile.fileName ?? 'Untitled',
+    );
     String title = rawTitle.substring(
       rawTitle.lastIndexOf('/') + 1,
       rawTitle.lastIndexOf('.'),
@@ -461,6 +463,14 @@ class XppFile {
   XppPickedFile toXppPickedFile({String? filePath}) {
     Uint8List bytes = toUint8List()!;
     return XppPickedFile(bytes, fileExtension: 'xopp', path: filePath);
+  }
+
+  static String _decodePathForFileName(String path) {
+    try {
+      return Uri.decodeFull(path);
+    } on FormatException {
+      return path;
+    }
   }
 }
 

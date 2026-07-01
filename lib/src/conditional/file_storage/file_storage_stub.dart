@@ -8,6 +8,10 @@ Future<String> writeFileBytes(String path, Uint8List bytes) {
   throw UnsupportedError('Writing local file paths is not supported here.');
 }
 
+Future<String?> saveDocumentBytes(Uint8List bytes, {String? fileName}) async {
+  return null;
+}
+
 Future<void> deleteFile(String path) {
   throw UnsupportedError('Deleting local file paths is not supported here.');
 }

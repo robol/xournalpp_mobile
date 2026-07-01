@@ -228,9 +228,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => CanvasPage(
-              file: XppFile.empty(background: Colors.white),
-            ),
+            builder: (context) =>
+                CanvasPage(file: XppFile.empty(background: Colors.white)),
           ),
         ),
         label: Text(S.of(context).newNotebook),
@@ -347,10 +346,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return List.generate(files.length > 0 ? files.length : 1, (index) {
       if (files.length > 0) {
         Map fileInfo = files.toList()[index];
+        final displayName = _decodeFileInfoForDisplay(fileInfo['name']);
+        final displayPath = _decodeFileInfoForDisplay(fileInfo['path']);
         return ListTile(
           isThreeLine: true,
           title: Text(
-            fileInfo['name'],
+            displayName,
             style: Theme.of(context).textTheme.bodyLarge!,
           ),
           leading: AspectRatio(
@@ -363,12 +364,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             ),
           ),
           subtitle: Text(
-            fileInfo['path'],
+            displayPath,
             style: Theme.of(context).textTheme.bodySmall!,
           ),
           trailing: Tooltip(
             child: Icon(Icons.info_outline),
-            message: fileInfo['path'],
+            message: displayPath,
           ),
           onLongPress: () => showDeleteDialog(fileInfo['path']),
           onTap: () async {
@@ -418,6 +419,15 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         );
       }
     });
+  }
+
+  String _decodeFileInfoForDisplay(Object? value) {
+    final text = value?.toString() ?? '';
+    try {
+      return Uri.decodeFull(text);
+    } on FormatException {
+      return text;
+    }
   }
 
   showDeleteDialog(path) {

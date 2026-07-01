@@ -594,18 +594,19 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     setState(() {
       savingFile = true;
     });
-    ScaffoldFeatureController snackBarController = ScaffoldMessenger.of(context)
-        .showSnackBar(
-          SnackBar(
-            content: Text(S.of(context).savingFile),
-            duration: Duration(days: 999),
-          ),
-        );
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.clearSnackBars();
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text(S.of(context).savingFile),
+        duration: Duration(days: 999),
+      ),
+    );
     //try {
     if (_file!.title == null) {
       final titleApplied = await _showTitleDialog();
       if (!titleApplied || _file!.title == null) {
-        snackBarController.close();
+        if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
         if (mounted) {
           setState(() {
             savingFile = false;
@@ -621,11 +622,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         ? kTransparentImage
         : await pageListViewKey.currentState!.getPng(0);
     XppPickedFile file = _file!.toXppPickedFile(filePath: path);
-    final savedPath = export
-        ? await file.exportToStorage()
-        : await file.saveToPath(path: path);
+    String? savedPath;
+    if (export) {
+      savedPath = await file.exportToStorage();
+    } else {
+      savedPath = await file.saveToPath(path: path);
+    }
     if (savedPath == null) {
-      snackBarController.close();
+      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
       if (mounted) {
         setState(() {
           savingFile = false;
@@ -648,7 +652,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       jsonData = jsonEncode(files.toList());
       prefs.setString(PreferencesKeys.kRecentFiles, jsonData);
     });
-    snackBarController.close();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     setState(() {
       savingFile = false;
     });
