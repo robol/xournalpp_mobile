@@ -844,7 +844,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void rememberToolSettings() {
     SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt(PreferencesKeys.kToolColor, toolColor.value);
+      prefs.setInt(PreferencesKeys.kToolColor, toolColor.toARGB32());
       prefs.setDouble(PreferencesKeys.kToolWidth, toolWidth);
       prefs.setDouble(PreferencesKeys.kEraserWidth, eraserWidth);
     });

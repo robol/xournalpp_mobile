@@ -292,7 +292,7 @@ class _LinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withOpacity(.3)
+      ..color = Colors.grey[500]!.withValues(alpha: .3)
       ..strokeWidth = 1;
     // 1 because no line at the top
     for (int i = 1; i < size.height / 24; i++) {
@@ -315,7 +315,7 @@ class _RuledPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withOpacity(.3)
+      ..color = Colors.grey[500]!.withValues(alpha: .3)
       ..strokeWidth = 1;
     // 1 because no line at the top
     for (int i = 1; i < size.height / 24; i++) {
@@ -338,7 +338,7 @@ class _GraphPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withOpacity(.3)
+      ..color = Colors.grey[500]!.withValues(alpha: .3)
       ..strokeWidth = 1;
     // 1 because no line at the top
     for (int i = 1; i < size.height / XppPageSize.pt2mm(5); i++) {
@@ -369,7 +369,7 @@ class _DotPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withOpacity(.3)
+      ..color = Colors.grey[500]!.withValues(alpha: .3)
       ..strokeWidth = 1;
     // 1 because no line at the top
     for (int i = 1; i < size.height / XppPageSize.pt2mm(5); i++) {
