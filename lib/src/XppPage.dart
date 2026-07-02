@@ -15,7 +15,6 @@ class XppPage {
 
   XppPageSize? pageSize;
   XppBackground? background;
-  @required
   List<XppLayer>? layers;
 
   XmlElement toXmlElement() => XmlElement(

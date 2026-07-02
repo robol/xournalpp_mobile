@@ -5,7 +5,6 @@ import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppPage.dart';
 
 class ToolBoxBottomSheet extends StatefulWidget {
-  @required
   final EditingTool? tool;
   final Function(EditingTool)? onToolChange;
   final Function(XppBackground)? onBackgroundChange;

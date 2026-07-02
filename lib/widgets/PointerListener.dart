@@ -10,26 +10,16 @@ import 'package:xournalpp/widgets/StrokePreviewController.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class PointerListener extends StatefulWidget {
-  @required
   final Function(XppContent?)? onNewContent;
-  @required
   final Function({int? device, PointerDeviceKind? kind})? onDeviceChange;
-  @required
   final Widget? child;
-  @required
   final Map<PointerDeviceKind?, EditingTool> toolData;
-  @required
   final Matrix4? translationMatrix;
-  @required
   final double? strokeWidth;
-  @required
   final double? eraserWidth;
-  @required
   final Color? color;
-  @required
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
-  @required
   final Function()? removeLastContent;
 
   const PointerListener({

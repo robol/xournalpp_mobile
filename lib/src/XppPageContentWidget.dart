@@ -5,15 +5,10 @@ typedef bool IsSelectableCallback(Offset offset);
 typedef bool ShouldCatchCallback(Offset offset, EditingTool tool);
 
 class XppPageContentWidget extends StatefulWidget {
-  @required
   final Widget? child;
-  @required
   final EditingTool? tool;
-  @required
   final bool? catchTool;
-  @required
   final Builder? contextMenuBuilder;
-  @required
   final Function? onSelected;
 
   const XppPageContentWidget({

@@ -13,7 +13,6 @@ class XppTexImage extends XppContent {
   /// TODO: proper implementation of bottom and right
   Offset? bottomRight = Offset(0, 0);
 
-  @required
   final String? text;
 
   Color? color;

@@ -420,7 +420,6 @@ class XppFile {
   Uint8List? previewImage;
 
   /// [List] of [XppPages] inside the document
-  @required
   List<XppPage>? pages;
 
   /// the main title of the document. usually the [String] between the last `/` and the last `.`.

@@ -6,11 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 
 class ZoomableWidget extends StatefulWidget {
-  @required
   final Widget? child;
-  @required
   final TransformationController? controller;
-  @required
   final GestureScaleUpdateCallback? onInteractionUpdate;
   final GestureScaleStartCallback? onInteractionStart;
   final VoidCallback? onTransformationChanged;

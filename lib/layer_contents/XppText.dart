@@ -6,15 +6,10 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppText extends XppContent {
-  @required
   final Color? color;
-  @required
   final double? size;
-  @required
   final String? text;
-  @required
   final Offset? offset;
-  @required
   final String? fontFamily;
 
   XppText({this.size, this.offset, this.fontFamily, this.color, this.text});

@@ -14,7 +14,6 @@ class XppImage extends XppContent {
   Offset? topLeft = Offset(0, 0);
   Offset? bottomRight = Offset(0, 0);
 
-  @required
   final Uint8List? data;
 
   XppImage({this.data, this.topLeft, this.bottomRight});

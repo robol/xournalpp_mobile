@@ -28,7 +28,6 @@ import 'package:xournalpp/widgets/ZoomableWidget.dart';
 class CanvasPage extends StatefulWidget {
   CanvasPage({Key? key, this.file, this.filePath}) : super(key: key);
 
-  @required
   final XppFile? file;
   final String? filePath;
 

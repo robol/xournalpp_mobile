@@ -9,9 +9,7 @@ import 'package:xournalpp/widgets/ContextualBottomSheet.dart';
 import 'XppPageStack.dart';
 
 class XppPagesListView extends StatefulWidget {
-  @required
   final List<XppPage>? pages;
-  @required
   final Function(int pageNumber)? onPageChange;
   final Function(int pageNumber)? onPageDelete;
   final Function(int pageNumber, int newIndex)? onPageMove;

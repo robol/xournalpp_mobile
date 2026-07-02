@@ -281,13 +281,9 @@ class XppStrokeHighlight extends XppStroke {
 }
 
 class XppStrokePainter extends CustomPainter {
-  @required
   final List<XppStrokePoint>? points;
-  @required
   final Color? color;
-  @required
   final Offset? topLeft;
-  @required
   final bool? smoothPressure;
 
   XppStrokePainter({
