@@ -3,12 +3,10 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:xournalpp/generated/l10n.dart';
 
 class ToolSettingDialog extends StatefulWidget {
-  double width;
-  Function(Color)? onColorChange;
-  Function(double newWidth)? onWidthChange;
-  Object? S;
-  Color color;
-  FloatingActionButton? pickerButton;
+  final double width;
+  final ValueChanged<Color>? onColorChange;
+  final ValueChanged<double>? onWidthChange;
+  final Color color;
   final bool enableColor;
 
   ToolSettingDialog({
@@ -17,7 +15,6 @@ class ToolSettingDialog extends StatefulWidget {
     required this.color,
     this.onColorChange,
     this.onWidthChange,
-    this.S,
     this.enableColor = true,
   }) : super(key: key);
 
@@ -26,6 +23,16 @@ class ToolSettingDialog extends StatefulWidget {
 }
 
 class _ToolSettingDialogState extends State<ToolSettingDialog> {
+  late double width;
+  late Color color;
+
+  @override
+  void initState() {
+    super.initState();
+    width = widget.width;
+    color = widget.color;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -36,7 +43,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
     );
   }
 
-  contentBox(context) {
+  Widget contentBox(BuildContext context) {
     return Stack(
       children: <Widget>[
         Container(
@@ -60,7 +67,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
               Container(
                 child: Text(
                   //todo: limit to one decimal place
-                  S.of(context).strokeWidth + ' ${this.widget.width}',
+                  S.of(context).strokeWidth + width.toStringAsFixed(1),
                   style: TextStyle(color: Colors.black),
                 ),
               ),
@@ -69,14 +76,16 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                 child: Slider(
                   activeColor: Theme.of(context).colorScheme.secondary,
                   inactiveColor: Theme.of(context).colorScheme.onPrimary,
-                  value: this.widget.width,
+                  value: width,
                   min: 0.1,
-                  max: 8,
+                  max: 3,
+                  divisions: 29, // Make sure this matches the max value and step size
+                  label: width.toStringAsFixed(1),
                   onChanged: (newWidth) {
                     setState(() {
-                      this.widget.width = newWidth;
+                      width = newWidth;
                     });
-                    widget.onWidthChange!(newWidth);
+                    widget.onWidthChange?.call(newWidth);
                   },
                 ),
               ),
@@ -125,7 +134,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
   FloatingActionButton getColorPicker() {
     var picker = FloatingActionButton(
       heroTag: MaterialPicker,
-      backgroundColor: widget.color,
+      backgroundColor: color,
       onPressed: () {
         showDialog(
           context: context,
@@ -133,7 +142,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
             title: Text(S.of(context).selectColor),
             content: SingleChildScrollView(
               child: MaterialPicker(
-                pickerColor: widget.color,
+                pickerColor: color,
                 onColorChanged: (color) {
                   setNewColor(color);
                 },
@@ -152,10 +161,11 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
     return picker;
   }
 
-  void setNewColor(Color color) {
-    widget.onColorChange!(color);
-    //widget.pickerButton!.backgroundColor = color;
-    widget.color = color;
+  void setNewColor(Color newColor) {
+    widget.onColorChange?.call(newColor);
+    setState(() {
+      color = newColor;
+    });
     Navigator.of(context).pop();
   }
 

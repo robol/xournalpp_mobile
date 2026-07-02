@@ -44,7 +44,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   int currentPage = 0;
 
   Color toolColor = Colors.blueGrey;
-  double toolWidth = 5;
+  double toolWidth = 1;
   double eraserWidth = 20;
 
   TransformationController _zoomController = TransformationController();
