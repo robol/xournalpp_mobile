@@ -352,7 +352,7 @@ class XppFile {
           List<String> rawWidth = strokeElement
               .getAttribute('width')!
               .split(' ');
-          List<String> rawPoints = strokeElement.value!.trim().split(' ');
+          List<String> rawPoints = strokeElement.innerText.trim().split(' ');
           for (int i = 0; i < rawPoints.length / 2; i++) {
             points.add(
               XppStrokePoint(
