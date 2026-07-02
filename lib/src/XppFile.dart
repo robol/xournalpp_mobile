@@ -266,7 +266,7 @@ class XppFile {
         /// processing all images first
         layer.findElements('image').forEach((imageElement) {
           content[int.parse(imageElement.getAttribute('counter')!)] = XppImage(
-            data: base64Decode(imageElement.value!.trim()),
+            data: base64Decode(imageElement.innerText.trim()),
             topLeft: Offset(
               double.parse(imageElement.getAttribute('left')!),
               double.parse(imageElement.getAttribute('top')!),
