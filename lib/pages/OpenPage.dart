@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ui';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
@@ -48,37 +47,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) afterFirstLayout(context);
     });
-
-    // trying to load fitting locale
-
-    try {
-      if (['en', 'de', 'pt'].contains(window.locale.languageCode))
-        S.load(Locale(window.locale.languageCode));
-
-      /// TODO: implement custom change of language
-      // checking for locale override
-      /*Preferences().fetch('language').then((languageCode) {
-      switch (languageCode) {
-        case 'en':
-          S.load(Locale('en'));
-          break;
-
-        case 'de':
-          S.load(Locale('de'));
-          break;
-
-        case 'fr':
-          S.load(Locale('fr'));
-          break;
-
-          case 'tlh':
-            S.load(Locale('tlh'));
-            break;
-          default:
-            break;
-        }
-      });*/
-    } catch (e) {}
 
     SharedPreferences.getInstance()
         .then((prefs) {

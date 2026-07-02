@@ -30,7 +30,7 @@ class _DropFileState extends State<DropFile> {
             children: [
               Builder(
                 builder: (context) => DropzoneView(
-                  onDrop: (file) {
+                  onDropFile: (file) {
                     setState(() {
                       _fileHover = false;
                       _loadingDropZone = true;

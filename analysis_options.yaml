@@ -1,3 +1,5 @@
 analyzer:
+ exclude:
+   - build/**
  optional-checks:
    chrome-os-manifest-checks

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:archive/archive.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
@@ -248,8 +247,8 @@ class XppFile {
         int index = 0;
         layer.children.forEach((XmlNode node) {
           if (node.nodeType == XmlNodeType.TEXT) {
-            if (node.text.trim().isNotEmpty)
-              print('Skipping text \'${node.text}\'');
+            if (node.value!.trim().isNotEmpty)
+              print('Skipping text \'${node.value}\'');
             return;
           }
           if (node.nodeType != XmlNodeType.ELEMENT) {
@@ -267,7 +266,7 @@ class XppFile {
         /// processing all images first
         layer.findElements('image').forEach((imageElement) {
           content[int.parse(imageElement.getAttribute('counter')!)] = XppImage(
-            data: base64Decode(imageElement.text.trim()),
+            data: base64Decode(imageElement.value!.trim()),
             topLeft: Offset(
               double.parse(imageElement.getAttribute('left')!),
               double.parse(imageElement.getAttribute('top')!),
@@ -285,7 +284,7 @@ class XppFile {
           content[int.parse(textElement.getAttribute('counter')!)] = XppText(
             color: color,
             // note: not trimming
-            text: textElement.text.replaceAllMapped(
+            text: textElement.value!.replaceAllMapped(
               RegExp(r'(&amp;|&lt;|&gt;)'),
               (Match subtext) {
                 switch (subtext.group(0)) {
@@ -353,7 +352,7 @@ class XppFile {
           List<String> rawWidth = strokeElement
               .getAttribute('width')!
               .split(' ');
-          List<String> rawPoints = strokeElement.text.trim().split(' ');
+          List<String> rawPoints = strokeElement.value!.trim().split(' ');
           for (int i = 0; i < rawPoints.length / 2; i++) {
             points.add(
               XppStrokePoint(

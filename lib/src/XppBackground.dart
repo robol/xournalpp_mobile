@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/PdfImage.dart';
