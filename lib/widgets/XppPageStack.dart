@@ -10,6 +10,8 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
+import 'package:xournalpp/src/XppPageContentWidget.dart';
+import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppPageStack extends StatefulWidget {
   final XppPage? page;
@@ -21,6 +23,9 @@ class XppPageStack extends StatefulWidget {
   )?
   onReplaceContent;
   final void Function(PointerDownEvent event)? onContentPointerDown;
+  final EditingTool? activeTool;
+  final Set<XppContent> selectedContents;
+  final void Function(XppLayer layer, XppContent content)? onSelectContent;
 
   const XppPageStack({
     Key? key,
@@ -28,6 +33,9 @@ class XppPageStack extends StatefulWidget {
     this.rasterScale = 1,
     this.onReplaceContent,
     this.onContentPointerDown,
+    this.activeTool,
+    this.selectedContents = const {},
+    this.onSelectContent,
   }) : super(key: key);
 
   @override
@@ -68,6 +76,9 @@ class XppPageStackState extends State<XppPageStack>
           rasterScale: widget.rasterScale,
           onReplaceContent: widget.onReplaceContent,
           onContentPointerDown: widget.onContentPointerDown,
+          activeTool: widget.activeTool,
+          selectedContents: widget.selectedContents,
+          onSelectContent: widget.onSelectContent,
         ),
       ),
     );
@@ -138,6 +149,9 @@ class XppLayerStack extends StatefulWidget {
   )?
   onReplaceContent;
   final void Function(PointerDownEvent event)? onContentPointerDown;
+  final EditingTool? activeTool;
+  final Set<XppContent> selectedContents;
+  final void Function(XppLayer layer, XppContent content)? onSelectContent;
 
   const XppLayerStack({
     Key? key,
@@ -146,6 +160,9 @@ class XppLayerStack extends StatefulWidget {
     required this.rasterScale,
     this.onReplaceContent,
     this.onContentPointerDown,
+    this.activeTool,
+    this.selectedContents = const {},
+    this.onSelectContent,
   }) : super(key: key);
   @override
   _XppLayerStackState createState() => _XppLayerStackState();
@@ -153,10 +170,22 @@ class XppLayerStack extends StatefulWidget {
 
 class _XppLayerStackState extends State<XppLayerStack> {
   Map<XppContent, Widget> renderedContent = {};
+
+  @override
+  void didUpdateWidget(covariant XppLayerStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeTool != oldWidget.activeTool ||
+        widget.selectedContents != oldWidget.selectedContents) {
+      renderedContent.clear();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     List<Widget> children = [];
+    List<Widget> selectionChildren = [];
     List<XppStroke> pendingStrokes = [];
+    final selectionMode = widget.activeTool == EditingTool.SELECT;
 
     void flushPendingStrokes() {
       if (pendingStrokes.isEmpty) return;
@@ -177,6 +206,9 @@ class _XppLayerStackState extends State<XppLayerStack> {
 
       if (element is XppStroke) {
         pendingStrokes.add(element);
+        if (selectionMode) {
+          selectionChildren.add(_buildStrokeSelectionRegion(element));
+        }
         return;
       }
 
@@ -190,6 +222,10 @@ class _XppLayerStackState extends State<XppLayerStack> {
               newContent,
             ),
             onPointerDown: widget.onContentPointerDown,
+            selectionMode: selectionMode,
+            selected: widget.selectedContents.contains(element),
+            onSelect: () =>
+                widget.onSelectContent?.call(widget.layer!, element),
           ),
           top: element.getOffset()?.dy ?? 0,
           left: element.getOffset()?.dx ?? 0,
@@ -199,8 +235,45 @@ class _XppLayerStackState extends State<XppLayerStack> {
       if (child != null) children.add(child);
     });
     flushPendingStrokes();
+    children.addAll(selectionChildren);
     return Stack(children: children);
   }
+
+  Widget _buildStrokeSelectionRegion(XppStroke stroke) {
+    final bounds = stroke.eraseBounds;
+    if (bounds == null || bounds.isEmpty) return SizedBox.shrink();
+
+    final selectionBounds = bounds.inflate(6);
+    return Positioned.fromRect(
+      rect: selectionBounds,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: widget.onContentPointerDown,
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => widget.onSelectContent?.call(widget.layer!, stroke),
+          child: widget.selectedContents.contains(stroke)
+              ? CustomPaint(foregroundPainter: _SelectionFramePainter())
+              : SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionFramePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..color = XppPageContentWidget.selectionColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRect(rect.deflate(.75), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SelectionFramePainter oldDelegate) => false;
 }
 
 class _RasterizedStrokeRun extends StatefulWidget {

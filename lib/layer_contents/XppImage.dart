@@ -49,6 +49,9 @@ class XppImage extends XppContent {
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
+    bool selectionMode = false,
+    bool selected = false,
+    VoidCallback? onSelect,
   }) {
     return XppPageContentWidget(
       child: Stack(
@@ -64,12 +67,21 @@ class XppImage extends XppContent {
         ],
       ),
       onPointerDown: onPointerDown,
+      selectionMode: selectionMode,
+      selected: selected,
+      onSelect: onSelect,
       tool: EditingTool.IMAGE,
     );
   }
 
   @override
   Offset? getOffset() => topLeft;
+
+  @override
+  Rect? get selectionBounds {
+    if (topLeft == null || bottomRight == null) return null;
+    return Rect.fromPoints(topLeft!, bottomRight!);
+  }
 
   @override
   XmlElement toXmlElement() => XmlElement(

@@ -62,6 +62,9 @@ class XppTexImage extends XppContent {
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
+    bool selectionMode = false,
+    bool selected = false,
+    VoidCallback? onSelect,
   }) {
     return XppPageContentWidget(
       child: DefaultTextStyle(
@@ -73,12 +76,24 @@ class XppTexImage extends XppContent {
       ),
       onSelected: (context) => print('Edit LaTeX!'),
       onPointerDown: onPointerDown,
+      selectionMode: selectionMode,
+      selected: selected,
+      onSelect: onSelect,
       tool: EditingTool.LATEX,
     );
   }
 
   @override
   Offset? getOffset() => topLeft;
+
+  @override
+  Rect? get selectionBounds {
+    if (topLeft == null) return null;
+    if (bottomRight != null && bottomRight != Offset.zero) {
+      return Rect.fromPoints(topLeft!, bottomRight!);
+    }
+    return topLeft! & Size(120, 32);
+  }
 
   @override
   XmlElement toXmlElement() => XmlElement(

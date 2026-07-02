@@ -23,9 +23,14 @@ abstract class XppContent {
 
   Rect? get eraseBounds => null;
 
+  Rect? get selectionBounds => eraseBounds;
+
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
+    bool selectionMode = false,
+    bool selected = false,
+    VoidCallback? onSelect,
   });
 
   XmlElement toXmlElement();

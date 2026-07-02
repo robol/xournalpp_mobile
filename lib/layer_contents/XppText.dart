@@ -69,9 +69,28 @@ class XppText extends XppContent {
   Offset? getOffset() => offset;
 
   @override
+  Rect? get selectionBounds {
+    if (offset == null) return null;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text ?? '',
+        style: TextStyle(
+          fontSize: size ?? _defaultSize,
+          fontFamily: fontFamily,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return offset! & painter.size;
+  }
+
+  @override
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
+    bool selectionMode = false,
+    bool selected = false,
+    VoidCallback? onSelect,
   }) {
     return XppPageContentWidget(
       child: Text(
@@ -94,6 +113,9 @@ class XppText extends XppContent {
         ).then(onReplace).catchError((_) {});
       },
       onPointerDown: onPointerDown,
+      selectionMode: selectionMode,
+      selected: selected,
+      onSelect: onSelect,
       tool: EditingTool.TEXT,
     );
   }

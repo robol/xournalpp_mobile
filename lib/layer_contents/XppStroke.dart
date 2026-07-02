@@ -42,6 +42,9 @@ abstract class XppStroke extends XppContent {
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
+    bool selectionMode = false,
+    bool selected = false,
+    VoidCallback? onSelect,
   }) {
     if (points!.isEmpty) {
       return XppPageContentWidget(child: (Container()));
@@ -79,6 +82,9 @@ abstract class XppStroke extends XppContent {
         ),
       ),
       onPointerDown: onPointerDown,
+      selectionMode: selectionMode,
+      selected: selected,
+      onSelect: onSelect,
       tool: EditingTool.STYLUS,
     );
   }

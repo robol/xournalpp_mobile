@@ -24,6 +24,8 @@ class PointerListener extends StatefulWidget {
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   final Function()? removeLastContent;
+  final void Function(Rect? region)? onSelectionRegionChange;
+  final VoidCallback? onSelectionClear;
 
   const PointerListener({
     Key? key,
@@ -41,6 +43,8 @@ class PointerListener extends StatefulWidget {
     this.filterEraser,
     this.filterEraserPath,
     this.removeLastContent,
+    this.onSelectionRegionChange,
+    this.onSelectionClear,
   }) : super(key: key);
 
   @override
@@ -68,6 +72,10 @@ class PointerListenerState extends State<PointerListener> {
 
   PointerDeviceKind? _lastNotifiedDeviceKind;
   final Set<int> _contentPointerDownDevices = {};
+  Offset? _selectionStart;
+  Offset? _selectionCurrent;
+  int? _selectionPointerDevice;
+  bool _dragSelecting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +90,10 @@ class PointerListenerState extends State<PointerListener> {
           if (_detectTwoFingerGesture(data)) return;
           notifyDeviceChange(data);
           if (!drawingEnabled) return;
+          if (isSelect(data)) {
+            _updateSelectionRegion(data);
+            return;
+          }
           if (isPen(data) || isHighlighter(data) || isLaser(data)) {
             addStrokePoint(data);
           }
@@ -96,6 +108,10 @@ class PointerListenerState extends State<PointerListener> {
             tool = getToolFromPointer(data);
           });
           notifyDeviceChange(data);
+          if (isSelect(data)) {
+            _startSelectionRegion(data);
+            return;
+          }
           if (drawingEnabled &&
               (isPen(data) || isHighlighter(data) || isLaser(data))) {
             resetPreview();
@@ -113,7 +129,9 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
-          if (tool == XppStrokeTool.ERASER) {
+          if (activeEditingTool == EditingTool.SELECT) {
+            _finishSelectionRegion();
+          } else if (tool == XppStrokeTool.ERASER) {
             applyEraserPath();
           } else if (activeEditingTool == EditingTool.LASER) {
             finishLaserPreview();
@@ -131,6 +149,7 @@ class PointerListenerState extends State<PointerListener> {
           if (activeEditingTool == EditingTool.LASER) {
             finishLaserPreview();
           }
+          _cancelSelectionRegion();
           strokePoints.clear();
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
@@ -149,6 +168,18 @@ class PointerListenerState extends State<PointerListener> {
           children: [
             widget.child!,
             ...strokePreview.buildWidgets(),
+            if (_selectionRect != null)
+              Positioned.fromRect(
+                rect: _selectionRect!,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0x221976D2),
+                      border: Border.all(color: Color(0xFF1976D2), width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
             Positioned.fill(
               child: IgnorePointer(
                 child: RepaintBoundary(
@@ -175,6 +206,7 @@ class PointerListenerState extends State<PointerListener> {
   void clearPoints() {
     strokePoints.clear();
     eraserPreview.reset();
+    _cancelSelectionRegion();
     resetPreview(rebuild: true);
   }
 
@@ -187,6 +219,60 @@ class PointerListenerState extends State<PointerListener> {
 
   bool _consumeContentPointerDown(PointerDownEvent event) =>
       _contentPointerDownDevices.remove(event.device);
+
+  Rect? get _selectionRect {
+    if (!_dragSelecting ||
+        _selectionStart == null ||
+        _selectionCurrent == null) {
+      return null;
+    }
+    return Rect.fromPoints(_selectionStart!, _selectionCurrent!);
+  }
+
+  void _startSelectionRegion(PointerDownEvent data) {
+    _selectionStart = data.localPosition;
+    _selectionCurrent = data.localPosition;
+    _selectionPointerDevice = data.device;
+    _dragSelecting = false;
+  }
+
+  void _updateSelectionRegion(PointerMoveEvent data) {
+    if (_selectionStart == null) return;
+    _selectionCurrent = data.localPosition;
+    final distance = (_selectionCurrent! - _selectionStart!).distance;
+    if (!_dragSelecting && distance < 4) return;
+
+    _dragSelecting = true;
+    widget.onSelectionRegionChange?.call(_selectionRect);
+    setState(() {});
+  }
+
+  void _finishSelectionRegion() {
+    if (_dragSelecting) {
+      widget.onSelectionRegionChange?.call(_selectionRect);
+    } else if (_selectionStart != null) {
+      final pointerDevice = _selectionPointerDevice;
+      Future<void>.delayed(Duration.zero, () {
+        if (!mounted || _selectionStart != null) return;
+        if (_contentPointerDownDevices.remove(pointerDevice)) return;
+        widget.onSelectionClear?.call();
+      });
+    }
+    _selectionPointerDevice = null;
+    _selectionStart = null;
+    _selectionCurrent = null;
+    _dragSelecting = false;
+    setState(() {});
+  }
+
+  void _cancelSelectionRegion() {
+    if (_selectionStart == null && !_dragSelecting) return;
+    _selectionStart = null;
+    _selectionCurrent = null;
+    _selectionPointerDevice = null;
+    _dragSelecting = false;
+    setState(() {});
+  }
 
   void _insertLatex(PointerDownEvent data) {
     final topLeft = data.localPosition;
@@ -337,6 +423,11 @@ class PointerListenerState extends State<PointerListener> {
   bool isLaTeX(PointerEvent data) {
     return (widget.toolData.keys.contains(data.kind) &&
         widget.toolData[data.kind] == EditingTool.LATEX);
+  }
+
+  bool isSelect(PointerEvent data) {
+    return (widget.toolData.keys.contains(data.kind) &&
+        widget.toolData[data.kind] == EditingTool.SELECT);
   }
 
   EditingTool? getEditingToolFromPointer(PointerEvent data) {

@@ -77,6 +77,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   _EraserContentIndex? _eraserIndex;
   final List<_UndoEntry> _undoStack = [];
+  Set<XppContent> _selectedContents = {};
 
   Animation<Matrix4>? _animationReset;
   late AnimationController _controllerReset;
@@ -141,6 +142,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                                 radius: radius,
                               );
                             },
+                        onSelectionRegionChange: _selectRegion,
+                        onSelectionClear: _clearSelection,
                         onNewContent: (newContent) {
                           if (newContent == null) return;
 
@@ -174,6 +177,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             key: _pageStackKey,
                             page: _file!.pages![currentPage],
                             rasterScale: pageScale,
+                            activeTool: _activeTool,
+                            selectedContents: _selectedContents,
+                            onSelectContent: _selectContent,
                             onReplaceContent: _replaceContent,
                             onContentPointerDown: (event) => _pointerListenerKey
                                 .currentState
@@ -291,6 +297,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             onNewDeviceMap: (newDeviceMap) => setState(() {
               _toolData = newDeviceMap!;
               _setZoomableState();
+              if (_activeTool != EditingTool.SELECT) {
+                _selectedContents = {};
+              }
             }),
           ),
         ),
@@ -309,6 +318,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 onPageChange: (newPage) {
                   setState(() {
                     currentPage = newPage;
+                    _selectedContents = {};
                     _invalidateEraserIndex();
                   });
                   _pageStackKey.currentState!.setPageData(
@@ -317,6 +327,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 },
                 onPageDelete: (deletedIndex) => setState(() {
                   _file!.pages!.removeAt(deletedIndex);
+                  _selectedContents = {};
                   _invalidateEraserIndex();
                   if (_file!.pages!.length >= currentPage)
                     currentPage = _file!.pages!.length - 1;
@@ -337,6 +348,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   final page = _file!.pages![initialIndex];
                   _file!.pages!.removeAt(initialIndex);
                   _file!.pages!.insert(movedTo - 1, page);
+                  _selectedContents = {};
                   _invalidateEraserIndex();
                 }),
                 currentPage: currentPage,
@@ -345,6 +357,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 heroTag: 'AddXppPage',
                 onPressed: () => setState(() {
                   currentPage++;
+                  _selectedContents = {};
                   _invalidateEraserIndex();
                   _file!.pages!.insert(
                     currentPage,
@@ -505,7 +518,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     if (!deviceChanged && hadDeviceTool) return;
 
-    _currentDevice = kind;
+    setState(() {
+      _currentDevice = kind;
+      if (_activeTool != EditingTool.SELECT) {
+        _selectedContents = {};
+      }
+    });
     _editingToolbarKey.currentState!.setState(() {
       _editingToolbarKey.currentState!.currentDevice = kind;
       _setZoomableState();
@@ -523,6 +541,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _pointerListenerKey.currentState!.drawingEnabled = !zoomEnabled;
     });
   }
+
+  EditingTool? get _activeTool => _toolData[_currentDevice];
 
   void _updatePageScale() {
     setState(() => pageScale = _zoomController.value.getMaxScaleOnAxis());
@@ -642,6 +662,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     setState(() {
       content[index] = newContent;
       layer.content = content;
+      if (_selectedContents.contains(oldContent)) {
+        _selectedContents = {
+          ..._selectedContents.where(
+            (content) => !identical(content, oldContent),
+          ),
+          newContent,
+        };
+      }
       _undoStack.add(
         _UndoEntry([
           _LayerOperation.removed(
@@ -661,6 +689,33 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _invalidateEraserIndex();
     });
     _pageStackKey.currentState!.setPageData(page);
+  }
+
+  void _selectContent(XppLayer _, XppContent content) {
+    if (_activeTool != EditingTool.SELECT) return;
+    setState(() => _selectedContents = {content});
+  }
+
+  void _selectRegion(Rect? region) {
+    if (_activeTool != EditingTool.SELECT || region == null) return;
+
+    final selected = <XppContent>{};
+    for (final layer in _file!.pages![currentPage].layers ?? <XppLayer>[]) {
+      for (final content in layer.content ?? <XppContent?>[]) {
+        final bounds = content?.selectionBounds;
+        if (content == null || bounds == null || bounds.isEmpty) continue;
+        if (region.overlaps(bounds) || region.contains(bounds.center)) {
+          selected.add(content);
+        }
+      }
+    }
+
+    setState(() => _selectedContents = selected);
+  }
+
+  void _clearSelection() {
+    if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
+    setState(() => _selectedContents = {});
   }
 
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
