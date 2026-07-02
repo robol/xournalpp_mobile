@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 import 'package:xournalpp/generated/l10n.dart';
@@ -77,6 +76,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   bool savingFile = false;
 
   _EraserContentIndex? _eraserIndex;
+  final List<_UndoEntry> _undoStack = [];
 
   Animation<Matrix4>? _animationReset;
   late AnimationController _controllerReset;
@@ -144,20 +144,30 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                               );
                             },
                         onNewContent: (newContent) {
+                          if (newContent == null) return;
+
                           /// TODO: manage layers
+                          final page = _file!.pages![currentPage];
+                          final layer = page.layers![0];
                           setState(() {
-                            _file!
-                                .pages![currentPage]
-                                .layers![0]
-                                .content = new List.from(
-                              _file!.pages![currentPage].layers![0].content!,
+                            final content = List<XppContent?>.from(
+                              layer.content!,
                             )..add(newContent);
+                            layer.content = content;
+                            _undoStack.add(
+                              _UndoEntry([
+                                _LayerOperation.added(
+                                  page: page,
+                                  layer: layer,
+                                  content: newContent,
+                                  index: content.length - 1,
+                                ),
+                              ]),
+                            );
                           });
                           _eraserIndex?.add(newContent);
 
-                          _pageStackKey.currentState!.setPageData(
-                            _file!.pages![currentPage],
-                          );
+                          _pageStackKey.currentState!.setPageData(page);
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
@@ -253,8 +263,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         actions: [
           IconButton(
             icon: Icon(Icons.undo),
-            onPressed: _canUndoLastStroke ? _undoLastStroke : null,
-            tooltip: 'Undo last stroke',
+            onPressed: _canUndo ? _undoLastOperation : null,
+            tooltip: 'Undo last operation',
           ),
           savingFile
               ? Center(
@@ -585,34 +595,29 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _eraseContentAlongPath(coordinates: [coordinates], radius: radius);
   }
 
-  bool get _canUndoLastStroke {
-    final content = _file?.pages?[currentPage].layers?[0].content;
-    return content?.any((item) => item is XppStroke) ?? false;
-  }
+  bool get _canUndo => _undoStack.isNotEmpty;
 
-  void _undoLastStroke() {
-    final page = _file!.pages![currentPage];
-    final layer = page.layers![0];
-    final content = layer.content;
-    if (content == null || content.isEmpty) return;
+  void _undoLastOperation() {
+    if (_undoStack.isEmpty) return;
 
-    final strokeIndex = content.lastIndexWhere((item) => item is XppStroke);
-    if (strokeIndex == -1) return;
-
-    final removedContent = content[strokeIndex];
+    final undoEntry = _undoStack.removeLast();
     setState(() {
-      layer.content = List<XppContent?>.from(content)..removeAt(strokeIndex);
-      if (removedContent != null) {
-        _eraserIndex?.remove(removedContent);
+      for (final operation in undoEntry.operations.reversed) {
+        operation.undo();
       }
+      _invalidateEraserIndex();
     });
-    _pageStackKey.currentState!.setPageData(page);
+
+    if (undoEntry.page == _file!.pages![currentPage]) {
+      _pageStackKey.currentState!.setPageData(undoEntry.page);
+    }
   }
 
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
     if (coordinates == null || coordinates.isEmpty || radius == null) return;
 
-    final layer = _file!.pages![currentPage].layers![0];
+    final page = _file!.pages![currentPage];
+    final layer = page.layers![0];
     final eraserIndex = _eraserIndexForLayer(layer);
     final eraseCandidates = <XppContent>{};
     for (final coordinate in coordinates) {
@@ -625,9 +630,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (eraseCandidates.isEmpty) return;
 
     final List<XppContent?> updatedContent = [];
+    final operations = <_LayerOperation>[];
     bool erasedAnything = false;
 
-    for (final content in layer.content!) {
+    for (var index = 0; index < layer.content!.length; index++) {
+      final content = layer.content![index];
       if (content == null) {
         updatedContent.add(null);
         continue;
@@ -646,11 +653,27 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
       if (delta.affected) {
         erasedAnything = true;
+        operations.add(
+          _LayerOperation.removed(
+            page: page,
+            layer: layer,
+            content: content,
+            index: index,
+          ),
+        );
         eraserIndex.remove(content);
         for (final newContent in delta.newContent) {
+          operations.add(
+            _LayerOperation.added(
+              page: page,
+              layer: layer,
+              content: newContent,
+              index: updatedContent.length,
+            ),
+          );
           eraserIndex.add(newContent);
+          updatedContent.add(newContent);
         }
-        updatedContent.addAll(delta.newContent);
       } else {
         updatedContent.add(content);
       }
@@ -659,7 +682,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (!erasedAnything) return;
 
     layer.content = updatedContent;
-    _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    _undoStack.add(_UndoEntry(operations));
+    _pageStackKey.currentState!.setPageData(page);
     setState(() {});
   }
 
@@ -932,6 +956,92 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       eraserWidth =
           prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
     });
+  }
+}
+
+class _UndoEntry {
+  final List<_LayerOperation> operations;
+
+  _UndoEntry(this.operations);
+
+  XppPage get page => operations.first.page;
+}
+
+enum _LayerOperationType { added, removed }
+
+class _LayerOperation {
+  final XppPage page;
+  final XppLayer layer;
+  final XppContent content;
+  final int index;
+  final _LayerOperationType type;
+
+  _LayerOperation._({
+    required this.page,
+    required this.layer,
+    required this.content,
+    required this.index,
+    required this.type,
+  });
+
+  factory _LayerOperation.added({
+    required XppPage page,
+    required XppLayer layer,
+    required XppContent content,
+    required int index,
+  }) {
+    return _LayerOperation._(
+      page: page,
+      layer: layer,
+      content: content,
+      index: index,
+      type: _LayerOperationType.added,
+    );
+  }
+
+  factory _LayerOperation.removed({
+    required XppPage page,
+    required XppLayer layer,
+    required XppContent content,
+    required int index,
+  }) {
+    return _LayerOperation._(
+      page: page,
+      layer: layer,
+      content: content,
+      index: index,
+      type: _LayerOperationType.removed,
+    );
+  }
+
+  void undo() {
+    switch (type) {
+      case _LayerOperationType.added:
+        _removeContent();
+        break;
+      case _LayerOperationType.removed:
+        _restoreContent();
+        break;
+    }
+  }
+
+  void _removeContent() {
+    final contentList = List<XppContent?>.from(layer.content ?? []);
+    final contentIndex = contentList.indexWhere(
+      (item) => identical(item, content),
+    );
+    if (contentIndex == -1) return;
+
+    contentList.removeAt(contentIndex);
+    layer.content = contentList;
+  }
+
+  void _restoreContent() {
+    final contentList = List<XppContent?>.from(layer.content ?? []);
+    if (contentList.any((item) => identical(item, content))) return;
+
+    contentList.insert(index.clamp(0, contentList.length), content);
+    layer.content = contentList;
   }
 }
 

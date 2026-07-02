@@ -83,16 +83,18 @@ class EditingToolBarState extends State<EditingToolBar> {
               Icon(Icons.science),
               usePrimaryColor: true,
             ),
-            getInkwellButton(
-              EditingTool.IMAGE,
-              Icon(Icons.add_photo_alternate),
-              usePrimaryColor: true,
-            ),
-            getInkwellButton(
-              EditingTool.SELECT,
-              Icon(Icons.tab_unselected),
-              usePrimaryColor: true,
-            ),
+            // TODO: Currently not implemented
+            // getInkwellButton(
+            //   EditingTool.IMAGE,
+            //   Icon(Icons.add_photo_alternate),
+            //   usePrimaryColor: true,
+            // ),
+            // TODO: Currently not implemented
+            // getInkwellButton(
+            //   EditingTool.SELECT,
+            //   Icon(Icons.tab_unselected),
+            //   usePrimaryColor: true,
+            // ),
           ],
           shrinkWrap: true,
           scrollDirection: Axis.horizontal,
