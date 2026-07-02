@@ -61,6 +61,7 @@ class EditingToolBarState extends State<EditingToolBar> {
               FaIcon(FontAwesomeIcons.highlighter),
               enableSettings: true,
             ),
+            getInkwellButton(EditingTool.LASER, Icon(Icons.adjust)),
             getInkwellButton(
               EditingTool.MOVE,
               Icon(Icons.pan_tool),

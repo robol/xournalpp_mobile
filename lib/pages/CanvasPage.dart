@@ -37,6 +37,7 @@ class CanvasPage extends StatefulWidget {
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _defaultToolColor = 0xFF607D8B;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
+  static const Color _laserColor = Colors.redAccent;
   static const double _fitWidthHorizontalMargin = 50;
   static const double _penMinWidth = 0.1;
   static const double _penMaxWidth = 3;
@@ -127,6 +128,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         eraserWidth: eraserWidth,
                         color: toolColor,
                         highlighterColor: highlighterColor,
+                        laserColor: _laserColor,
                         onDeviceChange: _handleDeviceChange,
                         filterEraser: ({Offset? coordinates, double? radius}) {
                           _eraseContentAt(
@@ -852,6 +854,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   Color getColor(EditingTool? tool) {
     if (tool == EditingTool.HIGHLIGHT) {
       return highlighterColor;
+    }
+    if (tool == EditingTool.LASER) {
+      return _laserColor;
     }
     return toolColor;
   }

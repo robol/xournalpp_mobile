@@ -20,6 +20,7 @@ class PointerListener extends StatefulWidget {
   final double? eraserWidth;
   final Color? color;
   final Color? highlighterColor;
+  final Color? laserColor;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   final Function()? removeLastContent;
@@ -36,6 +37,7 @@ class PointerListener extends StatefulWidget {
     this.eraserWidth,
     this.color,
     this.highlighterColor,
+    this.laserColor,
     this.filterEraser,
     this.filterEraserPath,
     this.removeLastContent,
@@ -46,6 +48,9 @@ class PointerListener extends StatefulWidget {
 }
 
 class PointerListenerState extends State<PointerListener> {
+  static const Duration _laserPreviewFadeOutDuration = Duration(seconds: 3);
+  static const double _laserWidth = 20;
+
   bool drawingEnabled = true;
 
   final StrokePointBuffer strokePoints = StrokePointBuffer();
@@ -55,6 +60,7 @@ class PointerListenerState extends State<PointerListener> {
   );
 
   XppStrokeTool tool = XppStrokeTool.PEN;
+  EditingTool? activeEditingTool = EditingTool.STYLUS;
 
   Map<int, DateTime> pointerTimestamps = Map();
 
@@ -75,7 +81,9 @@ class PointerListenerState extends State<PointerListener> {
           if (_detectTwoFingerGesture(data)) return;
           notifyDeviceChange(data);
           if (!drawingEnabled) return;
-          if (isPen(data) || isHighlighter(data)) addStrokePoint(data);
+          if (isPen(data) || isHighlighter(data) || isLaser(data)) {
+            addStrokePoint(data);
+          }
 
           if (isEraser(data)) eraseAt(data);
         },
@@ -83,10 +91,12 @@ class PointerListenerState extends State<PointerListener> {
           if (_detectTwoFingerGesture(data, shouldPop: true)) return;
 
           setState(() {
+            activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
           notifyDeviceChange(data);
-          if (drawingEnabled && (isPen(data) || isHighlighter(data))) {
+          if (drawingEnabled &&
+              (isPen(data) || isHighlighter(data) || isLaser(data))) {
             resetPreview();
             addStrokePoint(data);
           }
@@ -114,22 +124,32 @@ class PointerListenerState extends State<PointerListener> {
         onPointerUp: (data) {
           if (tool == XppStrokeTool.ERASER) {
             applyEraserPath();
+          } else if (activeEditingTool == EditingTool.LASER) {
+            finishLaserPreview();
           } else if (!poppedContentForCurrentPointer) {
             saveStroke(tool);
           }
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
           strokePoints.clear();
-          resetPreview(rebuild: true);
+          if (activeEditingTool != EditingTool.LASER) {
+            resetPreview(rebuild: true);
+          }
         },
         onPointerCancel: (data) {
+          if (activeEditingTool == EditingTool.LASER) {
+            finishLaserPreview();
+          }
           strokePoints.clear();
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
-          resetPreview(rebuild: true);
+          if (activeEditingTool != EditingTool.LASER) {
+            resetPreview(rebuild: true);
+          }
         },
         onPointerSignal: (data) {
           setState(() {
+            activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
           notifyDeviceChange(data);
@@ -182,6 +202,9 @@ class PointerListenerState extends State<PointerListener> {
   Color? get _activeStrokeColor => _colorForTool(tool);
 
   Color? _colorForTool(XppStrokeTool tool) {
+    if (activeEditingTool == EditingTool.LASER) {
+      return widget.laserColor;
+    }
     if (tool == XppStrokeTool.HIGHLIGHTER) {
       return widget.highlighterColor;
     }
@@ -203,7 +226,13 @@ class PointerListenerState extends State<PointerListener> {
     );
   }
 
+  void finishLaserPreview() {
+    strokePreview.finish(fadeOutDuration: _laserPreviewFadeOutDuration);
+    setState(() {});
+  }
+
   void addStrokePoint(PointerEvent data) {
+    activeEditingTool = getEditingToolFromPointer(data);
     tool = getToolFromPointer(data);
 
     double? width = (data.pressure == 0
@@ -212,6 +241,7 @@ class PointerListenerState extends State<PointerListener> {
 
     //A highlighter should not change its width
     if (isHighlighter(data)) width = widget.highlighterWidth;
+    if (isLaser(data)) width = _laserWidth;
 
     final point = XppStrokePoint(
       x: data.localPosition.dx,
@@ -224,7 +254,13 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void _appendStrokePoint(XppStrokePoint point) {
-    strokePreview.addPoint(point, onChunkReady: () => setState(() {}));
+    strokePreview.addPoint(
+      point,
+      fadeOutDuration: activeEditingTool == EditingTool.LASER
+          ? _laserPreviewFadeOutDuration
+          : null,
+      onChunkReady: () => setState(() {}),
+    );
   }
 
   void resetPreview({bool rebuild = false}) {
@@ -253,6 +289,11 @@ class PointerListenerState extends State<PointerListener> {
         widget.toolData[data.kind] == EditingTool.HIGHLIGHT);
   }
 
+  bool isLaser(PointerEvent data) {
+    return (widget.toolData.keys.contains(data.kind) &&
+        widget.toolData[data.kind] == EditingTool.LASER);
+  }
+
   bool isEraser(PointerEvent data) {
     return (widget.toolData.keys.contains(data.kind) &&
             widget.toolData[data.kind] == EditingTool.ERASER) ||
@@ -268,6 +309,17 @@ class PointerListenerState extends State<PointerListener> {
   bool isLaTeX(PointerEvent data) {
     return (widget.toolData.keys.contains(data.kind) &&
         widget.toolData[data.kind] == EditingTool.LATEX);
+  }
+
+  EditingTool? getEditingToolFromPointer(PointerEvent data) {
+    if (widget.toolData.keys.contains(data.kind)) {
+      return widget.toolData[data.kind];
+    }
+    if (data.kind == PointerDeviceKind.stylus) return EditingTool.STYLUS;
+    if (data.kind == PointerDeviceKind.invertedStylus) {
+      return EditingTool.ERASER;
+    }
+    return null;
   }
 
   XppStrokeTool getToolFromPointer(PointerEvent data) {

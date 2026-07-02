@@ -224,6 +224,7 @@ enum EditingTool {
   HIGHLIGHT,
   TEXT,
   LATEX,
+  LASER,
   IMAGE,
   MOVE,
   SELECT,
