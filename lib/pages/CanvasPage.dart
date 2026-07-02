@@ -107,11 +107,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               onInteractionStart: _onInteractionStart,
               onInteractionUpdate: (details) {
                 //print(details);
-                setState(() => pageScale = _zoomController.value.entry(0, 0));
+                _updatePageScale();
               },
-              onTransformationChanged: () {
-                setState(() => pageScale = _zoomController.value.entry(0, 0));
-              },
+              onTransformationChanged: _updatePageScale,
               child: Center(
                 child: Card(
                   elevation: 12,
@@ -191,55 +189,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   child: child,
                 )*/
           ),
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: Tooltip(
-              message: '${(pageScale * 100).round()} %',
-              child: SizedBox(
-                width: 64,
-                child: Column(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.add),
-                      color: Theme.of(context).primaryColor,
-                      onPressed: () {
-                        this._setScale(pageScale + 0.1);
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.fit_screen),
-                      color: Theme.of(context).primaryColor,
-                      tooltip: 'Fit width',
-                      onPressed: _fitPageToWidth,
-                    ),
-                    SizedBox(
-                      height: 128,
-                      child: RotatedBox(
-                        quarterTurns: 3,
-                        child: Slider(
-                          min: 0.1,
-                          max: 5,
-                          label: '${(pageScale * 100).round()} %',
-                          value: pageScale,
-                          onChanged: (newZoom) {
-                            _setScale(newZoom, animate: false);
-                          },
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.remove),
-                      color: Theme.of(context).primaryColor,
-                      onPressed: () {
-                        this._setScale(pageScale - 0.1);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
       appBar: AppBar(
@@ -261,6 +210,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           ),
         ),
         actions: [
+          _buildZoomControls(context),
           IconButton(
             icon: Icon(Icons.undo),
             onPressed: _canUndo ? _undoLastOperation : null,
@@ -485,6 +435,40 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         false;
   }
 
+  Widget _buildZoomControls(BuildContext context) {
+    return Tooltip(
+      message: '${(pageScale * 100).round()} %',
+      child: SizedBox(
+        height: 64,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.remove),
+              color: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                _setScale(pageScale - 0.1);
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.fit_screen),
+              color: Theme.of(context).colorScheme.onPrimary,
+              tooltip: 'Fit width',
+              onPressed: _fitPageToWidth,
+            ),
+            IconButton(
+              icon: Icon(Icons.add),
+              color: Theme.of(context).colorScheme.onPrimary,
+              onPressed: () {
+                _setScale(pageScale + 0.1);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void setDefaultDeviceIfNotSet({PointerDeviceKind? kind}) {
     if (!_toolData.keys.contains(kind)) {
       EditingTool tool;
@@ -536,24 +520,52 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     });
   }
 
+  void _updatePageScale() {
+    setState(() => pageScale = _zoomController.value.getMaxScaleOnAxis());
+  }
+
   void _setScale(double newZoom, {animate = true}) {
     newZoom = max(.1, min(5, newZoom));
     if (newZoom != pageScale) {
-      // final translation =
-      //     _zoomController.value.getTranslation() * newZoom / pageScale;
       pageScale = newZoom;
+      final scaledMatrix = _scaleAroundViewportCenter(newZoom);
       if (animate) {
-        _animateTransformation(
-          _zoomController.value.clone()
-            ..setDiagonal(Vector4(newZoom, newZoom, 1, 1)),
-        );
-        // ..setTranslation(translation));
+        _animateTransformation(scaledMatrix);
       } else {
-        _zoomController.value.setDiagonal(Vector4(newZoom, newZoom, 1, 1));
-        // _zoomController.value.setTranslation(translation);
+        _zoomController.value = scaledMatrix;
       }
       setState(() {});
     }
+  }
+
+  Matrix4 _scaleAroundViewportCenter(double targetScale) {
+    final viewportObject = _zoomableKey.currentContext?.findRenderObject();
+    if (viewportObject is! RenderBox) {
+      return _zoomController.value.clone()
+        ..setDiagonal(Vector4(targetScale, targetScale, 1, 1));
+    }
+
+    final matrix = _zoomController.value;
+    final currentScale = matrix.getMaxScaleOnAxis();
+    if (currentScale <= 0) {
+      return matrix.clone()
+        ..setDiagonal(Vector4(targetScale, targetScale, 1, 1));
+    }
+
+    final scaleRatio = targetScale / currentScale;
+    final focalPoint = viewportObject.size.center(Offset.zero);
+    final currentX = matrix.entry(0, 3);
+    final currentY = matrix.entry(1, 3);
+
+    return Matrix4.identity()
+      ..setDiagonal(Vector4(targetScale, targetScale, 1, 1))
+      ..setTranslation(
+        Vector3(
+          focalPoint.dx - (focalPoint.dx - currentX) * scaleRatio,
+          focalPoint.dy - (focalPoint.dy - currentY) * scaleRatio,
+          0,
+        ),
+      );
   }
 
   void _fitPageToWidth() {
