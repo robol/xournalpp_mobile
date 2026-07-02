@@ -298,8 +298,7 @@ class XppFile {
                 return subtext.group(0)!;
               },
             ),
-            size: XppPageSize.pt2mm(
-              double.parse(textElement.getAttribute('size')!),
+            size: double.parse(textElement.getAttribute('size')!,
             ),
             fontFamily: textElement.getAttribute('font'),
             offset: Offset(
