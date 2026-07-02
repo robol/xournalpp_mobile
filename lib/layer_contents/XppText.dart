@@ -6,6 +6,9 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppText extends XppContent {
+  static const String _defaultFontFamily = 'Sans';
+  static const double _defaultSize = 18;
+
   final Color? color;
   final double? size;
   final String? text;
@@ -14,33 +17,89 @@ class XppText extends XppContent {
 
   XppText({this.size, this.offset, this.fontFamily, this.color, this.text});
 
+  static Future<XppText> edit({
+    required BuildContext context,
+    String text = '',
+    Offset? offset,
+    Color? color,
+    double? size,
+    String? fontFamily,
+  }) async {
+    final textController = TextEditingController(text: text);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Enter text'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: 'Text',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Okay'),
+          ),
+        ],
+      ),
+    );
+    final enteredText = textController.text;
+    textController.dispose();
+    if (result != true) throw UnsupportedError('Aborted.');
+    return XppText(
+      text: enteredText,
+      offset: offset,
+      color: color,
+      size: size ?? _defaultSize,
+      fontFamily: fontFamily ?? _defaultFontFamily,
+    );
+  }
+
   @override
   Offset? getOffset() => offset;
 
   @override
   XppPageContentWidget render() {
     return XppPageContentWidget(
-      child: RichTextField(),
+      child: Text(
+        text ?? '',
+        style: TextStyle(
+          color: color ?? Colors.black,
+          fontSize: size ?? _defaultSize,
+          fontFamily: fontFamily,
+        ),
+      ),
       tool: EditingTool.TEXT,
     );
   }
 
   @override
-  XmlElement toXmlElement() => XmlElement(XmlName('text'), [
-        XmlAttribute(XmlName('font'), fontFamily!),
-        XmlAttribute(XmlName('size'), size.toString()),
-        XmlAttribute(XmlName('x'), offset!.dx.toString()),
-        XmlAttribute(XmlName('y'), offset!.dy.toString()),
-        XmlAttribute(XmlName('color'), color!.toHexTriplet()),
-      ], [
-        XmlText(encodeText(text!))
-      ]);
+  XmlElement toXmlElement() => XmlElement(
+    XmlName('text'),
+    [
+      XmlAttribute(XmlName('font'), fontFamily ?? _defaultFontFamily),
+      XmlAttribute(XmlName('size'), size.toString()),
+      XmlAttribute(XmlName('x'), offset!.dx.toString()),
+      XmlAttribute(XmlName('y'), offset!.dy.toString()),
+      XmlAttribute(XmlName('color'), (color ?? Colors.black).toHexTriplet()),
+    ],
+    [XmlText(encodeText(text ?? ''))],
+  );
 
   static String encodeText(String text) {
-    text.replaceAll(r'&', r'&amp;');
-    text.replaceAll(r'<', r'&lt;');
-    text.replaceAll(r'>', r'&gt;');
-    return text;
+    return text
+        .replaceAll(r'&', r'&amp;')
+        .replaceAll(r'<', r'&lt;')
+        .replaceAll(r'>', r'&gt;');
   }
 
   @override
@@ -54,60 +113,4 @@ class XppText extends XppContent {
     // TODO: implement shouldSelectAt
     throw UnimplementedError();
   }
-}
-
-class RichTextField extends StatefulWidget {
-  final Function(String text)? onChange;
-
-  final String? text;
-
-  final double? size;
-
-  final Color? color;
-
-  const RichTextField(
-      {Key? key, this.onChange, this.text, this.size, this.color})
-      : super(key: key);
-
-  @override
-  _RichTextFieldState createState() => _RichTextFieldState();
-}
-
-class _RichTextFieldState extends State<RichTextField> {
-  //ZefyrController _controller;
-  TextEditingController? _controller;
-  FocusNode? _focusNode;
-
-  bool active = false;
-
-  @override
-  void initState() {
-    _controller = TextEditingController(text: widget.text);
-    //_controller = ZefyrController(
-    //   NotusDocument.fromDelta(NotusMarkdownCodec().decode(widget.text)));
-    _focusNode = FocusNode();
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return XppPageContentWidget(
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-      ),
-    );
-    /*return ZefyrEditor(
-      controller: _controller,
-      focusNode: _focusNode,
-      autofocus: true,
-      mode: active ? ZefyrMode.edit : ZefyrMode.select,
-    );*/
-  }
-
-  /*@override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }*/
 }

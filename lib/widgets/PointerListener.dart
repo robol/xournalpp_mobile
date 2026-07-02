@@ -114,11 +114,14 @@ class PointerListenerState extends State<PointerListener> {
             });
           }
           if (isText(data)) {
-            XppText(
+            XppText.edit(
+              context: context,
               offset: data.localPosition,
               color: _activeStrokeColor,
               size: widget.strokeWidth! * 3,
-            );
+            ).then((value) {
+              widget.onNewContent!(value);
+            });
           }
         },
         onPointerUp: (data) {

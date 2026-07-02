@@ -48,7 +48,7 @@ class XppFile {
           ..background = XppBackgroundPdf(
             onUnavailable: (context, String? p) async =>
                 throw ("$p is not available even though just imported"),
-            page: i,
+            page: i + 1,
             filename: pdfPath,
           ),
       );
@@ -89,7 +89,7 @@ class XppFile {
         context: context,
         builder: (c) => AlertDialog(
           title: Text(S.of(context).noFileSelected),
-          content: Text(S.of(context).youDidNotSelectAnyFile),
+          content: Text(S.of(context).youDidNotSelectAnyFile + e.toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -247,7 +247,7 @@ class XppFile {
         int index = 0;
         layer.children.forEach((XmlNode node) {
           if (node.nodeType == XmlNodeType.TEXT) {
-            if (node.value!.trim().isNotEmpty)
+            if (node.innerText.trim().isNotEmpty)
               print('Skipping text \'${node.value}\'');
             return;
           }
@@ -284,7 +284,7 @@ class XppFile {
           content[int.parse(textElement.getAttribute('counter')!)] = XppText(
             color: color,
             // note: not trimming
-            text: textElement.value!.replaceAllMapped(
+            text: textElement.innerText.replaceAllMapped(
               RegExp(r'(&amp;|&lt;|&gt;)'),
               (Match subtext) {
                 switch (subtext.group(0)) {

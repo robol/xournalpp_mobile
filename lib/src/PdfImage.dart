@@ -10,7 +10,8 @@ Future<int> pdfPageCount(XppPickedFile pdf) =>
     Printing.raster(pdf.toUint8List()).length;
 
 Future<Uint8List> pdfImage(XppPickedFile pdf, int? page) async {
-  final pageIndex = page ?? 0;
+  final pageNumber = page ?? 1;
+  final pageIndex = pageNumber <= 0 ? 0 : pageNumber - 1;
   final raster = await Printing.raster(
     pdf.toUint8List(),
     pages: [pageIndex],
