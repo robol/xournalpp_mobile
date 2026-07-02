@@ -3,11 +3,11 @@ name: Flutter Release
 on:
   push:
     tags:
-      - "*"
+      - "v*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to build, for example 1.2.3 or 1.2.3-beta.1"
+        description: "Release tag to build, for example v1.2.3 or v1.2.3-beta.1"
         required: true
         type: string
 
