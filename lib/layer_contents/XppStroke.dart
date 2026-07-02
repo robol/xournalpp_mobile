@@ -191,6 +191,20 @@ abstract class XppStroke extends XppContent {
 
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points});
 
+  @override
+  XppContent translatedBy(Offset delta) => newStroke(
+    color: color,
+    points: points
+        ?.map(
+          (point) => XppStrokePoint(
+            x: point.x == null ? null : point.x! + delta.dx,
+            y: point.y == null ? null : point.y! + delta.dy,
+            width: point.width,
+          ),
+        )
+        .toList(),
+  );
+
   XppStrokeBounds get _strokeBounds {
     return _cachedBounds ??= XppStrokeBounds.fromPoints(points!);
   }

@@ -96,6 +96,14 @@ class XppTexImage extends XppContent {
   }
 
   @override
+  XppContent translatedBy(Offset delta) => XppTexImage(
+    text: text,
+    topLeft: topLeft == null ? null : topLeft! + delta,
+    bottomRight: bottomRight == null ? null : bottomRight! + delta,
+    color: color,
+  );
+
+  @override
   XmlElement toXmlElement() => XmlElement(
     XmlName('teximage'),
     [

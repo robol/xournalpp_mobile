@@ -26,6 +26,8 @@ class PointerListener extends StatefulWidget {
   final Function()? removeLastContent;
   final void Function(Rect? region)? onSelectionRegionChange;
   final VoidCallback? onSelectionClear;
+  final bool Function(Offset position)? shouldMoveSelection;
+  final void Function(Offset delta, {bool done})? onSelectionMove;
 
   const PointerListener({
     Key? key,
@@ -45,6 +47,8 @@ class PointerListener extends StatefulWidget {
     this.removeLastContent,
     this.onSelectionRegionChange,
     this.onSelectionClear,
+    this.shouldMoveSelection,
+    this.onSelectionMove,
   }) : super(key: key);
 
   @override
@@ -76,6 +80,8 @@ class PointerListenerState extends State<PointerListener> {
   Offset? _selectionCurrent;
   int? _selectionPointerDevice;
   bool _dragSelecting = false;
+  Offset? _selectionMoveLastPosition;
+  bool _movingSelection = false;
 
   @override
   Widget build(BuildContext context) {
@@ -234,10 +240,21 @@ class PointerListenerState extends State<PointerListener> {
     _selectionCurrent = data.localPosition;
     _selectionPointerDevice = data.device;
     _dragSelecting = false;
+    _selectionMoveLastPosition = data.localPosition;
+    _movingSelection =
+        widget.shouldMoveSelection?.call(data.localPosition) ?? false;
   }
 
   void _updateSelectionRegion(PointerMoveEvent data) {
     if (_selectionStart == null) return;
+    if (_movingSelection) {
+      final lastPosition = _selectionMoveLastPosition;
+      _selectionMoveLastPosition = data.localPosition;
+      if (lastPosition == null) return;
+      widget.onSelectionMove?.call(data.localPosition - lastPosition);
+      return;
+    }
+
     _selectionCurrent = data.localPosition;
     final distance = (_selectionCurrent! - _selectionStart!).distance;
     if (!_dragSelecting && distance < 4) return;
@@ -248,7 +265,9 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void _finishSelectionRegion() {
-    if (_dragSelecting) {
+    if (_movingSelection) {
+      widget.onSelectionMove?.call(Offset.zero, done: true);
+    } else if (_dragSelecting) {
       widget.onSelectionRegionChange?.call(_selectionRect);
     } else if (_selectionStart != null) {
       final pointerDevice = _selectionPointerDevice;
@@ -262,6 +281,8 @@ class PointerListenerState extends State<PointerListener> {
     _selectionStart = null;
     _selectionCurrent = null;
     _dragSelecting = false;
+    _selectionMoveLastPosition = null;
+    _movingSelection = false;
     setState(() {});
   }
 
@@ -271,6 +292,8 @@ class PointerListenerState extends State<PointerListener> {
     _selectionCurrent = null;
     _selectionPointerDevice = null;
     _dragSelecting = false;
+    _selectionMoveLastPosition = null;
+    _movingSelection = false;
     setState(() {});
   }
 

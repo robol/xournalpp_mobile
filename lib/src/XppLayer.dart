@@ -25,6 +25,8 @@ abstract class XppContent {
 
   Rect? get selectionBounds => eraseBounds;
 
+  XppContent translatedBy(Offset delta);
+
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,

@@ -84,6 +84,13 @@ class XppImage extends XppContent {
   }
 
   @override
+  XppContent translatedBy(Offset delta) => XppImage(
+    data: data,
+    topLeft: topLeft == null ? null : topLeft! + delta,
+    bottomRight: bottomRight == null ? null : bottomRight! + delta,
+  );
+
+  @override
   XmlElement toXmlElement() => XmlElement(
     XmlName('image'),
     [

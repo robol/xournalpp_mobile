@@ -78,6 +78,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   _EraserContentIndex? _eraserIndex;
   final List<_UndoEntry> _undoStack = [];
   Set<XppContent> _selectedContents = {};
+  List<_SelectionMoveOriginal>? _selectionMoveOriginals;
 
   Animation<Matrix4>? _animationReset;
   late AnimationController _controllerReset;
@@ -144,6 +145,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             },
                         onSelectionRegionChange: _selectRegion,
                         onSelectionClear: _clearSelection,
+                        shouldMoveSelection: _shouldMoveSelection,
+                        onSelectionMove: _moveSelection,
                         onNewContent: (newContent) {
                           if (newContent == null) return;
 
@@ -718,6 +721,110 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     setState(() => _selectedContents = {});
   }
 
+  bool _shouldMoveSelection(Offset position) {
+    if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) {
+      return false;
+    }
+
+    return _selectedContents.any((content) {
+      final bounds = content.selectionBounds;
+      return bounds != null && bounds.inflate(6).contains(position);
+    });
+  }
+
+  void _moveSelection(Offset delta, {bool done = false}) {
+    if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
+
+    _selectionMoveOriginals ??= _selectionMoveStartData();
+
+    if (delta != Offset.zero) {
+      final translatedSelection = <XppContent>{};
+      final page = _file!.pages![currentPage];
+
+      for (final layer in page.layers ?? <XppLayer>[]) {
+        final content = List<XppContent?>.from(layer.content ?? []);
+        var changedLayer = false;
+
+        for (var index = 0; index < content.length; index++) {
+          final item = content[index];
+          if (item == null || !_selectedContents.contains(item)) continue;
+
+          final translated = item.translatedBy(delta);
+          content[index] = translated;
+          translatedSelection.add(translated);
+          changedLayer = true;
+        }
+
+        if (changedLayer) layer.content = content;
+      }
+
+      setState(() {
+        _selectedContents = translatedSelection;
+        _invalidateEraserIndex();
+      });
+      _pageStackKey.currentState!.setPageData(page);
+    }
+
+    if (done) _finishSelectionMove();
+  }
+
+  List<_SelectionMoveOriginal> _selectionMoveStartData() {
+    final originals = <_SelectionMoveOriginal>[];
+    final page = _file!.pages![currentPage];
+
+    for (final layer in page.layers ?? <XppLayer>[]) {
+      final content = layer.content ?? <XppContent?>[];
+      for (var index = 0; index < content.length; index++) {
+        final item = content[index];
+        if (item == null || !_selectedContents.contains(item)) continue;
+        originals.add(
+          _SelectionMoveOriginal(
+            page: page,
+            layer: layer,
+            content: item,
+            index: index,
+          ),
+        );
+      }
+    }
+
+    return originals;
+  }
+
+  void _finishSelectionMove() {
+    final originals = _selectionMoveOriginals;
+    _selectionMoveOriginals = null;
+    if (originals == null || originals.isEmpty) return;
+
+    final operations = <_LayerOperation>[];
+    for (final original in originals) {
+      final movedContent = original.layer.content?[original.index];
+      if (movedContent == null || identical(movedContent, original.content)) {
+        continue;
+      }
+      operations.add(
+        _LayerOperation.removed(
+          page: original.page,
+          layer: original.layer,
+          content: original.content,
+          index: original.index,
+        ),
+      );
+      operations.add(
+        _LayerOperation.added(
+          page: original.page,
+          layer: original.layer,
+          content: movedContent,
+          index: original.index,
+        ),
+      );
+    }
+
+    if (operations.isNotEmpty) {
+      setState(() => _undoStack.add(_UndoEntry(operations)));
+    }
+  }
+
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
     if (coordinates == null || coordinates.isEmpty || radius == null) return;
 
@@ -1070,6 +1177,20 @@ class _UndoEntry {
   _UndoEntry(this.operations);
 
   XppPage get page => operations.first.page;
+}
+
+class _SelectionMoveOriginal {
+  final XppPage page;
+  final XppLayer layer;
+  final XppContent content;
+  final int index;
+
+  _SelectionMoveOriginal({
+    required this.page,
+    required this.layer,
+    required this.content,
+    required this.index,
+  });
 }
 
 enum _LayerOperationType { added, removed }

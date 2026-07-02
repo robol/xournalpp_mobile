@@ -85,6 +85,15 @@ class XppText extends XppContent {
   }
 
   @override
+  XppContent translatedBy(Offset delta) => XppText(
+    size: size,
+    offset: offset == null ? null : offset! + delta,
+    fontFamily: fontFamily,
+    color: color,
+    text: text,
+  );
+
+  @override
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,
     void Function(PointerDownEvent event)? onPointerDown,
