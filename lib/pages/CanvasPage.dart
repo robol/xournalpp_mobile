@@ -183,6 +183,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             activeTool: _activeTool,
                             selectedContents: _selectedContents,
                             onSelectContent: _selectContent,
+                            onDeleteSelection: _deleteSelection,
                             onReplaceContent: _replaceContent,
                             onContentPointerDown: (event) => _pointerListenerKey
                                 .currentState
@@ -719,6 +720,48 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _clearSelection() {
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
     setState(() => _selectedContents = {});
+  }
+
+  void _deleteSelection() {
+    if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
+
+    final page = _file!.pages![currentPage];
+    final operations = <_LayerOperation>[];
+
+    for (final layer in page.layers ?? <XppLayer>[]) {
+      final content = layer.content ?? <XppContent?>[];
+      final updatedContent = <XppContent?>[];
+      var deletedFromLayer = false;
+
+      for (var index = 0; index < content.length; index++) {
+        final item = content[index];
+        if (item == null || !_selectedContents.contains(item)) {
+          updatedContent.add(item);
+          continue;
+        }
+
+        operations.add(
+          _LayerOperation.removed(
+            page: page,
+            layer: layer,
+            content: item,
+            index: index,
+          ),
+        );
+        deletedFromLayer = true;
+      }
+
+      if (deletedFromLayer) layer.content = updatedContent;
+    }
+
+    if (operations.isEmpty) return;
+
+    setState(() {
+      _undoStack.add(_UndoEntry(operations));
+      _selectedContents = {};
+      _invalidateEraserIndex();
+    });
+    _pageStackKey.currentState!.setPageData(page);
   }
 
   bool _shouldMoveSelection(Offset position) {

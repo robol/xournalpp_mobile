@@ -26,6 +26,7 @@ class XppPageStack extends StatefulWidget {
   final EditingTool? activeTool;
   final Set<XppContent> selectedContents;
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
+  final VoidCallback? onDeleteSelection;
 
   const XppPageStack({
     Key? key,
@@ -36,6 +37,7 @@ class XppPageStack extends StatefulWidget {
     this.activeTool,
     this.selectedContents = const {},
     this.onSelectContent,
+    this.onDeleteSelection,
   }) : super(key: key);
 
   @override
@@ -82,6 +84,8 @@ class XppPageStackState extends State<XppPageStack>
         ),
       ),
     );
+    final deleteButton = _buildDeleteSelectionButton();
+    if (deleteButton != null) children.add(deleteButton);
     return RepaintBoundary(
       key: pngKey,
       child: Theme(
@@ -102,6 +106,55 @@ class XppPageStackState extends State<XppPageStack>
             width: page!.pageSize!.width,
             height: page!.pageSize!.height,
             child: Stack(fit: StackFit.expand, children: children),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildDeleteSelectionButton() {
+    if (widget.activeTool != EditingTool.SELECT ||
+        widget.selectedContents.isEmpty ||
+        widget.onDeleteSelection == null) {
+      return null;
+    }
+
+    Rect? selectionBounds;
+    for (final content in widget.selectedContents) {
+      final bounds = content.selectionBounds;
+      if (bounds == null || bounds.isEmpty) continue;
+      selectionBounds = selectionBounds?.expandToInclude(bounds) ?? bounds;
+    }
+    if (selectionBounds == null) return null;
+
+    final pageSize = page!.pageSize!.toSize();
+    const buttonSize = 32.0;
+    final left = (selectionBounds.right + 6)
+        .clamp(0.0, max(0.0, pageSize.width - buttonSize))
+        .toDouble();
+    final top = (selectionBounds.top - buttonSize - 6)
+        .clamp(0.0, max(0.0, pageSize.height - buttonSize))
+        .toDouble();
+
+    return Positioned(
+      left: left,
+      top: top,
+      width: buttonSize,
+      height: buttonSize,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: widget.onContentPointerDown,
+        child: Material(
+          color: Colors.redAccent,
+          shape: CircleBorder(),
+          elevation: 3,
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            iconSize: 18,
+            color: Colors.white,
+            tooltip: 'Delete selection',
+            icon: Icon(Icons.delete),
+            onPressed: widget.onDeleteSelection,
           ),
         ),
       ),
