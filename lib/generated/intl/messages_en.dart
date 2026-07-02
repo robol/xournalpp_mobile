@@ -146,9 +146,6 @@ class MessageLookup extends MessageLookupByLibrary {
           "Unfortunately, there was an error saving this file.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("used"),
-    "whiteoutEraserNotImplemented": MessageLookupByLibrary.simpleMessage(
-      "Whiteout eraser (not implemented)",
-    ),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":
         MessageLookupByLibrary.simpleMessage(
           "Xournal++ Mobile is a project trying to make Xournal++ files and features available on different devices.",

@@ -334,8 +334,6 @@ class XppFile {
               break;
             case "eraser":
               tool = XppStrokeTool.ERASER;
-
-              /// TODO: implement whiteout eraser
               return;
             case "highlighter":
               tool = XppStrokeTool.HIGHLIGHTER;

@@ -155,9 +155,6 @@ class MessageLookup extends MessageLookupByLibrary {
           "Infelizmente houve um erro ao salvar este arquivo.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("utilizado"),
-    "whiteoutEraserNotImplemented": MessageLookupByLibrary.simpleMessage(
-      "Corretivo (não implementado)",
-    ),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":
         MessageLookupByLibrary.simpleMessage(
           "Xournal++ Mobile é um projeto que visa tornar as funcionalidades de Xournal++ e seus arquivos disponíveis em diferentes aparelhos.",

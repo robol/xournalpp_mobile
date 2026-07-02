@@ -61,6 +61,12 @@ class EditingToolBarState extends State<EditingToolBar> {
               FaIcon(FontAwesomeIcons.highlighter),
               enableSettings: true,
             ),
+            getInkwellButton(
+              EditingTool.ERASER,
+              FaIcon(FontAwesomeIcons.eraser),
+              enableSettings: true,
+              usePrimaryColor: true,
+            ),
             getInkwellButton(EditingTool.LASER, Icon(Icons.adjust)),
             getInkwellButton(
               EditingTool.MOVE,
@@ -75,17 +81,6 @@ class EditingToolBarState extends State<EditingToolBar> {
             getInkwellButton(
               EditingTool.LATEX,
               Icon(Icons.science),
-              usePrimaryColor: true,
-            ),
-            getInkwellButton(
-              EditingTool.ERASER,
-              FaIcon(FontAwesomeIcons.eraser),
-              enableSettings: true,
-              usePrimaryColor: true,
-            ),
-            getInkwellButton(
-              EditingTool.WHITEOUT,
-              Icon(Icons.format_paint),
               usePrimaryColor: true,
             ),
             getInkwellButton(

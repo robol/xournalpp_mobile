@@ -229,5 +229,4 @@ enum EditingTool {
   MOVE,
   SELECT,
   ERASER,
-  WHITEOUT,
 }

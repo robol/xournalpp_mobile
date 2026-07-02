@@ -213,7 +213,7 @@ abstract class XppStroke extends XppContent {
         stroke = XppStrokeHighlight(color: color, points: points);
         break;
       case XppStrokeTool.ERASER:
-        stroke = XppStrokeWhiteout(color: color, points: points);
+        stroke = XppStrokeEraser(color: color, points: points);
         break;
     }
     return stroke;
@@ -240,23 +240,23 @@ class XppStrokePen extends XppStroke {
   }
 }
 
-class XppStrokeWhiteout extends XppStroke {
+class XppStrokeEraser extends XppStroke {
   XppStrokeTool tool = XppStrokeTool.ERASER;
   List<XppStrokePoint>? points;
   Color? color;
 
   EditingTool? editingTool;
-  XppStrokeWhiteout({this.points, this.color})
+  XppStrokeEraser({this.points, this.color})
     : super(
         points: points,
         color: color,
         tool: XppStrokeTool.ERASER,
-        editingTool: EditingTool.WHITEOUT,
+        editingTool: EditingTool.ERASER,
       );
 
   @override
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points}) {
-    return XppStrokeWhiteout(points: points, color: color);
+    return XppStrokeEraser(points: points, color: color);
   }
 }
 
