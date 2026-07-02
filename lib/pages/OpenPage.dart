@@ -325,7 +325,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           title: Text(
             displayName,
             style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-              fontWeight: FontWeight.bold, fontSize: kLargeFontSize
+              fontWeight: FontWeight.bold,
+              fontSize: kLargeFontSize,
             ),
           ),
           leading: AspectRatio(
@@ -374,7 +375,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               });
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(S.of(context).errorOpeningFile + e.toString())),
+                SnackBar(
+                  content: Text(S.of(context).errorOpeningFile + e.toString()),
+                ),
               );
             }
           },
@@ -461,7 +464,7 @@ Future<XppPickedFile> showMissingFileDialog(
   if (existingSelection != null) return existingSelection;
 
   late Future<XppPickedFile> selection;
-  selection = _pickMissingPdfFile(context, path).catchError((error) {
+  selection = _resolveMissingPdfFile(context, path).catchError((error) {
     if (identical(_missingFileSelections[cacheKey], selection)) {
       _missingFileSelections.remove(cacheKey);
     }
@@ -469,6 +472,24 @@ Future<XppPickedFile> showMissingFileDialog(
   });
   _missingFileSelections[cacheKey] = selection;
   return selection;
+}
+
+Future<XppPickedFile> _resolveMissingPdfFile(
+  BuildContext context,
+  String? path,
+) async {
+  final mappedPath = await _mappedMissingPdfPath(path);
+  if (mappedPath != null) {
+    try {
+      return XppPickedFile.fromInternalPath(path: mappedPath);
+    } catch (_) {
+      await _forgetMissingPdfMapping(path);
+    }
+  }
+
+  final file = await _pickMissingPdfFile(context, path);
+  await _rememberMissingPdfMapping(path, file.path);
+  return file;
 }
 
 Future<XppPickedFile> _pickMissingPdfFile(
@@ -505,4 +526,58 @@ Future<XppPickedFile> _pickMissingPdfFile(
     type: XppFilePickType.custom,
     fileExtension: 'pdf',
   );
+}
+
+Future<String?> _mappedMissingPdfPath(String? path) async {
+  if (path == null || path.isEmpty) return null;
+  final prefs = await SharedPreferences.getInstance();
+  final mappings = _missingPdfMappingsFromPrefs(prefs);
+  return mappings[path];
+}
+
+Future<void> _rememberMissingPdfMapping(
+  String? originalPath,
+  String? replacementPath,
+) async {
+  if (originalPath == null ||
+      originalPath.isEmpty ||
+      replacementPath == null ||
+      replacementPath.isEmpty) {
+    return;
+  }
+
+  final prefs = await SharedPreferences.getInstance();
+  final mappings = _missingPdfMappingsFromPrefs(prefs);
+  mappings[originalPath] = replacementPath;
+  await prefs.setString(
+    PreferencesKeys.kMissingPdfFileMappings,
+    jsonEncode(mappings),
+  );
+}
+
+Future<void> _forgetMissingPdfMapping(String? originalPath) async {
+  if (originalPath == null || originalPath.isEmpty) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final mappings = _missingPdfMappingsFromPrefs(prefs);
+  if (mappings.remove(originalPath) == null) return;
+  await prefs.setString(
+    PreferencesKeys.kMissingPdfFileMappings,
+    jsonEncode(mappings),
+  );
+}
+
+Map<String, String> _missingPdfMappingsFromPrefs(SharedPreferences prefs) {
+  final jsonData = prefs.getString(PreferencesKeys.kMissingPdfFileMappings);
+  if (jsonData == null || jsonData.isEmpty) return {};
+
+  try {
+    final decoded = jsonDecode(jsonData);
+    if (decoded is! Map) return {};
+    return decoded.map(
+      (key, value) => MapEntry(key.toString(), value.toString()),
+    );
+  } catch (_) {
+    return {};
+  }
 }
