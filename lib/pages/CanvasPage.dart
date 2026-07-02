@@ -36,7 +36,17 @@ class CanvasPage extends StatefulWidget {
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _defaultToolColor = 0xFF607D8B;
+  static const int _defaultHighlighterColor = 0xFFFFFF00;
   static const double _fitWidthHorizontalMargin = 50;
+  static const double _penMinWidth = 0.1;
+  static const double _penMaxWidth = 3;
+  static const int _penWidthDivisions = 29;
+  static const double _highlighterMinWidth = 5;
+  static const double _highlighterMaxWidth = 50;
+  static const int _highlighterWidthDivisions = 45;
+  static const double _eraserMinWidth = 1;
+  static const double _eraserMaxWidth = 20;
+  static const int _eraserWidthDivisions = 19;
 
   XppFile? _file;
   String? filePath;
@@ -44,7 +54,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   int currentPage = 0;
 
   Color toolColor = Colors.blueGrey;
+  Color highlighterColor = Colors.yellow;
   double toolWidth = 1;
+  double highlighterWidth = 20;
   double eraserWidth = 20;
 
   TransformationController _zoomController = TransformationController();
@@ -111,8 +123,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         translationMatrix: _zoomController.value,
                         toolData: _toolData,
                         strokeWidth: toolWidth,
+                        highlighterWidth: highlighterWidth,
                         eraserWidth: eraserWidth,
                         color: toolColor,
+                        highlighterColor: highlighterColor,
                         onDeviceChange: _handleDeviceChange,
                         filterEraser: ({Offset? coordinates, double? radius}) {
                           _eraseContentAt(
@@ -281,10 +295,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             deviceMap: _toolData,
             getColor: getColor,
             getWidth: getWidth,
+            getMinWidth: getMinWidth,
+            getMaxWidth: getMaxWidth,
+            getWidthDivisions: getWidthDivisions,
             onWidthChange: (newWidth, tool) {
               setState(() {
                 if (tool == EditingTool.ERASER) {
                   eraserWidth = newWidth * 2;
+                } else if (tool == EditingTool.HIGHLIGHT) {
+                  highlighterWidth = newWidth;
                 } else {
                   toolWidth =
                       newWidth *
@@ -293,12 +312,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               });
               rememberToolSettings();
             },
-            onColorChange: (newColor) {
-              rememberToolSettings();
-              toolColor = newColor;
+            onColorChange: (newColor, tool) {
               setState(() {
-                toolColor = newColor;
+                if (tool == EditingTool.HIGHLIGHT) {
+                  highlighterColor = newColor;
+                } else {
+                  toolColor = newColor;
+                }
               });
+              rememberToolSettings();
             },
             onNewDeviceMap: (newDeviceMap) => setState(() {
               _toolData = newDeviceMap!;
@@ -827,7 +849,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Color getColor() {
+  Color getColor(EditingTool? tool) {
+    if (tool == EditingTool.HIGHLIGHT) {
+      return highlighterColor;
+    }
     return toolColor;
   }
 
@@ -837,13 +862,51 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (tool == EditingTool.ERASER) {
       return eraserWidth / 2;
     }
+    if (tool == EditingTool.HIGHLIGHT) {
+      return highlighterWidth;
+    }
     return toolWidth / 2;
+  }
+
+  double getMinWidth(EditingTool? tool) {
+    if (tool == EditingTool.ERASER) {
+      return _eraserMinWidth;
+    }
+    if (tool == EditingTool.HIGHLIGHT) {
+      return _highlighterMinWidth;
+    }
+    return _penMinWidth;
+  }
+
+  double getMaxWidth(EditingTool? tool) {
+    if (tool == EditingTool.ERASER) {
+      return _eraserMaxWidth;
+    }
+    if (tool == EditingTool.HIGHLIGHT) {
+      return _highlighterMaxWidth;
+    }
+    return _penMaxWidth;
+  }
+
+  int getWidthDivisions(EditingTool? tool) {
+    if (tool == EditingTool.ERASER) {
+      return _eraserWidthDivisions;
+    }
+    if (tool == EditingTool.HIGHLIGHT) {
+      return _highlighterWidthDivisions;
+    }
+    return _penWidthDivisions;
   }
 
   void rememberToolSettings() {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt(PreferencesKeys.kToolColor, toolColor.toARGB32());
+      prefs.setInt(
+        PreferencesKeys.kHighlighterColor,
+        highlighterColor.toARGB32(),
+      );
       prefs.setDouble(PreferencesKeys.kToolWidth, toolWidth);
+      prefs.setDouble(PreferencesKeys.kHighlighterWidth, highlighterWidth);
       prefs.setDouble(PreferencesKeys.kEraserWidth, eraserWidth);
     });
   }
@@ -853,7 +916,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       toolColor = Color(
         prefs.getInt(PreferencesKeys.kToolColor) ?? _defaultToolColor,
       );
+      highlighterColor = Color(
+        prefs.getInt(PreferencesKeys.kHighlighterColor) ??
+            _defaultHighlighterColor,
+      );
       toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth) ?? toolWidth;
+      highlighterWidth =
+          prefs.getDouble(PreferencesKeys.kHighlighterWidth) ??
+          highlighterWidth;
       eraserWidth =
           prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
     });

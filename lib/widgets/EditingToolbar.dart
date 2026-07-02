@@ -9,9 +9,12 @@ class EditingToolBar extends StatefulWidget {
   final Function(Map<PointerDeviceKind?, EditingTool>?)? onNewDeviceMap;
   final Function(double newWidth, EditingTool? tool)? onWidthChange;
   final Map<PointerDeviceKind?, EditingTool>? deviceMap;
-  final Function(Color)? onColorChange;
-  final Function()? getColor;
+  final Function(Color color, EditingTool? tool)? onColorChange;
+  final Function(EditingTool? tool)? getColor;
   final Function(EditingTool? tool)? getWidth;
+  final double Function(EditingTool? tool)? getMinWidth;
+  final double Function(EditingTool? tool)? getMaxWidth;
+  final int? Function(EditingTool? tool)? getWidthDivisions;
 
   const EditingToolBar({
     Key? key,
@@ -21,6 +24,9 @@ class EditingToolBar extends StatefulWidget {
     this.onColorChange,
     this.getColor,
     this.getWidth,
+    this.getMinWidth,
+    this.getMaxWidth,
+    this.getWidthDivisions,
   }) : super(key: key);
 
   @override
@@ -109,8 +115,12 @@ class EditingToolBarState extends State<EditingToolBar> {
       pageBuilder: (_, __, ___) {
         return ToolSettingDialog(
           width: widget.getWidth!(getTool()),
-          color: widget.getColor!(),
-          onColorChange: widget.onColorChange,
+          minWidth: widget.getMinWidth!(getTool()),
+          maxWidth: widget.getMaxWidth!(getTool()),
+          widthDivisions: widget.getWidthDivisions!(getTool()),
+          color: widget.getColor!(getTool()),
+          onColorChange: (newColor) =>
+              widget.onColorChange!(newColor, getTool()),
           onWidthChange: (newWidth) =>
               widget.onWidthChange!(newWidth, getTool()),
           enableColor: getTool() != EditingTool.ERASER,
@@ -141,7 +151,7 @@ class EditingToolBarState extends State<EditingToolBar> {
         child: icon,
         elevation: 6,
         backgroundColor: getTool() == tool
-            ? (!usePrimaryColor ? widget.getColor!() : null)
+            ? (!usePrimaryColor ? widget.getColor!(tool) : null)
             : Theme.of(context).cardColor,
       ),
     );

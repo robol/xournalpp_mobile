@@ -16,8 +16,10 @@ class PointerListener extends StatefulWidget {
   final Map<PointerDeviceKind?, EditingTool> toolData;
   final Matrix4? translationMatrix;
   final double? strokeWidth;
+  final double? highlighterWidth;
   final double? eraserWidth;
   final Color? color;
+  final Color? highlighterColor;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   final Function()? removeLastContent;
@@ -30,8 +32,10 @@ class PointerListener extends StatefulWidget {
     this.translationMatrix,
     this.onDeviceChange,
     this.strokeWidth,
+    this.highlighterWidth,
     this.eraserWidth,
     this.color,
+    this.highlighterColor,
     this.filterEraser,
     this.filterEraserPath,
     this.removeLastContent,
@@ -47,7 +51,7 @@ class PointerListenerState extends State<PointerListener> {
   final StrokePointBuffer strokePoints = StrokePointBuffer();
   final EraserPreviewController eraserPreview = EraserPreviewController();
   late final StrokePreviewController strokePreview = StrokePreviewController(
-    colorProvider: () => widget.color,
+    colorProvider: () => _activeStrokeColor,
   );
 
   XppStrokeTool tool = XppStrokeTool.PEN;
@@ -94,7 +98,7 @@ class PointerListenerState extends State<PointerListener> {
             XppTexImage.edit(
               context: context,
               topLeft: data.localPosition,
-              color: widget.color,
+              color: _activeStrokeColor,
             ).then((value) {
               widget.onNewContent!(value);
             });
@@ -102,7 +106,7 @@ class PointerListenerState extends State<PointerListener> {
           if (isText(data)) {
             XppText(
               offset: data.localPosition,
-              color: widget.color,
+              color: _activeStrokeColor,
               size: widget.strokeWidth! * 3,
             );
           }
@@ -169,10 +173,19 @@ class PointerListenerState extends State<PointerListener> {
       XppStroke stroke = XppStroke.byTool(
         tool: tool,
         points: smoothedPoints,
-        color: widget.color,
+        color: _colorForTool(tool),
       );
       widget.onNewContent!(stroke);
     }
+  }
+
+  Color? get _activeStrokeColor => _colorForTool(tool);
+
+  Color? _colorForTool(XppStrokeTool tool) {
+    if (tool == XppStrokeTool.HIGHLIGHTER) {
+      return widget.highlighterColor;
+    }
+    return widget.color;
   }
 
   void eraseAt(PointerEvent data) {
@@ -191,12 +204,14 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void addStrokePoint(PointerEvent data) {
+    tool = getToolFromPointer(data);
+
     double? width = (data.pressure == 0
         ? widget.strokeWidth
         : data.pressure * widget.strokeWidth!);
 
     //A highlighter should not change its width
-    if (isHighlighter(data)) width = widget.strokeWidth;
+    if (isHighlighter(data)) width = widget.highlighterWidth;
 
     final point = XppStrokePoint(
       x: data.localPosition.dx,

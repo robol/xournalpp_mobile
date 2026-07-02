@@ -8,6 +8,9 @@ class ToolSettingDialog extends StatefulWidget {
   final ValueChanged<double>? onWidthChange;
   final Color color;
   final bool enableColor;
+  final double minWidth;
+  final double maxWidth;
+  final int? widthDivisions;
 
   ToolSettingDialog({
     Key? key,
@@ -16,6 +19,9 @@ class ToolSettingDialog extends StatefulWidget {
     this.onColorChange,
     this.onWidthChange,
     this.enableColor = true,
+    this.minWidth = 0.1,
+    this.maxWidth = 3,
+    this.widthDivisions,
   }) : super(key: key);
 
   @override
@@ -29,7 +35,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
   @override
   void initState() {
     super.initState();
-    width = widget.width;
+    width = widget.width.clamp(widget.minWidth, widget.maxWidth);
     color = widget.color;
   }
 
@@ -77,9 +83,9 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                   activeColor: Theme.of(context).colorScheme.secondary,
                   inactiveColor: Theme.of(context).colorScheme.onPrimary,
                   value: width,
-                  min: 0.1,
-                  max: 3,
-                  divisions: 29, // Make sure this matches the max value and step size
+                  min: widget.minWidth,
+                  max: widget.maxWidth,
+                  divisions: widget.widthDivisions,
                   label: width.toStringAsFixed(1),
                   onChanged: (newWidth) {
                     setState(() {
