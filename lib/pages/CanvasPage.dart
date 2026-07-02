@@ -53,9 +53,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   int currentPage = 0;
 
-  Color toolColor = Colors.blueGrey;
+  Color toolColor = Color(0xFF336699); // This is Colorfab3
   Color highlighterColor = Colors.yellow;
-  double toolWidth = 1;
+  double toolWidth = 2;
   double highlighterWidth = 20;
   double eraserWidth = 20;
 
