@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
+import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/XppLayer.dart';
@@ -46,7 +46,10 @@ class XppImage extends XppContent {
   }
 
   @override
-  XppPageContentWidget render() {
+  XppPageContentWidget render({
+    void Function(XppContent newContent)? onReplace,
+    void Function(PointerDownEvent event)? onPointerDown,
+  }) {
     return XppPageContentWidget(
       child: Stack(
         alignment: Alignment.center,
@@ -60,6 +63,7 @@ class XppImage extends XppContent {
           ),
         ],
       ),
+      onPointerDown: onPointerDown,
       tool: EditingTool.IMAGE,
     );
   }

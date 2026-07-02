@@ -59,8 +59,10 @@ class XppTexImage extends XppContent {
   }
 
   @override
-  XppPageContentWidget render() {
-    print(color);
+  XppPageContentWidget render({
+    void Function(XppContent newContent)? onReplace,
+    void Function(PointerDownEvent event)? onPointerDown,
+  }) {
     return XppPageContentWidget(
       child: DefaultTextStyle(
         style: TextStyle(
@@ -69,7 +71,8 @@ class XppTexImage extends XppContent {
         ), // TODO: implement text size
         child: Math.tex('\\displaystyle{$text}'),
       ),
-      onSelected: () => print('Edit LaTeX!'),
+      onSelected: (context) => print('Edit LaTeX!'),
+      onPointerDown: onPointerDown,
       tool: EditingTool.LATEX,
     );
   }

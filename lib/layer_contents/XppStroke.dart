@@ -39,7 +39,10 @@ abstract class XppStroke extends XppContent {
   }
 
   @override
-  XppPageContentWidget render() {
+  XppPageContentWidget render({
+    void Function(XppContent newContent)? onReplace,
+    void Function(PointerDownEvent event)? onPointerDown,
+  }) {
     if (points!.isEmpty) {
       return XppPageContentWidget(child: (Container()));
     }
@@ -75,6 +78,7 @@ abstract class XppStroke extends XppContent {
           }).toList(),
         ),
       ),
+      onPointerDown: onPointerDown,
       tool: EditingTool.STYLUS,
     );
   }

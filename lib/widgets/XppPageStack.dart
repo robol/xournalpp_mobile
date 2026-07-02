@@ -14,9 +14,21 @@ import 'package:xournalpp/src/XppPage.dart';
 class XppPageStack extends StatefulWidget {
   final XppPage? page;
   final double rasterScale;
+  final void Function(
+    XppLayer layer,
+    XppContent oldContent,
+    XppContent newContent,
+  )?
+  onReplaceContent;
+  final void Function(PointerDownEvent event)? onContentPointerDown;
 
-  const XppPageStack({Key? key, this.page, this.rasterScale = 1})
-    : super(key: key);
+  const XppPageStack({
+    Key? key,
+    this.page,
+    this.rasterScale = 1,
+    this.onReplaceContent,
+    this.onContentPointerDown,
+  }) : super(key: key);
 
   @override
   XppPageStackState createState() => XppPageStackState();
@@ -54,6 +66,8 @@ class XppPageStackState extends State<XppPageStack>
           layer: e,
           pageSize: page!.pageSize!.toSize(),
           rasterScale: widget.rasterScale,
+          onReplaceContent: widget.onReplaceContent,
+          onContentPointerDown: widget.onContentPointerDown,
         ),
       ),
     );
@@ -117,12 +131,21 @@ class XppLayerStack extends StatefulWidget {
   final XppLayer? layer;
   final Size pageSize;
   final double rasterScale;
+  final void Function(
+    XppLayer layer,
+    XppContent oldContent,
+    XppContent newContent,
+  )?
+  onReplaceContent;
+  final void Function(PointerDownEvent event)? onContentPointerDown;
 
   const XppLayerStack({
     Key? key,
     this.layer,
     required this.pageSize,
     required this.rasterScale,
+    this.onReplaceContent,
+    this.onContentPointerDown,
   }) : super(key: key);
   @override
   _XppLayerStackState createState() => _XppLayerStackState();
@@ -160,7 +183,14 @@ class _XppLayerStackState extends State<XppLayerStack> {
       flushPendingStrokes();
       if (!renderedContent.keys.contains(element)) {
         renderedContent[element] = Positioned(
-          child: element.render(),
+          child: element.render(
+            onReplace: (newContent) => widget.onReplaceContent?.call(
+              widget.layer!,
+              element,
+              newContent,
+            ),
+            onPointerDown: widget.onContentPointerDown,
+          ),
           top: element.getOffset()?.dy ?? 0,
           left: element.getOffset()?.dx ?? 0,
         );

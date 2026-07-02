@@ -23,7 +23,10 @@ abstract class XppContent {
 
   Rect? get eraseBounds => null;
 
-  XppPageContentWidget render();
+  XppPageContentWidget render({
+    void Function(XppContent newContent)? onReplace,
+    void Function(PointerDownEvent event)? onPointerDown,
+  });
 
   XmlElement toXmlElement();
 

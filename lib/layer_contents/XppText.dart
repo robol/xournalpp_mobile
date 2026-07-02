@@ -35,6 +35,7 @@ class XppText extends XppContent {
           autofocus: true,
           minLines: 1,
           maxLines: 5,
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
           decoration: InputDecoration(
             border: OutlineInputBorder(),
             labelText: 'Text',
@@ -68,7 +69,10 @@ class XppText extends XppContent {
   Offset? getOffset() => offset;
 
   @override
-  XppPageContentWidget render() {
+  XppPageContentWidget render({
+    void Function(XppContent newContent)? onReplace,
+    void Function(PointerDownEvent event)? onPointerDown,
+  }) {
     return XppPageContentWidget(
       child: Text(
         text ?? '',
@@ -78,6 +82,18 @@ class XppText extends XppContent {
           fontFamily: fontFamily,
         ),
       ),
+      onSelected: (context) {
+        if (onReplace == null) return;
+        XppText.edit(
+          context: context,
+          text: text ?? '',
+          offset: offset,
+          color: color,
+          size: size,
+          fontFamily: fontFamily,
+        ).then(onReplace).catchError((_) {});
+      },
+      onPointerDown: onPointerDown,
       tool: EditingTool.TEXT,
     );
   }

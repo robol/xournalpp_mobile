@@ -9,7 +9,8 @@ class XppPageContentWidget extends StatefulWidget {
   final EditingTool? tool;
   final bool? catchTool;
   final Builder? contextMenuBuilder;
-  final Function? onSelected;
+  final void Function(BuildContext context)? onSelected;
+  final void Function(PointerDownEvent event)? onPointerDown;
 
   const XppPageContentWidget({
     Key? key,
@@ -18,6 +19,7 @@ class XppPageContentWidget extends StatefulWidget {
     this.catchTool,
     this.contextMenuBuilder,
     this.onSelected,
+    this.onPointerDown,
   }) : super(key: key);
 
   @override
@@ -27,8 +29,13 @@ class XppPageContentWidget extends StatefulWidget {
 class _XppPageContentWidgetState extends State<XppPageContentWidget> {
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      child: widget.child,
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: widget.onPointerDown,
+      child: GestureDetector(
+        onTap: () => widget.onSelected?.call(context),
+        child: widget.child,
+      ),
     );
   }
 }

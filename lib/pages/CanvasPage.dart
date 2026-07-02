@@ -174,6 +174,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             key: _pageStackKey,
                             page: _file!.pages![currentPage],
                             rasterScale: pageScale,
+                            onReplaceContent: _replaceContent,
+                            onContentPointerDown: (event) => _pointerListenerKey
+                                .currentState
+                                ?.markContentPointerDown(event),
                           ),
                         ),
                       ),
@@ -623,6 +627,40 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (undoEntry.page == _file!.pages![currentPage]) {
       _pageStackKey.currentState!.setPageData(undoEntry.page);
     }
+  }
+
+  void _replaceContent(
+    XppLayer layer,
+    XppContent oldContent,
+    XppContent newContent,
+  ) {
+    final page = _file!.pages![currentPage];
+    final content = List<XppContent?>.from(layer.content ?? []);
+    final index = content.indexWhere((item) => identical(item, oldContent));
+    if (index == -1) return;
+
+    setState(() {
+      content[index] = newContent;
+      layer.content = content;
+      _undoStack.add(
+        _UndoEntry([
+          _LayerOperation.removed(
+            page: page,
+            layer: layer,
+            content: oldContent,
+            index: index,
+          ),
+          _LayerOperation.added(
+            page: page,
+            layer: layer,
+            content: newContent,
+            index: index,
+          ),
+        ]),
+      );
+      _invalidateEraserIndex();
+    });
+    _pageStackKey.currentState!.setPageData(page);
   }
 
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {

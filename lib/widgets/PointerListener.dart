@@ -67,6 +67,7 @@ class PointerListenerState extends State<PointerListener> {
   bool poppedContentForCurrentPointer = false;
 
   PointerDeviceKind? _lastNotifiedDeviceKind;
+  final Set<int> _contentPointerDownDevices = {};
 
   @override
   Widget build(BuildContext context) {
@@ -105,23 +106,10 @@ class PointerListenerState extends State<PointerListener> {
             eraseAt(data);
           }
           if (isLaTeX(data)) {
-            XppTexImage.edit(
-              context: context,
-              topLeft: data.localPosition,
-              color: _activeStrokeColor,
-            ).then((value) {
-              widget.onNewContent!(value);
-            });
+            _insertLatex(data);
           }
           if (isText(data)) {
-            XppText.edit(
-              context: context,
-              offset: data.localPosition,
-              color: _activeStrokeColor,
-              size: widget.strokeWidth! * 3,
-            ).then((value) {
-              widget.onNewContent!(value);
-            });
+            _insertText(data);
           }
         },
         onPointerUp: (data) {
@@ -188,6 +176,43 @@ class PointerListenerState extends State<PointerListener> {
     strokePoints.clear();
     eraserPreview.reset();
     resetPreview(rebuild: true);
+  }
+
+  void markContentPointerDown(PointerDownEvent event) {
+    _contentPointerDownDevices.add(event.device);
+    Future<void>.delayed(Duration(milliseconds: 100), () {
+      _contentPointerDownDevices.remove(event.device);
+    });
+  }
+
+  bool _consumeContentPointerDown(PointerDownEvent event) =>
+      _contentPointerDownDevices.remove(event.device);
+
+  void _insertLatex(PointerDownEvent data) {
+    final topLeft = data.localPosition;
+    final color = _activeStrokeColor;
+    Future<void>.delayed(Duration.zero, () {
+      if (!mounted || _consumeContentPointerDown(data)) return;
+      XppTexImage.edit(context: context, topLeft: topLeft, color: color)
+          .then((value) {
+            widget.onNewContent!(value);
+          })
+          .catchError((_) {});
+    });
+  }
+
+  void _insertText(PointerDownEvent data) {
+    final offset = data.localPosition;
+    final color = _activeStrokeColor;
+    final size = widget.strokeWidth! * 3;
+    Future<void>.delayed(Duration.zero, () {
+      if (!mounted || _consumeContentPointerDown(data)) return;
+      XppText.edit(context: context, offset: offset, color: color, size: size)
+          .then((value) {
+            widget.onNewContent!(value);
+          })
+          .catchError((_) {});
+    });
   }
 
   void saveStroke(XppStrokeTool tool) {
