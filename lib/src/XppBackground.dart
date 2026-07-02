@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
@@ -175,12 +176,11 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
   XppBackgroundSolidLined({this.color = Colors.white, this.size});
   @override
   Widget render() {
-    return Container(
+    return _RasterizedSolidBackground(
+      style: 'lined',
       color: color,
-      child: CustomPaint(
-        painter: _LinePainter(color: color),
-        size: size!.toSize(),
-      ),
+      size: size!.toSize(),
+      painter: _LinePainter(color: color),
     );
   }
 
@@ -195,12 +195,11 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
   XppBackgroundSolidRuled({this.color = Colors.white, this.size});
   @override
   Widget render() {
-    return Container(
+    return _RasterizedSolidBackground(
+      style: 'ruled',
       color: color,
-      child: CustomPaint(
-        painter: _RuledPainter(color: color),
-        size: size!.toSize(),
-      ),
+      size: size!.toSize(),
+      painter: _RuledPainter(color: color),
     );
   }
 
@@ -215,12 +214,11 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
   XppBackgroundSolidGraph({this.color = Colors.white, this.size});
   @override
   Widget render() {
-    return Container(
+    return _RasterizedSolidBackground(
+      style: 'graph',
       color: color,
-      child: CustomPaint(
-        painter: _GraphPainter(color: color),
-        size: size!.toSize(),
-      ),
+      size: size!.toSize(),
+      painter: _GraphPainter(color: color),
     );
   }
 
@@ -235,12 +233,11 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
   XppBackgroundSolidDot({this.color = Colors.white, this.size});
   @override
   Widget render() {
-    return Container(
+    return _RasterizedSolidBackground(
+      style: 'dotted',
       color: color,
-      child: CustomPaint(
-        painter: _DotPainter(color: color),
-        size: size!.toSize(),
-      ),
+      size: size!.toSize(),
+      painter: _DotPainter(color: color),
     );
   }
 
@@ -282,6 +279,122 @@ class _NoXppBackground extends XppBackground {
     ]);
     return (node);
   }
+}
+
+class _RasterizedSolidBackground extends StatefulWidget {
+  final String style;
+  final Color? color;
+  final Size size;
+  final CustomPainter painter;
+
+  const _RasterizedSolidBackground({
+    required this.style,
+    required this.color,
+    required this.size,
+    required this.painter,
+  });
+
+  @override
+  State<_RasterizedSolidBackground> createState() =>
+      _RasterizedSolidBackgroundState();
+}
+
+class _RasterizedSolidBackgroundState
+    extends State<_RasterizedSolidBackground> {
+  static final Map<_RasterizedBackgroundKey, Future<ui.Image>> _imageCache = {};
+
+  Future<ui.Image>? _imageFuture;
+  _RasterizedBackgroundKey? _cacheKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final key = _RasterizedBackgroundKey(
+      style: widget.style,
+      color: widget.color ?? Colors.white,
+      size: widget.size,
+      pixelRatio: pixelRatio,
+    );
+    if (_cacheKey != key) {
+      _cacheKey = key;
+      _imageFuture = _imageCache.putIfAbsent(
+        key,
+        () => _renderImage(
+          color: key.color,
+          size: widget.size,
+          pixelRatio: pixelRatio,
+          painter: widget.painter,
+        ),
+      );
+    }
+
+    return FutureBuilder<ui.Image>(
+      future: _imageFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return RawImage(
+            image: snapshot.data,
+            width: widget.size.width,
+            height: widget.size.height,
+            fit: BoxFit.fill,
+          );
+        }
+
+        return SizedBox(
+          width: widget.size.width,
+          height: widget.size.height,
+          child: ColoredBox(color: widget.color ?? Colors.white),
+        );
+      },
+    );
+  }
+
+  static Future<ui.Image> _renderImage({
+    required Color color,
+    required Size size,
+    required double pixelRatio,
+    required CustomPainter painter,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(pixelRatio);
+    canvas.drawRect(Offset.zero & size, Paint()..color = color);
+    painter.paint(canvas, size);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(
+      (size.width * pixelRatio).ceil().clamp(1, 100000),
+      (size.height * pixelRatio).ceil().clamp(1, 100000),
+    );
+    picture.dispose();
+    return image;
+  }
+}
+
+class _RasterizedBackgroundKey {
+  final String style;
+  final Color color;
+  final Size size;
+  final double pixelRatio;
+
+  const _RasterizedBackgroundKey({
+    required this.style,
+    required this.color,
+    required this.size,
+    required this.pixelRatio,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    return other is _RasterizedBackgroundKey &&
+        other.style == style &&
+        other.color == color &&
+        other.size == size &&
+        other.pixelRatio == pixelRatio;
+  }
+
+  @override
+  int get hashCode => Object.hash(style, color, size, pixelRatio);
 }
 
 class _LinePainter extends CustomPainter {
