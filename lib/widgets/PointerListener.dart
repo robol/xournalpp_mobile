@@ -21,6 +21,7 @@ class PointerListener extends StatefulWidget {
   final Color? color;
   final Color? highlighterColor;
   final Color? laserColor;
+  final bool drawWithStylusOnly;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   final Function()? removeLastContent;
@@ -44,6 +45,7 @@ class PointerListener extends StatefulWidget {
     this.color,
     this.highlighterColor,
     this.laserColor,
+    this.drawWithStylusOnly = false,
     this.filterEraser,
     this.filterEraserPath,
     this.removeLastContent,
@@ -480,53 +482,57 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   bool isPen(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-            widget.toolData[data.kind] == EditingTool.STYLUS) ||
-        (!widget.toolData.keys.contains(data.kind) &&
-            data.kind == PointerDeviceKind.stylus);
+    return getEditingToolFromPointer(data) == EditingTool.STYLUS;
   }
 
   bool isHighlighter(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-        widget.toolData[data.kind] == EditingTool.HIGHLIGHT);
+    return getEditingToolFromPointer(data) == EditingTool.HIGHLIGHT;
   }
 
   bool isLaser(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-        widget.toolData[data.kind] == EditingTool.LASER);
+    return getEditingToolFromPointer(data) == EditingTool.LASER;
   }
 
   bool isEraser(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-            widget.toolData[data.kind] == EditingTool.ERASER) ||
-        (!widget.toolData.keys.contains(data.kind) &&
-            data.kind == PointerDeviceKind.invertedStylus);
+    return getEditingToolFromPointer(data) == EditingTool.ERASER;
   }
 
   bool isText(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-        widget.toolData[data.kind] == EditingTool.TEXT);
+    return getEditingToolFromPointer(data) == EditingTool.TEXT;
   }
 
   bool isLaTeX(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-        widget.toolData[data.kind] == EditingTool.LATEX);
+    return getEditingToolFromPointer(data) == EditingTool.LATEX;
   }
 
   bool isSelect(PointerEvent data) {
-    return (widget.toolData.keys.contains(data.kind) &&
-        widget.toolData[data.kind] == EditingTool.SELECT);
+    return getEditingToolFromPointer(data) == EditingTool.SELECT;
   }
 
   EditingTool? getEditingToolFromPointer(PointerEvent data) {
+    EditingTool? tool;
     if (widget.toolData.keys.contains(data.kind)) {
-      return widget.toolData[data.kind];
+      tool = widget.toolData[data.kind];
+    } else if (data.kind == PointerDeviceKind.stylus) {
+      tool = EditingTool.STYLUS;
+    } else if (data.kind == PointerDeviceKind.invertedStylus) {
+      tool = EditingTool.ERASER;
     }
-    if (data.kind == PointerDeviceKind.stylus) return EditingTool.STYLUS;
-    if (data.kind == PointerDeviceKind.invertedStylus) {
-      return EditingTool.ERASER;
+
+    if (widget.drawWithStylusOnly &&
+        data.kind == PointerDeviceKind.touch &&
+        _isDrawingTool(tool)) {
+      return EditingTool.MOVE;
     }
-    return null;
+
+    return tool;
+  }
+
+  bool _isDrawingTool(EditingTool? tool) {
+    return tool == EditingTool.STYLUS ||
+        tool == EditingTool.HIGHLIGHT ||
+        tool == EditingTool.ERASER ||
+        tool == EditingTool.LASER;
   }
 
   XppStrokeTool getToolFromPointer(PointerEvent data) {

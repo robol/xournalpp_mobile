@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
+import 'package:xournalpp/pages/SettingsPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
@@ -72,6 +73,11 @@ class _MainDrawerState extends State<MainDrawer> {
               children: [
                 QuotaTile(),
                 Divider(),
+                ListTile(
+                  leading: Icon(Icons.settings),
+                  title: const Text('Settings'),
+                  onTap: _openSettings,
+                ),
                 ListTile(
                   leading: Icon(Icons.info),
                   title: Text(S.of(context).about),
@@ -153,6 +159,13 @@ class _MainDrawerState extends State<MainDrawer> {
         builder: (context) =>
             CanvasPage(file: XppFile.empty(background: Colors.white)),
       ),
+    );
+  }
+
+  Future<void> _openSettings() async {
+    if (!await _canLeave() || !context.mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const SettingsPage()),
     );
   }
 

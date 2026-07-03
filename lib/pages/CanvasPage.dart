@@ -60,6 +60,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double toolWidth = 2.6;
   double highlighterWidth = 20;
   double eraserWidth = 20;
+  bool drawWithStylusOnly = false;
 
   TransformationController _zoomController = TransformationController();
 
@@ -147,6 +148,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                           color: toolColor,
                           highlighterColor: highlighterColor,
                           laserColor: _laserColor,
+                          drawWithStylusOnly: drawWithStylusOnly,
                           onDeviceChange: _handleDeviceChange,
                           filterEraser:
                               ({Offset? coordinates, double? radius}) {
@@ -550,9 +552,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _setZoomableState() {
+    final activeTool = _toolData[_currentDevice];
     final zoomEnabled =
-        _toolData[_currentDevice] == null ||
-        _toolData[_currentDevice] == EditingTool.MOVE;
+        activeTool == null ||
+        activeTool == EditingTool.MOVE ||
+        (drawWithStylusOnly &&
+            _currentDevice == PointerDeviceKind.touch &&
+            _isDrawingTool(activeTool));
     _zoomableKey.currentState!.setState(
       () => _zoomableKey.currentState!.enabled = zoomEnabled,
     );
@@ -562,6 +568,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   EditingTool? get _activeTool => _toolData[_currentDevice];
+
+  bool _isDrawingTool(EditingTool tool) {
+    return tool == EditingTool.STYLUS ||
+        tool == EditingTool.HIGHLIGHT ||
+        tool == EditingTool.ERASER ||
+        tool == EditingTool.LASER;
+  }
 
   void _updatePageScale() {
     setState(() => pageScale = _zoomController.value.getMaxScaleOnAxis());
@@ -1291,6 +1304,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             highlighterWidth;
         eraserWidth =
             prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
+        drawWithStylusOnly =
+            prefs.getBool(PreferencesKeys.kDrawWithStylusOnly) ??
+            drawWithStylusOnly;
       });
     });
   }
