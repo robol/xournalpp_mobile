@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -16,6 +17,7 @@ import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/PdfImage.dart';
 import 'package:xournalpp/src/XppBackground.dart';
+import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 
 import 'XppLayer.dart';
 import 'XppPage.dart';
@@ -56,34 +58,76 @@ class XppFile {
     return file;
   }
 
+  Future<void> prepareForOpening(
+    BuildContext context, {
+    int currentPage = 0,
+    int thumbnailCount = 8,
+  }) async {
+    if (pages == null || pages!.isEmpty) return;
+
+    final selectedPage = pages![currentPage.clamp(0, pages!.length - 1)];
+    final selectedBackground = selectedPage.background;
+    if (selectedBackground is XppBackgroundPdf) {
+      final pdf = await _pdfFileForBackground(context, selectedBackground);
+      await pdfImage(pdf, selectedBackground.page);
+    }
+
+    final visibleCount = pages!.length < thumbnailCount
+        ? pages!.length
+        : thumbnailCount;
+    for (var i = 0; i < visibleCount; i++) {
+      final background = pages![i].background;
+      if (background is! XppBackgroundPdf) continue;
+      unawaited(
+        _pdfFileForBackground(
+          context,
+          background,
+        ).then((pdf) => pdfThumbnailImage(pdf, background.page)),
+      );
+    }
+  }
+
+  Future<XppPickedFile> _pdfFileForBackground(
+    BuildContext context,
+    XppBackgroundPdf background,
+  ) async {
+    final filename = background.filename;
+    if (filename != null && filename.isNotEmpty) {
+      try {
+        return XppPickedFile.fromInternalPath(path: filename);
+      } catch (_) {
+        // Fall through to the missing-file callback below.
+      }
+    }
+    return background.onUnavailable(context, filename);
+  }
+
   /// showing a [open] dialog and pushes a [CanvasPage] to the provided [BuildContext]'s [Navigator]
   static void openAndEdit({required BuildContext context}) async {
-    //double percentage = 0;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        duration: Duration(days: 999),
-        content: Text(S.of(context).loadingFile),
-      ),
-    );
     XppFile file;
-    String? filePath;
+    late XppPickedFile rawFile;
     try {
-      file = await open(
-        (percentage) => null,
-        (missingContext, path) => showMissingFileDialog(context, path),
-        onPath: (path) => filePath = path,
-      );
+      file = await runWithLoadingFileDialog(context, () async {
+        rawFile = await XppPickedFile.importFromStorage(
+          type: XppFilePickType.custom,
+          fileExtension: 'xopp',
+        );
+        final file = await fromXppPickedFile(
+          rawFile,
+          (percentage) => null,
+          (missingContext, path) => showMissingFileDialog(context, path),
+        );
+        if (context.mounted) await file.prepareForOpening(context);
+        return file;
+      });
 
-      scaffoldMessenger.hideCurrentSnackBar();
       if (!context.mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => CanvasPage(file: file, filePath: filePath),
+          builder: (context) => CanvasPage(file: file, filePath: rawFile.path),
         ),
       );
     } catch (e) {
-      scaffoldMessenger.hideCurrentSnackBar();
       if (!context.mounted) return;
       showDialog(
         context: context,

@@ -6,6 +6,7 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 
 class DropFile extends StatefulWidget {
   @override
@@ -37,27 +38,23 @@ class _DropFileState extends State<DropFile> {
                     });
 
                     _fileDropController.getFilename(file).then((filename) {
-                      var controller = ScaffoldMessenger.of(context)
-                          .showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                S.of(context).openingFile + filename + ' ...',
-                              ),
-                              duration: Duration(days: 999),
-                            ),
-                          );
                       _fileDropController.getFileData(file).then((bytes) {
-                        XppFile.fromXppPickedFile(
-                              XppPickedFile(
-                                bytes,
-                                path: filename,
-                                fileExtension: 'xopp',
-                              ),
-                              (percentage) {},
-                              showMissingFileDialog,
-                            )
+                        runWithLoadingFileDialog(context, () async {
+                              final file = await XppFile.fromXppPickedFile(
+                                XppPickedFile(
+                                  bytes,
+                                  path: filename,
+                                  fileExtension: 'xopp',
+                                ),
+                                (percentage) {},
+                                showMissingFileDialog,
+                              );
+                              if (context.mounted) {
+                                await file.prepareForOpening(context);
+                              }
+                              return file;
+                            })
                             .then((file) {
-                              controller.close();
                               setState(() {
                                 _loadingDropZone = false;
                               });
@@ -68,7 +65,6 @@ class _DropFileState extends State<DropFile> {
                               );
                             })
                             .catchError((e) {
-                              controller.close();
                               setState(() {
                                 _loadingDropZone = false;
                               });

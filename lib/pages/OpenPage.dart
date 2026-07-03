@@ -16,6 +16,7 @@ import 'package:xournalpp/src/conditional/open_file/open_file_generic.dart'
     if (dart.library.io) 'package:xournalpp/src/conditional/open_file/open_file_io.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
+import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 
 class OpenPage extends StatefulWidget {
@@ -169,12 +170,20 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               ListTile(
                 leading: Icon(Icons.picture_as_pdf),
                 onTap: () async {
-                  final _file = await XppFile.importPdf(
-                    pdf: await XppPickedFile.importFromStorage(
-                      type: XppFilePickType.custom,
-                      fileExtension: 'pdf',
-                    ),
+                  final _file = await runWithLoadingFileDialog(
+                    context,
+                    () async {
+                      final pdf = await XppPickedFile.importFromStorage(
+                        type: XppFilePickType.custom,
+                        fileExtension: 'pdf',
+                      );
+                      final file = await XppFile.importPdf(pdf: pdf);
+                      if (context.mounted)
+                        await file.prepareForOpening(context);
+                      return file;
+                    },
                   ); // TODO `.pdf`
+                  if (!context.mounted) return;
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (c) => CanvasPage(file: _file)),
                   );
@@ -240,9 +249,17 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(S.of(context).openingFile),
-          content: Text(
-            S.of(context).opening +
-                ' ${data[0].path.substring(data[0].path.lastIndexOf('/') + 1, data[0].path.lastIndexOf('.'))} ...',
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 24),
+              Expanded(
+                child: Text(
+                  S.of(context).opening +
+                      ' ${data[0].path.substring(data[0].path.lastIndexOf('/') + 1, data[0].path.lastIndexOf('.'))} ...',
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -265,6 +282,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           (percentage) => null,
           showMissingFileDialog,
         );
+        if (context.mounted) await file.prepareForOpening(context);
         if (_aborted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
@@ -274,6 +292,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           final file = await XppFile.importPdf(
             pdf: openFileByUri(_sharedFiles[0].path, 'pdf'),
           );
+          if (context.mounted) await file.prepareForOpening(context);
           if (_aborted) return;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
@@ -349,11 +368,15 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           onLongPress: () => showDeleteDialog(fileInfo['path']),
           onTap: () async {
             try {
-              XppFile file = await XppFile.fromXppPickedFile(
-                await XppPickedFile.fromInternalPath(path: fileInfo['path']),
-                (percent) {},
-                showMissingFileDialog,
-              );
+              final file = await runWithLoadingFileDialog(context, () async {
+                final file = await XppFile.fromXppPickedFile(
+                  await XppPickedFile.fromInternalPath(path: fileInfo['path']),
+                  (percent) {},
+                  showMissingFileDialog,
+                );
+                if (context.mounted) await file.prepareForOpening(context);
+                return file;
+              });
               if (!context.mounted) return;
               Navigator.of(context).push(
                 MaterialPageRoute(
