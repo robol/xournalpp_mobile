@@ -7,6 +7,7 @@ import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
@@ -75,6 +76,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double pageScale = 1;
 
   bool savingFile = false;
+  bool _allowPop = false;
+  int _revision = 0;
+  int _savedRevision = 0;
 
   _EraserContentIndex? _eraserIndex;
   final List<_UndoEntry> _undoStack = [];
@@ -97,100 +101,117 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: MainDrawer(),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Hero(
-            tag: 'ZoomArea',
-            child: ZoomableWidget(
-              key: _zoomableKey,
-              controller: _zoomController,
-              onInteractionStart: _onInteractionStart,
-              onInteractionUpdate: (details) {
-                //print(details);
-                _updatePageScale();
-              },
-              onTransformationChanged: _updatePageScale,
-              child: Center(
-                child: Card(
-                  elevation: 12,
-                  color: Colors.white,
-                  child: AspectRatio(
-                    aspectRatio: _file!.pages![currentPage].pageSize!.ratio,
-                    child: FittedBox(
-                      child: PointerListener(
-                        key: _pointerListenerKey,
-                        translationMatrix: _zoomController.value,
-                        toolData: _toolData,
-                        strokeWidth: toolWidth,
-                        highlighterWidth: highlighterWidth,
-                        eraserWidth: eraserWidth,
-                        color: toolColor,
-                        highlighterColor: highlighterColor,
-                        laserColor: _laserColor,
-                        onDeviceChange: _handleDeviceChange,
-                        filterEraser: ({Offset? coordinates, double? radius}) {
-                          _eraseContentAt(
-                            coordinates: coordinates,
-                            radius: radius,
-                          );
-                        },
-                        filterEraserPath:
-                            ({List<Offset>? coordinates, double? radius}) {
-                              _eraseContentAlongPath(
-                                coordinates: coordinates,
-                                radius: radius,
+    return PopScope(
+      canPop: _allowPop || !_isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (!await _confirmLeave()) return;
+        _allowPop = true;
+        if (!context.mounted) return;
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop(result);
+        } else {
+          await SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        drawer: MainDrawer(onLeaveRequested: _confirmLeave),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Hero(
+              tag: 'ZoomArea',
+              child: ZoomableWidget(
+                key: _zoomableKey,
+                controller: _zoomController,
+                onInteractionStart: _onInteractionStart,
+                onInteractionUpdate: (details) {
+                  //print(details);
+                  _updatePageScale();
+                },
+                onTransformationChanged: _updatePageScale,
+                child: Center(
+                  child: Card(
+                    elevation: 12,
+                    color: Colors.white,
+                    child: AspectRatio(
+                      aspectRatio: _file!.pages![currentPage].pageSize!.ratio,
+                      child: FittedBox(
+                        child: PointerListener(
+                          key: _pointerListenerKey,
+                          translationMatrix: _zoomController.value,
+                          toolData: _toolData,
+                          strokeWidth: toolWidth,
+                          highlighterWidth: highlighterWidth,
+                          eraserWidth: eraserWidth,
+                          color: toolColor,
+                          highlighterColor: highlighterColor,
+                          laserColor: _laserColor,
+                          onDeviceChange: _handleDeviceChange,
+                          filterEraser:
+                              ({Offset? coordinates, double? radius}) {
+                                _eraseContentAt(
+                                  coordinates: coordinates,
+                                  radius: radius,
+                                );
+                              },
+                          filterEraserPath:
+                              ({List<Offset>? coordinates, double? radius}) {
+                                _eraseContentAlongPath(
+                                  coordinates: coordinates,
+                                  radius: radius,
+                                );
+                              },
+                          onSelectionRegionChange: _selectRegion,
+                          onSelectionClear: _clearSelection,
+                          shouldMoveSelection: _shouldMoveSelection,
+                          onSelectionMove: _moveSelection,
+                          onSwipeLeft: () => _switchToPage(currentPage + 1),
+                          onSwipeRight: () => _switchToPage(currentPage - 1),
+                          onNewContent: (newContent) {
+                            if (newContent == null) return;
+
+                            /// TODO: manage layers
+                            final page = _file!.pages![currentPage];
+                            final layer = page.layers![0];
+                            setState(() {
+                              final content = List<XppContent?>.from(
+                                layer.content!,
+                              )..add(newContent);
+                              layer.content = content;
+                              _undoStack.add(
+                                _UndoEntry([
+                                  _LayerOperation.added(
+                                    page: page,
+                                    layer: layer,
+                                    content: newContent,
+                                    index: content.length - 1,
+                                  ),
+                                ]),
                               );
-                            },
-                        onSelectionRegionChange: _selectRegion,
-                        onSelectionClear: _clearSelection,
-                        shouldMoveSelection: _shouldMoveSelection,
-                        onSelectionMove: _moveSelection,
-                        onSwipeLeft: () => _switchToPage(currentPage + 1),
-                        onSwipeRight: () => _switchToPage(currentPage - 1),
-                        onNewContent: (newContent) {
-                          if (newContent == null) return;
+                              _markDirty();
+                            });
+                            _eraserIndex?.add(newContent);
 
-                          /// TODO: manage layers
-                          final page = _file!.pages![currentPage];
-                          final layer = page.layers![0];
-                          setState(() {
-                            final content = List<XppContent?>.from(
-                              layer.content!,
-                            )..add(newContent);
-                            layer.content = content;
-                            _undoStack.add(
-                              _UndoEntry([
-                                _LayerOperation.added(
-                                  page: page,
-                                  layer: layer,
-                                  content: newContent,
-                                  index: content.length - 1,
-                                ),
-                              ]),
-                            );
-                          });
-                          _eraserIndex?.add(newContent);
-
-                          _pageStackKey.currentState!.setPageData(page);
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: XppPageStack(
-                            /// to communicate from [PointerListener] to [XppPageStack]
-                            key: _pageStackKey,
-                            page: _file!.pages![currentPage],
-                            rasterScale: pageScale,
-                            activeTool: _activeTool,
-                            selectedContents: _selectedContents,
-                            onSelectContent: _selectContent,
-                            onDeleteSelection: _deleteSelection,
-                            onReplaceContent: _replaceContent,
-                            onContentPointerDown: (event) => _pointerListenerKey
-                                .currentState
-                                ?.markContentPointerDown(event),
+                            _pageStackKey.currentState!.setPageData(page);
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: XppPageStack(
+                              /// to communicate from [PointerListener] to [XppPageStack]
+                              key: _pageStackKey,
+                              page: _file!.pages![currentPage],
+                              rasterScale: pageScale,
+                              activeTool: _activeTool,
+                              selectedContents: _selectedContents,
+                              onSelectContent: _selectContent,
+                              onDeleteSelection: _deleteSelection,
+                              onReplaceContent: _replaceContent,
+                              onContentPointerDown: (event) =>
+                                  _pointerListenerKey.currentState
+                                      ?.markContentPointerDown(event),
+                            ),
                           ),
                         ),
                       ),
@@ -198,218 +219,267 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-            ),
-            /*ColorFiltered(
+              /*ColorFiltered(
                   colorFilter: ColorFilter.mode(
                       Theme.of(context).colorScheme.surface.withOpacity(.5),
                       BlendMode.darken),
                   child: child,
                 )*/
-          ),
-        ],
-      ),
-      appBar: AppBar(
-        toolbarHeight: kToolbarHeight,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).colorScheme.onPrimary,
+            ),
+          ],
         ),
-        actionsIconTheme: IconThemeData(
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
-        elevation: 4,
-        title: Tooltip(
-          message: S.of(context).doubleTapToChange,
-          child: GestureDetector(
-            onDoubleTap: _showTitleDialog,
-            child: Text(widget.file?.title ?? S.of(context).newDocument),
+        appBar: AppBar(
+          toolbarHeight: kToolbarHeight,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          iconTheme: IconThemeData(
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
-        ),
-        actions: [
-          _buildZoomControls(context),
-          IconButton(
-            icon: Icon(Icons.undo),
-            onPressed: _canUndo ? _undoLastOperation : null,
-            tooltip: 'Undo last operation',
+          actionsIconTheme: IconThemeData(
+            color: Theme.of(context).colorScheme.onPrimary,
           ),
-          savingFile
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation(
-                        Theme.of(context).colorScheme.onPrimary,
+          elevation: 4,
+          title: Tooltip(
+            message: S.of(context).doubleTapToChange,
+            child: GestureDetector(
+              onDoubleTap: _showTitleDialog,
+              child: Text(widget.file?.title ?? S.of(context).newDocument),
+            ),
+          ),
+          actions: [
+            _buildZoomControls(context),
+            IconButton(
+              icon: Icon(Icons.undo),
+              onPressed: _canUndo ? _undoLastOperation : null,
+              tooltip: 'Undo last operation',
+            ),
+            savingFile
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(
+                          Theme.of(context).colorScheme.onPrimary,
+                        ),
                       ),
                     ),
+                  )
+                : IconButton(
+                    icon: Icon(Icons.save),
+                    onPressed: saveFile,
+                    tooltip: S.of(context).save,
                   ),
-                )
-              : IconButton(
-                  icon: Icon(Icons.save),
-                  onPressed: saveFile,
-                  tooltip: S.of(context).save,
-                ),
-          PopupMenuButton<String>(
-            onSelected: (item) async {
-              if (item == S.of(context).saveAs) saveFile(saveAs: true);
-              if (item == S.of(context).sharePage) shareScreenshot();
-            },
-            itemBuilder: (BuildContext context) {
-              return {
-                S.of(context).saveAs,
-                if (!kIsWeb) S.of(context).sharePage,
-              }.map((String choice) {
-                return PopupMenuItem<String>(
-                  value: choice,
-                  child: Text(choice),
-                );
-              }).toList();
-            },
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(64),
-          child: EditingToolBar(
-            key: _editingToolbarKey,
-            deviceMap: _toolData,
-            getColor: getColor,
-            getWidth: getWidth,
-            getMinWidth: getMinWidth,
-            getMaxWidth: getMaxWidth,
-            getWidthDivisions: getWidthDivisions,
-            onWidthChange: (newWidth, tool) {
-              setState(() {
-                if (tool == EditingTool.ERASER) {
-                  eraserWidth = newWidth * 2;
-                } else if (tool == EditingTool.HIGHLIGHT) {
-                  highlighterWidth = newWidth;
-                } else {
-                  toolWidth =
-                      newWidth *
-                      2; // average pressure is 0.5, so multiplying by 2
-                }
-              });
-              rememberToolSettings();
-            },
-            onColorChange: (newColor, tool) {
-              setState(() {
-                if (tool == EditingTool.HIGHLIGHT) {
-                  highlighterColor = newColor;
-                } else {
-                  toolColor = newColor;
-                }
-              });
-              rememberToolSettings();
-            },
-            onNewDeviceMap: (newDeviceMap) => setState(() {
-              _toolData = newDeviceMap!;
-              _setZoomableState();
-              if (_activeTool != EditingTool.SELECT) {
-                _selectedContents = {};
-              }
-            }),
-          ),
-        ),
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: kIsWeb ? null : CircularNotchedRectangle(),
-        child: Container(
-          color: Theme.of(context).colorScheme.surface,
-          constraints: BoxConstraints(maxHeight: 100),
-          child: Row(
-            children: [
-              Expanded(
-                child: XppPagesListView(
-                  key: pageListViewKey,
-                  pages: _file!.pages,
-                  onPageChange: _switchToPage,
-                  onPageDelete: (deletedIndex) => setState(() {
-                    _file!.pages!.removeAt(deletedIndex);
-                    _selectedContents = {};
-                    _invalidateEraserIndex();
-                    if (_file!.pages!.length >= currentPage)
-                      currentPage = _file!.pages!.length - 1;
-                    if (_file!.pages!.isEmpty) {
-                      _file!.pages!.add(
-                        XppPage.empty(background: Colors.white),
-                      );
-                      currentPage = 0;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            S.of(context).thereWereNoMorePagesWeAddedOne,
-                          ),
-                        ),
-                      );
-                    }
-                  }),
-                  onPageMove: (initialIndex, movedTo) => setState(() {
-                    final page = _file!.pages![initialIndex];
-                    _file!.pages!.removeAt(initialIndex);
-                    _file!.pages!.insert(movedTo - 1, page);
-                    _selectedContents = {};
-                    _invalidateEraserIndex();
-                  }),
-                  currentPage: currentPage,
-                ),
-              ),
-              FloatingActionButton(
-                heroTag: 'AddXppPage',
-                onPressed: () => setState(() {
-                  currentPage++;
-                  _selectedContents = {};
-                  _invalidateEraserIndex();
-                  _file!.pages!.insert(
-                    currentPage,
-                    XppPage.empty(background: Colors.white),
+            PopupMenuButton<String>(
+              onSelected: (item) async {
+                if (item == S.of(context).saveAs) saveFile(saveAs: true);
+                if (item == S.of(context).sharePage) shareScreenshot();
+              },
+              itemBuilder: (BuildContext context) {
+                return {
+                  S.of(context).saveAs,
+                  if (!kIsWeb) S.of(context).sharePage,
+                }.map((String choice) {
+                  return PopupMenuItem<String>(
+                    value: choice,
+                    child: Text(choice),
                   );
-
-                  _pageStackKey.currentState!.setPageData(
-                    _file!.pages![currentPage],
-                  );
-                }),
-                child: Icon(Icons.add),
-                tooltip: S.of(context).addPage,
-              ),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: kIsWeb
-          ? FloatingActionButtonLocation.centerFloat
-          : FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          showModalBottomSheet(
-            elevation: 16,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-            ),
-            context: context,
-            builder: (context) => ToolBoxBottomSheet(
-              onBackgroundChange: (newBackground) {
-                newBackground.size = _file!.pages![currentPage].pageSize;
-                setState(
-                  () => _file!.pages![currentPage].background = newBackground,
-                );
+                }).toList();
               },
             ),
-          );
-        },
-        tooltip: S.of(context).tools,
-        child: Icon(Icons.format_paint),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+          ],
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(64),
+            child: EditingToolBar(
+              key: _editingToolbarKey,
+              deviceMap: _toolData,
+              getColor: getColor,
+              getWidth: getWidth,
+              getMinWidth: getMinWidth,
+              getMaxWidth: getMaxWidth,
+              getWidthDivisions: getWidthDivisions,
+              onWidthChange: (newWidth, tool) {
+                setState(() {
+                  if (tool == EditingTool.ERASER) {
+                    eraserWidth = newWidth * 2;
+                  } else if (tool == EditingTool.HIGHLIGHT) {
+                    highlighterWidth = newWidth;
+                  } else {
+                    toolWidth =
+                        newWidth *
+                        2; // average pressure is 0.5, so multiplying by 2
+                  }
+                });
+                rememberToolSettings();
+              },
+              onColorChange: (newColor, tool) {
+                setState(() {
+                  if (tool == EditingTool.HIGHLIGHT) {
+                    highlighterColor = newColor;
+                  } else {
+                    toolColor = newColor;
+                  }
+                });
+                rememberToolSettings();
+              },
+              onNewDeviceMap: (newDeviceMap) => setState(() {
+                _toolData = newDeviceMap!;
+                _setZoomableState();
+                if (_activeTool != EditingTool.SELECT) {
+                  _selectedContents = {};
+                }
+              }),
+            ),
+          ),
+        ),
+        bottomNavigationBar: BottomAppBar(
+          shape: kIsWeb ? null : CircularNotchedRectangle(),
+          child: Container(
+            color: Theme.of(context).colorScheme.surface,
+            constraints: BoxConstraints(maxHeight: 100),
+            child: Row(
+              children: [
+                Expanded(
+                  child: XppPagesListView(
+                    key: pageListViewKey,
+                    pages: _file!.pages,
+                    onPageChange: _switchToPage,
+                    onPageDelete: (deletedIndex) => setState(() {
+                      _file!.pages!.removeAt(deletedIndex);
+                      _selectedContents = {};
+                      _invalidateEraserIndex();
+                      if (_file!.pages!.length >= currentPage)
+                        currentPage = _file!.pages!.length - 1;
+                      if (_file!.pages!.isEmpty) {
+                        _file!.pages!.add(
+                          XppPage.empty(background: Colors.white),
+                        );
+                        currentPage = 0;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              S.of(context).thereWereNoMorePagesWeAddedOne,
+                            ),
+                          ),
+                        );
+                      }
+                      _markDirty();
+                    }),
+                    onPageMove: (initialIndex, movedTo) => setState(() {
+                      final page = _file!.pages![initialIndex];
+                      _file!.pages!.removeAt(initialIndex);
+                      _file!.pages!.insert(movedTo - 1, page);
+                      _selectedContents = {};
+                      _invalidateEraserIndex();
+                      _markDirty();
+                    }),
+                    currentPage: currentPage,
+                  ),
+                ),
+                FloatingActionButton(
+                  heroTag: 'AddXppPage',
+                  onPressed: () => setState(() {
+                    currentPage++;
+                    _selectedContents = {};
+                    _invalidateEraserIndex();
+                    _file!.pages!.insert(
+                      currentPage,
+                      XppPage.empty(background: Colors.white),
+                    );
+                    _markDirty();
+
+                    _pageStackKey.currentState!.setPageData(
+                      _file!.pages![currentPage],
+                    );
+                  }),
+                  child: Icon(Icons.add),
+                  tooltip: S.of(context).addPage,
+                ),
+              ],
+            ),
+          ),
+        ),
+        floatingActionButtonLocation: kIsWeb
+            ? FloatingActionButtonLocation.centerFloat
+            : FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            showModalBottomSheet(
+              elevation: 16,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              context: context,
+              builder: (context) => ToolBoxBottomSheet(
+                onBackgroundChange: (newBackground) {
+                  newBackground.size = _file!.pages![currentPage].pageSize;
+                  setState(() {
+                    _file!.pages![currentPage].background = newBackground;
+                    _markDirty();
+                  });
+                },
+              ),
+            );
+          },
+          tooltip: S.of(context).tools,
+          child: Icon(Icons.format_paint),
+        ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 
   void _setMetadata() {
     _file = widget.file;
     filePath = widget.filePath;
+  }
+
+  bool get _isDirty => _revision != _savedRevision;
+
+  void _markDirty() {
+    _revision++;
+  }
+
+  Future<bool> _confirmLeave() async {
+    if (!_isDirty) return true;
+
+    final action = await showDialog<_UnsavedChangesAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save changes?'),
+        content: const Text('This document has unsaved changes.'),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_UnsavedChangesAction.cancel),
+            child: Text(S.of(context).cancel),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_UnsavedChangesAction.discard),
+            child: const Text('Discard'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_UnsavedChangesAction.save),
+            child: Text(S.of(context).save),
+          ),
+        ],
+      ),
+    );
+
+    switch (action) {
+      case _UnsavedChangesAction.save:
+        return saveFile();
+      case _UnsavedChangesAction.discard:
+        return true;
+      case _UnsavedChangesAction.cancel:
+      case null:
+        return false;
+    }
   }
 
   Future<bool> _showTitleDialog() async {
@@ -441,6 +511,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   onPressed: () {
                     setState(() {
                       _file!.title = titleController.text;
+                      _markDirty();
                     });
                     Navigator.of(context).pop(true);
                   },
@@ -660,6 +731,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         operation.undo();
       }
       _invalidateEraserIndex();
+      _markDirty();
     });
 
     if (undoEntry.page == _file!.pages![currentPage]) {
@@ -705,6 +777,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         ]),
       );
       _invalidateEraserIndex();
+      _markDirty();
     });
     _pageStackKey.currentState!.setPageData(page);
   }
@@ -774,6 +847,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _undoStack.add(_UndoEntry(operations));
       _selectedContents = {};
       _invalidateEraserIndex();
+      _markDirty();
     });
     _pageStackKey.currentState!.setPageData(page);
   }
@@ -818,6 +892,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       setState(() {
         _selectedContents = translatedSelection;
         _invalidateEraserIndex();
+        _markDirty();
       });
       _pageStackKey.currentState!.setPageData(page);
     }
@@ -878,7 +953,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     }
 
     if (operations.isNotEmpty) {
-      setState(() => _undoStack.add(_UndoEntry(operations)));
+      setState(() {
+        _undoStack.add(_UndoEntry(operations));
+        _markDirty();
+      });
     }
   }
 
@@ -952,6 +1030,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     layer.content = updatedContent;
     _undoStack.add(_UndoEntry(operations));
+    _markDirty();
     _pageStackKey.currentState!.setPageData(page);
     setState(() {});
   }
@@ -1020,7 +1099,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> saveFile({bool saveAs = false}) async {
+  Future<bool> saveFile({bool saveAs = false}) async {
     setState(() {
       savingFile = true;
     });
@@ -1044,7 +1123,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               savingFile = false;
             });
           }
-          return;
+          return false;
         }
       }
       String path = _file!.title! + '.xopp';
@@ -1065,7 +1144,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             savingFile = false;
           });
         }
-        return;
+        return false;
       }
       filePath = savedPath;
 
@@ -1082,17 +1161,19 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       jsonData = jsonEncode(files.toList());
       await prefs.setString(PreferencesKeys.kRecentFiles, jsonData);
 
-      if (!mounted) return;
+      if (!mounted) return false;
       savingSnackBar.close();
       scaffoldMessenger.removeCurrentSnackBar();
       setState(() {
         savingFile = false;
+        _savedRevision = _revision;
       });
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text(S.of(context).successfullySaved)),
       );
+      return true;
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) return false;
       savingSnackBar.close();
       scaffoldMessenger.removeCurrentSnackBar();
       setState(() => savingFile = false);
@@ -1103,6 +1184,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           ),
         ),
       );
+      return false;
     }
   }
 
@@ -1237,6 +1319,8 @@ class _UndoEntry {
 
   XppPage get page => operations.first.page;
 }
+
+enum _UnsavedChangesAction { save, discard, cancel }
 
 class _SelectionMoveOriginal {
   final XppPage page;

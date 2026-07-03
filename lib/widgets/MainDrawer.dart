@@ -10,6 +10,10 @@ import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/QuotaTile.dart';
 
 class MainDrawer extends StatefulWidget {
+  final Future<bool> Function()? onLeaveRequested;
+
+  const MainDrawer({Key? key, this.onLeaveRequested}) : super(key: key);
+
   @override
   _MainDrawerState createState() => _MainDrawerState();
 }
@@ -43,14 +47,12 @@ class _MainDrawerState extends State<MainDrawer> {
                 ListTile(
                   leading: Icon(Icons.home),
                   title: Text(S.of(context).home),
-                  onTap: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => OpenPage()),
-                  ),
+                  onTap: _openHome,
                 ),
                 ListTile(
                   leading: Icon(Icons.folder),
                   title: Text(S.of(context).open),
-                  onTap: () => XppFile.openAndEdit(context: context),
+                  onTap: _openFile,
                 ),
                 ListTile(
                   leading: Icon(Icons.picture_as_pdf),
@@ -60,13 +62,7 @@ class _MainDrawerState extends State<MainDrawer> {
                 ListTile(
                   leading: Icon(Icons.insert_drive_file),
                   title: Text(S.of(context).newFile),
-                  onTap: () => Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => CanvasPage(
-                        file: XppFile.empty(background: Colors.white),
-                      ),
-                    ),
-                  ),
+                  onTap: _newFile,
                 ),
                 Divider(),
               ],
@@ -134,7 +130,34 @@ class _MainDrawerState extends State<MainDrawer> {
     );
   }
 
+  Future<bool> _canLeave() async {
+    return await (widget.onLeaveRequested?.call() ?? Future.value(true));
+  }
+
+  Future<void> _openHome() async {
+    if (!await _canLeave() || !context.mounted) return;
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (context) => OpenPage()));
+  }
+
+  Future<void> _openFile() async {
+    if (!await _canLeave() || !context.mounted) return;
+    XppFile.openAndEdit(context: context);
+  }
+
+  Future<void> _newFile() async {
+    if (!await _canLeave() || !context.mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) =>
+            CanvasPage(file: XppFile.empty(background: Colors.white)),
+      ),
+    );
+  }
+
   Future<void> _importPdf() async {
+    if (!await _canLeave() || !context.mounted) return;
     final file = await runWithLoadingFileDialog(context, () async {
       final pdf = await XppPickedFile.importFromStorage(
         type: XppFilePickType.custom,
