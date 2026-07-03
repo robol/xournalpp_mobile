@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
-import 'package:pdfx/pdfx.dart';
-import 'package:printing/printing.dart';
+import 'package:image/image.dart' as image;
+import 'package:pdfrx/pdfrx.dart';
 import 'package:xournalpp/src/conditional/file_storage/file_storage_stub.dart'
     if (dart.library.io) 'package:xournalpp/src/conditional/file_storage/file_storage_io.dart';
 import 'package:xournalpp/src/XppPage.dart';
@@ -17,11 +17,7 @@ final Map<String, Future<Uint8List>> _thumbnailRequests = {};
 final Map<String, Future<Uint8List>> _fullPageRequests = {};
 
 Future<int> pdfPageCount(XppPickedFile pdf) {
-  return _withPdfDocument(
-    pdf,
-    (document) async => document.pagesCount,
-    fallback: (bytes) async => (await _rasterPageSizes(bytes)).length,
-  );
+  return _withPdfDocument(pdf, (document) async => document.pages.length);
 }
 
 Future<Uint8List> pdfImage(XppPickedFile pdf, int? page) {
@@ -56,75 +52,49 @@ Future<Uint8List> pdfThumbnailImage(XppPickedFile pdf, int? page) {
 }
 
 Future<Uint8List> _renderPdfImage(XppPickedFile pdf, int? page, double dpi) {
-  return _withPdfDocument(
-    pdf,
-    (document) async {
-      final pdfPage = await document.getPage(_pageNumber(page, document));
-      try {
-        final image = await pdfPage.render(
-          width: _pixelsForPoints(pdfPage.width, dpi),
-          height: _pixelsForPoints(pdfPage.height, dpi),
-          format: PdfPageImageFormat.png,
-          backgroundColor: '#FFFFFF',
-          forPrint: true,
-        );
-        if (image == null) throw StateError('Could not render PDF page.');
-        return image.bytes;
-      } finally {
-        await pdfPage.close();
-      }
-    },
-    fallback: (bytes) {
-      final pageNumber = page ?? 1;
-      final pageIndex = pageNumber <= 0 ? 0 : pageNumber - 1;
-      return Printing.raster(
-        bytes,
-        pages: [pageIndex],
-        dpi: dpi,
-      ).single.then((raster) => raster.toPng());
-    },
-  );
+  return _withPdfDocument(pdf, (document) async {
+    final pdfPage = document.pages[_pageIndex(page, document)];
+    final scale = dpi / _pdfPointsPerInch;
+    final rendered = await pdfPage.render(
+      fullWidth: pdfPage.width * scale,
+      fullHeight: pdfPage.height * scale,
+      backgroundColor: 0xffffffff,
+    );
+    if (rendered == null) throw StateError('Could not render PDF page.');
+    try {
+      final png = image.encodePng(rendered.createImageNF());
+      return Uint8List.fromList(png);
+    } finally {
+      rendered.dispose();
+    }
+  });
 }
 
 Future<XppPageSize> pdfPageSize(XppPickedFile pdf, int page) {
   return _withPdfDocument(pdf, (document) async {
-    final pdfPage = await document.getPage(_pageNumber(page + 1, document));
-    try {
-      return _pageSize(pdfPage);
-    } finally {
-      await pdfPage.close();
-    }
-  }, fallback: (bytes) => _rasterPageSize(bytes, page));
+    return _pageSize(document.pages[_pageIndex(page + 1, document)]);
+  });
 }
 
 Future<List<XppPageSize>> pdfPageSizes(XppPickedFile pdf) {
   return _withPdfDocument(pdf, (document) async {
-    final sizes = <XppPageSize>[];
-    for (var pageNumber = 1; pageNumber <= document.pagesCount; pageNumber++) {
-      final pdfPage = await document.getPage(pageNumber);
-      try {
-        sizes.add(_pageSize(pdfPage));
-      } finally {
-        await pdfPage.close();
-      }
-    }
-    return sizes;
-  }, fallback: _rasterPageSizes);
+    return document.pages.map(_pageSize).toList();
+  });
 }
 
 Future<T> _withPdfDocument<T>(
   XppPickedFile pdf,
-  Future<T> Function(PdfDocument document) callback, {
-  required Future<T> Function(Uint8List bytes) fallback,
-}) async {
-  final bytes = pdf.toUint8List();
-  if (!await hasPdfSupport()) return fallback(bytes);
-
-  final document = await PdfDocument.openData(bytes);
+  Future<T> Function(PdfDocument document) callback,
+) async {
+  final document = await PdfDocument.openData(
+    pdf.toUint8List(),
+    sourceName: pdf.path ?? pdf.fileName ?? 'memory:${identityHashCode(pdf)}',
+    allowDataOwnershipTransfer: false,
+  );
   try {
     return await callback(document);
   } finally {
-    await document.close();
+    await document.dispose();
   }
 }
 
@@ -132,25 +102,9 @@ XppPageSize _pageSize(PdfPage page) {
   return XppPageSize(width: page.width, height: page.height);
 }
 
-int _pageNumber(int? page, PdfDocument document) {
+int _pageIndex(int? page, PdfDocument document) {
   final pageNumber = page ?? 1;
-  return pageNumber.clamp(1, document.pagesCount).toInt();
-}
-
-Future<XppPageSize> _rasterPageSize(Uint8List bytes, int page) async {
-  final raster = await Printing.raster(bytes, pages: [page], dpi: DPI).single;
-  return _rasterSize(raster);
-}
-
-Future<List<XppPageSize>> _rasterPageSizes(Uint8List bytes) {
-  return Printing.raster(bytes, dpi: DPI).map(_rasterSize).toList();
-}
-
-XppPageSize _rasterSize(PdfRaster raster) {
-  return XppPageSize(
-    width: raster.width / DPI * _pdfPointsPerInch,
-    height: raster.height / DPI * _pdfPointsPerInch,
-  );
+  return pageNumber.clamp(1, document.pages.length).toInt() - 1;
 }
 
 String _cacheKey(XppPickedFile pdf, int? page, double dpi, String variant) {
@@ -177,8 +131,4 @@ String _stableHash(String value) {
     hash = (hash * 0x01000193) & 0xffffffff;
   }
   return hash.toRadixString(16);
-}
-
-double _pixelsForPoints(double points, double dpi) {
-  return points / _pdfPointsPerInch * dpi;
 }

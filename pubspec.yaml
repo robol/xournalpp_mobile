@@ -32,9 +32,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   font_awesome_flutter: ^11.0.0
-  pdfx: ^2.9.2
-  printing: ^5.14.3
-
+  pdfrx: ^2.4.4
+  pdfium_flutter: ^0.2.2
+  image: ^4.8.0
 dev_dependencies:
   flutter_test:
     sdk:
