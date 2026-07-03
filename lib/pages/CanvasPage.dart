@@ -21,7 +21,7 @@ import 'package:xournalpp/widgets/MainDrawer.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
-import 'package:xournalpp/widgets/XppPagesListView.dart';
+import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 import 'package:xournalpp/widgets/ZoomableWidget.dart';
 
 class CanvasPage extends StatefulWidget {
@@ -71,7 +71,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final GlobalKey<EditingToolBarState> _editingToolbarKey = GlobalKey();
   final GlobalKey<PointerListenerState> _pointerListenerKey = GlobalKey();
   final GlobalKey<ZoomableWidgetState> _zoomableKey = GlobalKey();
-  final GlobalKey<XppPagesListViewState> pageListViewKey = GlobalKey();
 
   double pageScale = 1;
 
@@ -335,67 +334,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           shape: kIsWeb ? null : CircularNotchedRectangle(),
           child: Container(
             color: Theme.of(context).colorScheme.surface,
-            constraints: BoxConstraints(maxHeight: 100),
-            child: Row(
-              children: [
-                Expanded(
-                  child: XppPagesListView(
-                    key: pageListViewKey,
-                    pages: _file!.pages,
-                    onPageChange: _switchToPage,
-                    onPageDelete: (deletedIndex) => setState(() {
-                      _file!.pages!.removeAt(deletedIndex);
-                      _selectedContents = {};
-                      _invalidateEraserIndex();
-                      if (_file!.pages!.length >= currentPage)
-                        currentPage = _file!.pages!.length - 1;
-                      if (_file!.pages!.isEmpty) {
-                        _file!.pages!.add(
-                          XppPage.empty(background: Colors.white),
-                        );
-                        currentPage = 0;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              S.of(context).thereWereNoMorePagesWeAddedOne,
-                            ),
-                          ),
-                        );
-                      }
-                      _markDirty();
-                    }),
-                    onPageMove: (initialIndex, movedTo) => setState(() {
-                      final page = _file!.pages![initialIndex];
-                      _file!.pages!.removeAt(initialIndex);
-                      _file!.pages!.insert(movedTo - 1, page);
-                      _selectedContents = {};
-                      _invalidateEraserIndex();
-                      _markDirty();
-                    }),
-                    currentPage: currentPage,
-                  ),
-                ),
-                FloatingActionButton(
-                  heroTag: 'AddXppPage',
-                  onPressed: () => setState(() {
-                    currentPage++;
-                    _selectedContents = {};
-                    _invalidateEraserIndex();
-                    _file!.pages!.insert(
-                      currentPage,
-                      XppPage.empty(background: Colors.white),
-                    );
-                    _markDirty();
-
-                    _pageStackKey.currentState!.setPageData(
-                      _file!.pages![currentPage],
-                    );
-                  }),
-                  child: Icon(Icons.add),
-                  tooltip: S.of(context).addPage,
-                ),
-              ],
+            constraints: BoxConstraints(maxHeight: 72),
+            child: Center(
+              child: XppPagesBrowser(
+                currentPage: currentPage,
+                pageCount: _file!.pages!.length,
+                onPageChange: _switchToPage,
+                onPageAdd: _addPageAfterCurrent,
+                onPageDelete: () => _deletePage(currentPage),
+              ),
             ),
           ),
         ),
@@ -718,6 +665,43 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _invalidateEraserIndex();
     });
     _pageStackKey.currentState?.setPageData(pages[currentPage]);
+  }
+
+  void _addPageAfterCurrent() {
+    setState(() {
+      currentPage++;
+      _selectedContents = {};
+      _invalidateEraserIndex();
+      _file!.pages!.insert(
+        currentPage,
+        XppPage.empty(background: Colors.white),
+      );
+      _markDirty();
+
+      _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    });
+  }
+
+  void _deletePage(int pageIndex) {
+    setState(() {
+      _file!.pages!.removeAt(pageIndex);
+      _selectedContents = {};
+      _invalidateEraserIndex();
+      if (currentPage >= _file!.pages!.length) {
+        currentPage = _file!.pages!.length - 1;
+      }
+      if (_file!.pages!.isEmpty) {
+        _file!.pages!.add(XppPage.empty(background: Colors.white));
+        currentPage = 0;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(S.of(context).thereWereNoMorePagesWeAddedOne)),
+        );
+      }
+      _markDirty();
+
+      _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    });
   }
 
   bool get _canUndo => _undoStack.isNotEmpty;

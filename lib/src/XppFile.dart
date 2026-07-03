@@ -61,7 +61,7 @@ class XppFile {
   Future<void> prepareForOpening(
     BuildContext context, {
     int currentPage = 0,
-    int thumbnailCount = 8,
+    int thumbnailCount = 0,
   }) async {
     if (pages == null || pages!.isEmpty) return;
 
