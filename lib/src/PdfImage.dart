@@ -4,7 +4,7 @@ import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:printing/printing.dart';
 import 'package:xournalpp/src/XppPage.dart';
 
-const double DPI = 96;
+const double DPI = 300;
 
 Future<int> pdfPageCount(XppPickedFile pdf) =>
     Printing.raster(pdf.toUint8List()).length;
