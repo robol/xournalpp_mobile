@@ -37,11 +37,11 @@ class XppFile {
 
   /// creates an [XppFile] from a PDF document opened in a [XppPickedFile]
   static Future<XppFile> importPdf({required XppPickedFile pdf}) async {
-    final pageCount = await pdfPageCount(pdf);
+    final pageSizes = await pdfPageSizes(pdf);
     final pdfPath = pdf.path ?? await pdf.saveToTemporaryPath();
     XppFile file = XppFile.empty(title: pdf.fileName)..pages!.clear();
-    for (int i = 0; i < pageCount; i++) {
-      final size = await pdfPageSize(pdf, i);
+    for (int i = 0; i < pageSizes.length; i++) {
+      final size = pageSizes[i];
       file.pages!.add(
         XppPage.empty()
           ..pageSize = size
@@ -298,8 +298,7 @@ class XppFile {
                 return subtext.group(0)!;
               },
             ),
-            size: double.parse(textElement.getAttribute('size')!,
-            ),
+            size: double.parse(textElement.getAttribute('size')!),
             fontFamily: textElement.getAttribute('font'),
             offset: Offset(
               double.parse(textElement.getAttribute('x')!),

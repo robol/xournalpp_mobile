@@ -15,7 +15,7 @@ abstract class XppBackground {
 
   static XppBackground get none => _NoXppBackground();
 
-  Widget render();
+  Widget render({ValueChanged<bool>? onLoadingChanged});
 
   XmlElement toXmlElement();
 }
@@ -34,7 +34,7 @@ class XppBackgroundImage extends XppBackground {
   });
 
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return Container(color: Colors.white);
   }
 
@@ -81,8 +81,11 @@ class XppBackgroundPdf extends XppBackground {
   });
 
   @override
-  Widget render() {
-    return (PDfBackgroundWidget(provider: this));
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+    return (PDfBackgroundWidget(
+      provider: this,
+      onLoadingChanged: onLoadingChanged,
+    ));
   }
 
   @override
@@ -100,8 +103,10 @@ class XppBackgroundPdf extends XppBackground {
 
 class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
+  final ValueChanged<bool>? onLoadingChanged;
 
-  const PDfBackgroundWidget({Key? key, this.provider}) : super(key: key);
+  const PDfBackgroundWidget({Key? key, this.provider, this.onLoadingChanged})
+    : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
 }
@@ -109,6 +114,7 @@ class PDfBackgroundWidget extends StatefulWidget {
 class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
   Future<Uint8List>? _imageFuture;
+  bool _isLoading = false;
 
   Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
     final filename = provider.filename;
@@ -125,12 +131,26 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     return pdfImage(file, provider.page);
   }
 
+  Future<Uint8List> _startLoading(XppBackgroundPdf provider) {
+    _setLoading(true);
+    return _loadPdfImage(provider).whenComplete(() => _setLoading(false));
+  }
+
+  void _setLoading(bool isLoading) {
+    if (_isLoading == isLoading) return;
+    _isLoading = isLoading;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onLoadingChanged?.call(isLoading);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final provider = widget.provider;
     if (provider == null) return const SizedBox.shrink();
-    _imageFuture ??= _loadPdfImage(provider);
+    _imageFuture ??= _startLoading(provider);
 
     return FutureBuilder(
       future: _imageFuture,
@@ -176,7 +196,7 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
 
   XppBackgroundSolidLined({this.color = Colors.white, this.size});
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return _RasterizedSolidBackground(
       style: 'lined',
       color: color,
@@ -195,7 +215,7 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
 
   XppBackgroundSolidRuled({this.color = Colors.white, this.size});
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return _RasterizedSolidBackground(
       style: 'ruled',
       color: color,
@@ -214,7 +234,7 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
 
   XppBackgroundSolidGraph({this.color = Colors.white, this.size});
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return _RasterizedSolidBackground(
       style: 'graph',
       color: color,
@@ -233,7 +253,7 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
 
   XppBackgroundSolidDot({this.color = Colors.white, this.size});
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return _RasterizedSolidBackground(
       style: 'dotted',
       color: color,
@@ -252,7 +272,7 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
 
   XppBackgroundSolidPlain({this.color, this.size});
   @override
-  Widget render() {
+  Widget render({ValueChanged<bool>? onLoadingChanged}) {
     return Container(
       width: size!.width,
       height: size!.height,
@@ -269,7 +289,8 @@ class _NoXppBackground extends XppBackground {
   XppBackgroundType? type = XppBackgroundType.NONE;
 
   @override
-  Widget render() => Container(color: Colors.white);
+  Widget render({ValueChanged<bool>? onLoadingChanged}) =>
+      Container(color: Colors.white);
 
   @override
   XmlElement toXmlElement() {

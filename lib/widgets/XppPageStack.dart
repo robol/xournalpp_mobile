@@ -51,6 +51,7 @@ class XppPageStackState extends State<XppPageStack>
 
   XppBackground? _lastKnownBackground;
   Widget background = Container();
+  bool _isBackgroundLoading = false;
 
   @override
   void initState() {
@@ -65,7 +66,10 @@ class XppPageStackState extends State<XppPageStack>
 
     if (page!.background != null && _lastKnownBackground != page!.background) {
       _lastKnownBackground = page!.background;
-      background = page!.background!.render();
+      _isBackgroundLoading = page!.background is XppBackgroundPdf;
+      background = page!.background!.render(
+        onLoadingChanged: _handleBackgroundLoadingChanged,
+      );
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
     children.add(Positioned.fill(child: background));
@@ -86,6 +90,7 @@ class XppPageStackState extends State<XppPageStack>
     );
     final deleteButton = _buildDeleteSelectionButton();
     if (deleteButton != null) children.add(deleteButton);
+    if (_isBackgroundLoading) children.add(_buildLoadingOverlay());
     return RepaintBoundary(
       key: pngKey,
       child: Theme(
@@ -110,6 +115,20 @@ class XppPageStackState extends State<XppPageStack>
         ),
       ),
     );
+  }
+
+  Widget _buildLoadingOverlay() {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.white70,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+
+  void _handleBackgroundLoadingChanged(bool isLoading) {
+    if (!mounted || _isBackgroundLoading == isLoading) return;
+    setState(() => _isBackgroundLoading = isLoading);
   }
 
   Widget? _buildDeleteSelectionButton() {

@@ -34,7 +34,7 @@ class CanvasPage extends StatefulWidget {
 }
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
-  static const int _defaultToolColor = 0xFF607D8B;
+  static const int _defaultToolColor = 0xFF336699;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
   static const Color _laserColor = Colors.redAccent;
   static const double _fitWidthHorizontalMargin = 50;
@@ -53,9 +53,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   int currentPage = 0;
 
-  Color toolColor = Color(0xFF336699); // This is Colorfab3
+  Color toolColor = Color(_defaultToolColor); // This is Colorfab3
   Color highlighterColor = Colors.yellow;
-  double toolWidth = 2;
+  double toolWidth = 2.6;
   double highlighterWidth = 20;
   double eraserWidth = 20;
 
@@ -987,9 +987,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void shareScreenshot() async {
-    Uint8List imageBytes = await pageListViewKey.currentState!.getPng(
-      currentPage,
-    );
+    Uint8List imageBytes = await _pageStackKey.currentState!.toPng();
     String fileName =
         await (XppPickedFile(
           imageBytes,
@@ -1038,7 +1036,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         : filePath ?? _file!.title! + '.xopp';
     _file!.previewImage = kIsWeb
         ? kTransparentImage
-        : await pageListViewKey.currentState!.getPng(0);
+        : await _pageStackKey.currentState!.toPng();
     XppPickedFile file = _file!.toXppPickedFile(filePath: path);
     String? savedPath;
     if (export) {
@@ -1197,19 +1195,22 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void loadToolSettings() {
     SharedPreferences.getInstance().then((prefs) {
-      toolColor = Color(
-        prefs.getInt(PreferencesKeys.kToolColor) ?? _defaultToolColor,
-      );
-      highlighterColor = Color(
-        prefs.getInt(PreferencesKeys.kHighlighterColor) ??
-            _defaultHighlighterColor,
-      );
-      toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth) ?? toolWidth;
-      highlighterWidth =
-          prefs.getDouble(PreferencesKeys.kHighlighterWidth) ??
-          highlighterWidth;
-      eraserWidth =
-          prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
+      if (!mounted) return;
+      setState(() {
+        toolColor = Color(
+          prefs.getInt(PreferencesKeys.kToolColor) ?? _defaultToolColor,
+        );
+        highlighterColor = Color(
+          prefs.getInt(PreferencesKeys.kHighlighterColor) ??
+              _defaultHighlighterColor,
+        );
+        toolWidth = prefs.getDouble(PreferencesKeys.kToolWidth) ?? toolWidth;
+        highlighterWidth =
+            prefs.getDouble(PreferencesKeys.kHighlighterWidth) ??
+            highlighterWidth;
+        eraserWidth =
+            prefs.getDouble(PreferencesKeys.kEraserWidth) ?? eraserWidth;
+      });
     });
   }
 }
