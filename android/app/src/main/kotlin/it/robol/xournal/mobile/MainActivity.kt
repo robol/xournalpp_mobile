@@ -6,6 +6,7 @@ import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.FileOutputStream
 
 class MainActivity: FlutterActivity() {
     private val storageChannel = "it.robol.xournal.mobile/storage"
@@ -96,7 +97,12 @@ class MainActivity: FlutterActivity() {
 
     private fun writeDocument(uri: Uri, bytes: ByteArray, result: MethodChannel.Result) {
         try {
-            contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) }
+            contentResolver.openFileDescriptor(uri, "rwt")?.use { descriptor ->
+                FileOutputStream(descriptor.fileDescriptor).use { output ->
+                    output.write(bytes)
+                    output.flush()
+                }
+            }
                 ?: run {
                     result.error("write_failed", "Could not open document for writing.", uri.toString())
                     return

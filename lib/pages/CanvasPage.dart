@@ -34,6 +34,7 @@ class CanvasPage extends StatefulWidget {
 }
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
+  static const Duration _saveOverwriteTimeout = Duration(seconds: 30);
   static const int _defaultToolColor = 0xFF336699;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
   static const Color _laserColor = Colors.redAccent;
@@ -250,7 +251,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 ),
           PopupMenuButton<String>(
             onSelected: (item) async {
-              if (item == S.of(context).saveAs) saveFile(export: true);
+              if (item == S.of(context).saveAs) saveFile(saveAs: true);
               if (item == S.of(context).sharePage) shareScreenshot();
             },
             itemBuilder: (BuildContext context) {
@@ -1016,57 +1017,56 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  void saveFile({bool export = false}) async {
+  Future<void> saveFile({bool saveAs = false}) async {
     setState(() {
       savingFile = true;
     });
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.removeCurrentSnackBar();
     scaffoldMessenger.clearSnackBars();
-    scaffoldMessenger.showSnackBar(
+    final savingSnackBar = scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(S.of(context).savingFile),
         duration: Duration(days: 999),
       ),
     );
-    //try {
-    if (_file!.title == null) {
-      final titleApplied = await _showTitleDialog();
-      if (!titleApplied || _file!.title == null) {
-        if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    try {
+      if (_file!.title == null) {
+        final titleApplied = await _showTitleDialog();
+        if (!titleApplied || _file!.title == null) {
+          if (mounted) {
+            savingSnackBar.close();
+            scaffoldMessenger.removeCurrentSnackBar();
+            setState(() {
+              savingFile = false;
+            });
+          }
+          return;
+        }
+      }
+      String path = _file!.title! + '.xopp';
+      _file!.previewImage = kIsWeb
+          ? kTransparentImage
+          : await _pageStackKey.currentState!.toPng();
+      XppPickedFile file = _file!.toXppPickedFile(filePath: path);
+      final savedPath = !saveAs && filePath != null
+          ? await file
+                .saveToPath(path: filePath!)
+                .timeout(_saveOverwriteTimeout)
+          : await file.exportToStorage();
+      if (savedPath == null) {
         if (mounted) {
+          savingSnackBar.close();
+          scaffoldMessenger.removeCurrentSnackBar();
           setState(() {
             savingFile = false;
           });
         }
         return;
       }
-    }
-    String path = export
-        ? _file!.title! + '.xopp'
-        : filePath ?? _file!.title! + '.xopp';
-    _file!.previewImage = kIsWeb
-        ? kTransparentImage
-        : await _pageStackKey.currentState!.toPng();
-    XppPickedFile file = _file!.toXppPickedFile(filePath: path);
-    String? savedPath;
-    if (export) {
-      savedPath = await file.exportToStorage();
-    } else {
-      savedPath = await file.saveToPath(path: path);
-    }
-    if (savedPath == null) {
-      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      if (mounted) {
-        setState(() {
-          savingFile = false;
-        });
-      }
-      return;
-    }
-    filePath = savedPath;
+      filePath = savedPath;
 
-    /// starting async task to save recent files list
-    SharedPreferences.getInstance().then((prefs) {
+      final prefs = await SharedPreferences.getInstance();
       String jsonData = prefs.getString(PreferencesKeys.kRecentFiles) ?? '[]';
       Set files = (jsonDecode(jsonData) as Iterable).toSet();
       files.removeWhere((element) => element['path'] == savedPath);
@@ -1077,28 +1077,30 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         'modified': DateTime.now().toIso8601String(),
       });
       jsonData = jsonEncode(files.toList());
-      prefs.setString(PreferencesKeys.kRecentFiles, jsonData);
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    setState(() {
-      savingFile = false;
-    });
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(S.of(context).successfullySaved)));
-    /*} catch (e) {
-      snackBarController.close();
+      await prefs.setString(PreferencesKeys.kRecentFiles, jsonData);
+
+      if (!mounted) return;
+      savingSnackBar.close();
+      scaffoldMessenger.removeCurrentSnackBar();
       setState(() {
         savingFile = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(S.of(context).successfullySaved)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      savingSnackBar.close();
+      scaffoldMessenger.removeCurrentSnackBar();
+      setState(() => savingFile = false);
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content:
-              Text(S.of(context).unfortunatelyThereWasAnErrorSavingThisFile),
+          content: Text(
+            S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
+          ),
         ),
       );
-    }*/
+    }
   }
 
   void _onAnimationReset() {

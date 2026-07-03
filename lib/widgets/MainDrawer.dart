@@ -81,11 +81,16 @@ class _MainDrawerState extends State<MainDrawer> {
                       'assets/xournalpp.png',
                       scale: 8,
                     ),
-                    applicationLegalese: 'Powered by TestApp.schule',
+                    applicationLegalese: 
+                      'Xournal++ Mobile © its original authors and contributors. \n'
+                      'Licensed under the EUPL-1.2.',
                     children: [
-                      Image.asset('assets/feature-banner.png', scale: 2),
                       Padding(
-                        padding: const EdgeInsets.only(top: 12, bottom: 8),
+                        padding: const EdgeInsets.only(top: 16, bottom: 8),
+                        child: Image.asset('assets/feature-banner.png', scale: 2),
+                      ),                      
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: OutlinedButton(
                           onPressed: () => launchUrl(
                             Uri.parse('https://github.com/xournalpp/xournalpp'),
