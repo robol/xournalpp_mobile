@@ -28,6 +28,8 @@ class PointerListener extends StatefulWidget {
   final VoidCallback? onSelectionClear;
   final bool Function(Offset position)? shouldMoveSelection;
   final void Function(Offset delta, {bool done})? onSelectionMove;
+  final VoidCallback? onSwipeLeft;
+  final VoidCallback? onSwipeRight;
 
   const PointerListener({
     Key? key,
@@ -49,6 +51,8 @@ class PointerListener extends StatefulWidget {
     this.onSelectionClear,
     this.shouldMoveSelection,
     this.onSelectionMove,
+    this.onSwipeLeft,
+    this.onSwipeRight,
   }) : super(key: key);
 
   @override
@@ -58,6 +62,8 @@ class PointerListener extends StatefulWidget {
 class PointerListenerState extends State<PointerListener> {
   static const Duration _laserPreviewFadeOutDuration = Duration(seconds: 3);
   static const double _laserWidth = 20;
+  static const double _pageSwipeMinDistance = 80;
+  static const double _pageSwipeHorizontalBias = 1.5;
 
   bool drawingEnabled = true;
 
@@ -82,6 +88,8 @@ class PointerListenerState extends State<PointerListener> {
   bool _dragSelecting = false;
   Offset? _selectionMoveLastPosition;
   bool _movingSelection = false;
+  Offset? _pageSwipeStart;
+  int? _pageSwipePointerDevice;
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +102,7 @@ class PointerListenerState extends State<PointerListener> {
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
           if (_detectTwoFingerGesture(data)) return;
+          _updatePageSwipe(data);
           notifyDeviceChange(data);
           if (!drawingEnabled) return;
           if (isSelect(data)) {
@@ -113,6 +122,7 @@ class PointerListenerState extends State<PointerListener> {
             activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
+          _startPageSwipe(data);
           notifyDeviceChange(data);
           if (isSelect(data)) {
             _startSelectionRegion(data);
@@ -135,7 +145,10 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
-          if (activeEditingTool == EditingTool.SELECT) {
+          final changedPage = _finishPageSwipe(data);
+          if (changedPage) {
+            poppedContentForCurrentPointer = true;
+          } else if (activeEditingTool == EditingTool.SELECT) {
             _finishSelectionRegion();
           } else if (tool == XppStrokeTool.ERASER) {
             applyEraserPath();
@@ -152,6 +165,7 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerCancel: (data) {
+          _cancelPageSwipe(data);
           if (activeEditingTool == EditingTool.LASER) {
             finishLaserPreview();
           }
@@ -295,6 +309,57 @@ class PointerListenerState extends State<PointerListener> {
     _selectionMoveLastPosition = null;
     _movingSelection = false;
     setState(() {});
+  }
+
+  void _startPageSwipe(PointerDownEvent data) {
+    if (!_isPageSwipePointer(data)) return;
+    _pageSwipeStart = data.localPosition;
+    _pageSwipePointerDevice = data.device;
+  }
+
+  void _updatePageSwipe(PointerMoveEvent data) {
+    if (_pageSwipePointerDevice != data.device || _pageSwipeStart == null) {
+      return;
+    }
+
+    final delta = data.localPosition - _pageSwipeStart!;
+    if (delta.dy.abs() > delta.dx.abs() * _pageSwipeHorizontalBias) {
+      _pageSwipeStart = null;
+      _pageSwipePointerDevice = null;
+    }
+  }
+
+  bool _finishPageSwipe(PointerUpEvent data) {
+    if (_pageSwipePointerDevice != data.device || _pageSwipeStart == null) {
+      return false;
+    }
+
+    final delta = data.localPosition - _pageSwipeStart!;
+    _pageSwipeStart = null;
+    _pageSwipePointerDevice = null;
+
+    if (delta.dx.abs() < _pageSwipeMinDistance) return false;
+    if (delta.dx.abs() < delta.dy.abs() * _pageSwipeHorizontalBias) {
+      return false;
+    }
+
+    if (delta.dx < 0) {
+      widget.onSwipeLeft?.call();
+    } else {
+      widget.onSwipeRight?.call();
+    }
+    return true;
+  }
+
+  void _cancelPageSwipe(PointerEvent data) {
+    if (_pageSwipePointerDevice != data.device) return;
+    _pageSwipeStart = null;
+    _pageSwipePointerDevice = null;
+  }
+
+  bool _isPageSwipePointer(PointerDownEvent data) {
+    return data.kind == PointerDeviceKind.touch &&
+        getEditingToolFromPointer(data) == EditingTool.MOVE;
   }
 
   void _insertLatex(PointerDownEvent data) {

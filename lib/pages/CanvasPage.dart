@@ -147,6 +147,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         onSelectionClear: _clearSelection,
                         shouldMoveSelection: _shouldMoveSelection,
                         onSelectionMove: _moveSelection,
+                        onSwipeLeft: () => _switchToPage(currentPage + 1),
+                        onSwipeRight: () => _switchToPage(currentPage - 1),
                         onNewContent: (newContent) {
                           if (newContent == null) return;
 
@@ -319,16 +321,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               XppPagesListView(
                 key: pageListViewKey,
                 pages: _file!.pages,
-                onPageChange: (newPage) {
-                  setState(() {
-                    currentPage = newPage;
-                    _selectedContents = {};
-                    _invalidateEraserIndex();
-                  });
-                  _pageStackKey.currentState!.setPageData(
-                    _file!.pages![currentPage],
-                  );
-                },
+                onPageChange: _switchToPage,
                 onPageDelete: (deletedIndex) => setState(() {
                   _file!.pages!.removeAt(deletedIndex);
                   _selectedContents = {};
@@ -633,6 +626,23 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _eraseContentAt({Offset? coordinates, double? radius}) {
     if (coordinates == null) return;
     _eraseContentAlongPath(coordinates: [coordinates], radius: radius);
+  }
+
+  void _switchToPage(int pageIndex) {
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return;
+    if (pageIndex < 0 ||
+        pageIndex >= pages.length ||
+        pageIndex == currentPage) {
+      return;
+    }
+
+    setState(() {
+      currentPage = pageIndex;
+      _selectedContents = {};
+      _invalidateEraserIndex();
+    });
+    _pageStackKey.currentState?.setPageData(pages[currentPage]);
   }
 
   bool get _canUndo => _undoStack.isNotEmpty;
