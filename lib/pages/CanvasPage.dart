@@ -12,11 +12,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 import 'package:xournalpp/generated/l10n.dart';
+import 'package:xournalpp/src/PdfImage.dart';
+import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
@@ -97,6 +100,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 250),
     );
     loadToolSettings();
+    _scheduleInputModeRefresh();
   }
 
   @override
@@ -298,6 +302,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               getMinWidth: getMinWidth,
               getMaxWidth: getMaxWidth,
               getWidthDivisions: getWidthDivisions,
+              onBackgroundSettings: _showBackgroundSettings,
               onWidthChange: (newWidth, tool) {
                 setState(() {
                   if (tool == EditingTool.ERASER) {
@@ -348,35 +353,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             ),
           ),
         ),
-        floatingActionButtonLocation: kIsWeb
-            ? FloatingActionButtonLocation.centerFloat
-            : FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            showModalBottomSheet(
-              elevation: 16,
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              context: context,
-              builder: (context) => ToolBoxBottomSheet(
-                onBackgroundChange: (newBackground) {
-                  newBackground.size = _file!.pages![currentPage].pageSize;
-                  setState(() {
-                    _file!.pages![currentPage].background = newBackground;
-                    _markDirty();
-                  });
-                },
-              ),
-            );
-          },
-          tooltip: S.of(context).tools,
-          child: Icon(Icons.format_paint),
-        ), // This trailing comma makes auto-formatting nicer for build methods.
       ),
     );
   }
@@ -567,6 +543,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     });
   }
 
+  void _scheduleInputModeRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setDefaultDeviceIfNotSet(kind: _currentDevice);
+      _setZoomableState();
+    });
+  }
+
   EditingTool? get _activeTool => _toolData[_currentDevice];
 
   bool _isDrawingTool(EditingTool tool) {
@@ -714,6 +698,71 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _markDirty();
 
       _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    });
+  }
+
+  void _showBackgroundSettings() {
+    showModalBottomSheet(
+      elevation: 16,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      context: context,
+      builder: (context) => ToolBoxBottomSheet(
+        onPdfBackgroundChange: _changeBackgroundWithPdf,
+        onBackgroundChange: (newBackground) {
+          newBackground.size = _file!.pages![currentPage].pageSize;
+          setState(() {
+            _file!.pages![currentPage].background = newBackground;
+            _markDirty();
+          });
+        },
+      ),
+    );
+  }
+
+  Future<void> _changeBackgroundWithPdf() async {
+    final pdf = await XppPickedFile.importFromStorage(
+      type: XppFilePickType.custom,
+      fileExtension: 'pdf',
+    );
+    if (!mounted) return;
+
+    await runWithLoadingFileDialog(context, () async {
+      final pageSizes = await pdfPageSizes(pdf);
+      final pdfPath = pdf.path ?? await pdf.saveToTemporaryPath();
+      if (!mounted) return;
+
+      setState(() {
+        for (var i = 0; i < pageSizes.length; i++) {
+          final page = i < _file!.pages!.length
+              ? _file!.pages![i]
+              : XppPage.empty(background: Colors.white);
+          page.pageSize = pageSizes[i];
+          page.background = XppBackgroundPdf(
+            onUnavailable: (context, String? path) async =>
+                XppPickedFile.fromInternalPath(path: pdfPath),
+            filename: pdfPath,
+            page: i + 1,
+          );
+          if (i >= _file!.pages!.length) {
+            _file!.pages!.add(page);
+          }
+        }
+
+        if (currentPage >= _file!.pages!.length) {
+          currentPage = _file!.pages!.length - 1;
+        }
+        _selectedContents = {};
+        _invalidateEraserIndex();
+        _markDirty();
+      });
+
+      _pageStackKey.currentState?.setPageData(_file!.pages![currentPage]);
     });
   }
 
@@ -1308,6 +1357,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             prefs.getBool(PreferencesKeys.kDrawWithStylusOnly) ??
             drawWithStylusOnly;
       });
+      _scheduleInputModeRefresh();
     });
   }
 }

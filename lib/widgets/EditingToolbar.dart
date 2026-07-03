@@ -15,6 +15,7 @@ class EditingToolBar extends StatefulWidget {
   final double Function(EditingTool? tool)? getMinWidth;
   final double Function(EditingTool? tool)? getMaxWidth;
   final int? Function(EditingTool? tool)? getWidthDivisions;
+  final VoidCallback? onBackgroundSettings;
 
   const EditingToolBar({
     Key? key,
@@ -27,6 +28,7 @@ class EditingToolBar extends StatefulWidget {
     this.getMinWidth,
     this.getMaxWidth,
     this.getWidthDivisions,
+    this.onBackgroundSettings,
   }) : super(key: key);
 
   @override
@@ -93,6 +95,13 @@ class EditingToolBarState extends State<EditingToolBar> {
               EditingTool.SELECT,
               Icon(Icons.tab_unselected),
               usePrimaryColor: true,
+            ),
+            FloatingActionButton(
+              heroTag: 'PageBackground',
+              onPressed: widget.onBackgroundSettings,
+              tooltip: 'Change background',
+              child: Icon(Icons.format_paint),
+              backgroundColor: Theme.of(context).cardColor,
             ),
           ],
           shrinkWrap: true,

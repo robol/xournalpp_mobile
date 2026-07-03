@@ -8,12 +8,14 @@ class ToolBoxBottomSheet extends StatefulWidget {
   final EditingTool? tool;
   final Function(EditingTool)? onToolChange;
   final Function(XppBackground)? onBackgroundChange;
+  final Future<void> Function()? onPdfBackgroundChange;
 
   const ToolBoxBottomSheet({
     Key? key,
     this.tool,
     this.onToolChange,
     this.onBackgroundChange,
+    this.onPdfBackgroundChange,
   }) : super(key: key);
 
   @override
@@ -170,12 +172,21 @@ class _ToolBoxBottomSheetState extends State<ToolBoxBottomSheet> {
                   ),
                   AspectRatio(
                     aspectRatio: 1,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Card(child: XppBackground.none.render()),
-                        Text(S.of(context).pdf + S.of(context).notImplemented),
-                      ],
+                    child: GestureDetector(
+                      onTap: widget.onPdfBackgroundChange,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Card(
+                            child: SizedBox(
+                              width: 96,
+                              height: 96,
+                              child: Icon(Icons.picture_as_pdf, size: 48),
+                            ),
+                          ),
+                          Text(S.of(context).pdf),
+                        ],
+                      ),
                     ),
                   ),
                   AspectRatio(
