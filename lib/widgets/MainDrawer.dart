@@ -5,6 +5,8 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/XppPickedFile.dart';
+import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/QuotaTile.dart';
 
 class MainDrawer extends StatefulWidget {
@@ -51,6 +53,11 @@ class _MainDrawerState extends State<MainDrawer> {
                   onTap: () => XppFile.openAndEdit(context: context),
                 ),
                 ListTile(
+                  leading: Icon(Icons.picture_as_pdf),
+                  title: Text(S.of(context).importPdf),
+                  onTap: _importPdf,
+                ),
+                ListTile(
                   leading: Icon(Icons.insert_drive_file),
                   title: Text(S.of(context).newFile),
                   onTap: () => Navigator.of(context).pushReplacement(
@@ -81,14 +88,17 @@ class _MainDrawerState extends State<MainDrawer> {
                       'assets/xournalpp.png',
                       scale: 8,
                     ),
-                    applicationLegalese: 
-                      'Xournal++ Mobile © its original authors and contributors. \n'
-                      'Licensed under the EUPL-1.2.',
+                    applicationLegalese:
+                        'Xournal++ Mobile © its original authors and contributors. \n'
+                        'Licensed under the EUPL-1.2.',
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(top: 16, bottom: 8),
-                        child: Image.asset('assets/feature-banner.png', scale: 2),
-                      ),                      
+                        child: Image.asset(
+                          'assets/feature-banner.png',
+                          scale: 2,
+                        ),
+                      ),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: OutlinedButton(
@@ -121,6 +131,23 @@ class _MainDrawerState extends State<MainDrawer> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _importPdf() async {
+    final file = await runWithLoadingFileDialog(context, () async {
+      final pdf = await XppPickedFile.importFromStorage(
+        type: XppFilePickType.custom,
+        fileExtension: 'pdf',
+      );
+      final file = await XppFile.importPdf(pdf: pdf);
+      if (context.mounted) await file.prepareForOpening(context);
+      return file;
+    });
+
+    if (!context.mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
     );
   }
 }
