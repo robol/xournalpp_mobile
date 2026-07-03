@@ -144,7 +144,7 @@ Possible next steps include:
 * Large documents may consume a lot of memory.
 * Some `.xopp` files may not render perfectly.
 * Editing support is still basic.
-* Platform-specific behavior may differ between Android, iOS, web, and desktop.
+* Platform-specific behavior may differ between Android, iOS, and desktop.
 * Store builds are not currently provided by this fork.
 
 Please test with copies of your documents, not your only copy.
@@ -174,7 +174,6 @@ Contributions are welcome, especially in these areas:
 
 * Flutter modernization
 * Android and iOS fixes
-* Web support
 * `.xopp` parsing/rendering correctness
 * Performance and memory usage
 * UI/UX improvements

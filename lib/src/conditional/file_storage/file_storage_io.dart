@@ -58,6 +58,19 @@ Future<bool> persistDocumentAccess(String path, {bool writable = false}) async {
 
 Future<void> deleteFile(String path) => File(path).delete();
 
+Future<Uint8List?> readCacheFile(String key) async {
+  final file = await _cacheFile(key);
+  if (!await file.exists()) return null;
+  return file.readAsBytes();
+}
+
+Future<String> writeCacheFile(String key, Uint8List bytes) async {
+  final file = await _cacheFile(key);
+  await file.parent.create(recursive: true);
+  await file.writeAsBytes(bytes, flush: false);
+  return file.path;
+}
+
 Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {
   final directory = await Directory.systemTemp.createTemp('xournalpp_mobile_');
   final safeName = (fileName == null || fileName.isEmpty)
@@ -66,6 +79,11 @@ Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {
   final path = '${directory.path}/$safeName';
   await File(path).writeAsBytes(bytes);
   return path;
+}
+
+Future<File> _cacheFile(String key) async {
+  final directory = await getTemporaryDirectory();
+  return File('${directory.path}/xournalpp_mobile_pdf_cache/$key');
 }
 
 Future<File> _writableFileForPath(String path) async {

@@ -316,40 +316,43 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         child: Container(
           color: Theme.of(context).colorScheme.surface,
           constraints: BoxConstraints(maxHeight: 100),
-          child: ListView(
-            scrollDirection: Axis.horizontal,
+          child: Row(
             children: [
-              XppPagesListView(
-                key: pageListViewKey,
-                pages: _file!.pages,
-                onPageChange: _switchToPage,
-                onPageDelete: (deletedIndex) => setState(() {
-                  _file!.pages!.removeAt(deletedIndex);
-                  _selectedContents = {};
-                  _invalidateEraserIndex();
-                  if (_file!.pages!.length >= currentPage)
-                    currentPage = _file!.pages!.length - 1;
-                  if (_file!.pages!.isEmpty) {
-                    _file!.pages!.add(XppPage.empty(background: Colors.white));
-                    currentPage = 0;
+              Expanded(
+                child: XppPagesListView(
+                  key: pageListViewKey,
+                  pages: _file!.pages,
+                  onPageChange: _switchToPage,
+                  onPageDelete: (deletedIndex) => setState(() {
+                    _file!.pages!.removeAt(deletedIndex);
+                    _selectedContents = {};
+                    _invalidateEraserIndex();
+                    if (_file!.pages!.length >= currentPage)
+                      currentPage = _file!.pages!.length - 1;
+                    if (_file!.pages!.isEmpty) {
+                      _file!.pages!.add(
+                        XppPage.empty(background: Colors.white),
+                      );
+                      currentPage = 0;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          S.of(context).thereWereNoMorePagesWeAddedOne,
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            S.of(context).thereWereNoMorePagesWeAddedOne,
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                }),
-                onPageMove: (initialIndex, movedTo) => setState(() {
-                  final page = _file!.pages![initialIndex];
-                  _file!.pages!.removeAt(initialIndex);
-                  _file!.pages!.insert(movedTo - 1, page);
-                  _selectedContents = {};
-                  _invalidateEraserIndex();
-                }),
-                currentPage: currentPage,
+                      );
+                    }
+                  }),
+                  onPageMove: (initialIndex, movedTo) => setState(() {
+                    final page = _file!.pages![initialIndex];
+                    _file!.pages!.removeAt(initialIndex);
+                    _file!.pages!.insert(movedTo - 1, page);
+                    _selectedContents = {};
+                    _invalidateEraserIndex();
+                  }),
+                  currentPage: currentPage,
+                ),
               ),
               FloatingActionButton(
                 heroTag: 'AddXppPage',

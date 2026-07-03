@@ -27,6 +27,7 @@ class XppPageStack extends StatefulWidget {
   final Set<XppContent> selectedContents;
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
   final VoidCallback? onDeleteSelection;
+  final bool keepAlive;
 
   const XppPageStack({
     Key? key,
@@ -38,6 +39,7 @@ class XppPageStack extends StatefulWidget {
     this.selectedContents = const {},
     this.onSelectContent,
     this.onDeleteSelection,
+    this.keepAlive = true,
   }) : super(key: key);
 
   @override
@@ -197,7 +199,7 @@ class XppPageStackState extends State<XppPageStack>
   }
 
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => widget.keepAlive;
 
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {

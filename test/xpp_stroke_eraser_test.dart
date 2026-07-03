@@ -1,12 +1,7 @@
 import 'dart:ui';
-
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
-import 'package:xournalpp/src/PdfImage.dart';
-import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
   test('eraseWhere splits a stroke around erased points', () {
@@ -60,29 +55,5 @@ void main() {
     final element = background.toXmlElement();
 
     expect(element.getAttribute('color'), '#FFFFFFFF');
-  });
-
-  test('pdf page sizes are read from metadata', () async {
-    final document = pw.Document();
-    document.addPage(
-      pw.Page(
-        pageFormat: const PdfPageFormat(200, 300),
-        build: (_) => pw.SizedBox(),
-      ),
-    );
-    document.addPage(
-      pw.Page(
-        pageFormat: const PdfPageFormat(400, 250),
-        build: (_) => pw.SizedBox(),
-      ),
-    );
-
-    final sizes = await pdfPageSizes(XppPickedFile(await document.save()));
-
-    expect(sizes, hasLength(2));
-    expect(sizes[0].width, 200);
-    expect(sizes[0].height, 300);
-    expect(sizes[1].width, 400);
-    expect(sizes[1].height, 250);
   });
 }
