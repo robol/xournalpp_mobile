@@ -94,7 +94,7 @@ class XppFile {
     final filename = background.filename;
     if (filename != null && filename.isNotEmpty) {
       try {
-        return XppPickedFile.fromInternalPath(path: filename);
+        return await XppPickedFile.fromInternalPath(path: filename);
       } catch (_) {
         // Fall through to the missing-file callback below.
       }

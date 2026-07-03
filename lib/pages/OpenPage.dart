@@ -504,7 +504,7 @@ Future<XppPickedFile> _resolveMissingPdfFile(
   final mappedPath = await _mappedMissingPdfPath(path);
   if (mappedPath != null) {
     try {
-      return XppPickedFile.fromInternalPath(path: mappedPath);
+      return await XppPickedFile.fromInternalPath(path: mappedPath);
     } catch (_) {
       await _forgetMissingPdfMapping(path);
     }
