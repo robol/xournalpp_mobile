@@ -569,20 +569,20 @@ class PointerListenerState extends State<PointerListener> {
       tool = EditingTool.ERASER;
     }
 
-    if (widget.drawWithStylusOnly &&
-        data.kind == PointerDeviceKind.touch &&
-        _isDrawingTool(tool)) {
+    if (widget.drawWithStylusOnly && _isNonStylusPointer(data)) {
       return EditingTool.MOVE;
     }
 
     return tool;
   }
 
-  bool _isDrawingTool(EditingTool? tool) {
-    return tool == EditingTool.STYLUS ||
-        tool == EditingTool.HIGHLIGHT ||
-        tool == EditingTool.ERASER ||
-        tool == EditingTool.LASER;
+  bool _isNonStylusPointer(PointerEvent data) {
+    return data.kind != PointerDeviceKind.stylus &&
+        data.kind != PointerDeviceKind.invertedStylus;
+  }
+
+  bool _canPanWithPointer(PointerEvent data) {
+    return getEditingToolFromPointer(data) == EditingTool.MOVE;
   }
 
   XppStrokeTool getToolFromPointer(PointerEvent data) {
@@ -596,6 +596,7 @@ class PointerListenerState extends State<PointerListener> {
 
   bool _detectTwoFingerGesture(PointerEvent data, {bool shouldPop = false}) {
     if (data.kind != PointerDeviceKind.touch) return false;
+    if (!_canPanWithPointer(data)) return false;
 
     // detecting two-finger gestures
     final timestamp = DateTime.now();

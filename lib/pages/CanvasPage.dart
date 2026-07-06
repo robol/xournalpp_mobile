@@ -284,6 +284,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         return SingleChildScrollView(
           key: _pagesViewportKey,
           controller: _pagesHorizontalScrollController,
+          physics: _viewportScrollPhysics,
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             width: contentWidth,
@@ -295,6 +296,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               },
               child: ListView.builder(
                 controller: _pagesScrollController,
+                physics: _viewportScrollPhysics,
                 padding: const EdgeInsets.symmetric(vertical: _pageGap),
                 scrollCacheExtent: ScrollCacheExtent.pixels(
                   _estimatedPageExtent(_lastViewportWidth) * 1.5,
@@ -855,16 +857,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _setZoomableState() {
-    final activeTool = _toolData[_currentDevice];
-    final scrollingEnabled =
-        activeTool == null ||
-        activeTool == EditingTool.MOVE ||
-        (drawWithStylusOnly &&
-            _currentDevice == PointerDeviceKind.touch &&
-            _isDrawingTool(activeTool));
     for (final key in _pointerListenerKeys.values) {
       key.currentState?.setState(() {
-        key.currentState!.drawingEnabled = !scrollingEnabled;
+        key.currentState!.drawingEnabled = !_canPanViewport;
       });
     }
   }
@@ -879,11 +874,18 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   EditingTool? get _activeTool => _toolData[_currentDevice];
 
-  bool _isDrawingTool(EditingTool tool) {
-    return tool == EditingTool.STYLUS ||
-        tool == EditingTool.HIGHLIGHT ||
-        tool == EditingTool.ERASER ||
-        tool == EditingTool.LASER;
+  ScrollPhysics get _viewportScrollPhysics => _canPanViewport
+      ? const ClampingScrollPhysics()
+      : const NeverScrollableScrollPhysics();
+
+  bool get _canPanViewport {
+    return _activeTool == EditingTool.MOVE ||
+        (drawWithStylusOnly && _isNonStylusPointerKind(_currentDevice));
+  }
+
+  bool _isNonStylusPointerKind(PointerDeviceKind? kind) {
+    return kind != PointerDeviceKind.stylus &&
+        kind != PointerDeviceKind.invertedStylus;
   }
 
   void _setScale(double newZoom) {
