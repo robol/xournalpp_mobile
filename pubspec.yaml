@@ -3,7 +3,7 @@ description: A port of the main features of Xournal++ to various Flutter platfor
 
 publish_to: none
 
-version: 4.1.5+17
+version: 4.1.6+18
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
