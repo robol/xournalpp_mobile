@@ -31,40 +31,46 @@ Future<Uint8List> exportPdfDocument(
   XppFile file, {
   PdfSourceResolver? pdfResolver,
 }) async {
-  final source = _pdfSourceFor(file);
-  if (source == null) {
-    throw const PdfExportException(
-      'PDF export currently requires all pages to come from the same PDF.',
-    );
+  final plan = _pdfSourcePlan(file);
+  if (plan != null) {
+    final pickedPdf = pdfResolver == null
+        ? await XppPickedFile.fromInternalPath(path: plan.filename)
+        : await pdfResolver(plan.background);
+    final writer = _IncrementalPdfWriter(pickedPdf.toUint8List());
+    return writer.export(file: file, source: plan);
   }
 
-  final pickedPdf = pdfResolver == null
-      ? await XppPickedFile.fromInternalPath(path: source.filename)
-      : await pdfResolver(source.background);
-  final writer = _IncrementalPdfWriter(pickedPdf.toUint8List());
-  return writer.export(file: file, source: source);
+  return _GeneratedPdfWriter().export(file);
 }
 
-_PdfSource? _pdfSourceFor(XppFile file) {
+_PdfSource? _pdfSourcePlan(XppFile file) {
   final pages = file.pages;
   if (pages == null || pages.isEmpty) return null;
 
   String? filename;
   XppBackgroundPdf? sourceBackground;
-  final pageNumbers = <int>[];
+  final pageNumbers = <int?>[];
   for (final page in pages) {
     final background = page.background;
-    if (background is! XppBackgroundPdf) return null;
+    if (background is! XppBackgroundPdf) {
+      pageNumbers.add(null);
+      continue;
+    }
     if (background.filename == null || background.page == null) return null;
     filename ??= background.filename;
     sourceBackground ??= background;
-    if (filename != background.filename) return null;
+    if (filename != background.filename) {
+      throw const PdfExportException(
+        'PDF export with mixed PDF backgrounds currently requires a single source PDF.',
+      );
+    }
     pageNumbers.add(background.page!);
   }
 
+  if (filename == null || sourceBackground == null) return null;
   return _PdfSource(
-    filename: filename!,
-    background: sourceBackground!,
+    filename: filename,
+    background: sourceBackground,
     pageNumbers: pageNumbers,
   );
 }
@@ -72,7 +78,7 @@ _PdfSource? _pdfSourceFor(XppFile file) {
 class _PdfSource {
   final String filename;
   final XppBackgroundPdf background;
-  final List<int> pageNumbers;
+  final List<int?> pageNumbers;
 
   const _PdfSource({
     required this.filename,
@@ -117,20 +123,42 @@ class _IncrementalPdfWriter {
       return objectNumber;
     }
 
+    void writeUpdatedObject(int objectNumber, String body) {
+      newOffsets[objectNumber] =
+          _bytes.length + latin1.encode(builder.toString()).length;
+      builder.write('$objectNumber 0 obj\n$body\nendobj\n');
+    }
+
+    final newPagesObject = nextObject++;
     final fontObject = addObject(
       '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
     );
     final alphaObject = addObject('<< /Type /ExtGState /CA 0.5 /ca 0.5 >>');
+    final kids = <String>[];
+    final usedSourcePageObjects = <int>{};
 
     for (var i = 0; i < pages.length; i++) {
-      final sourcePageIndex = source.pageNumbers[i] - 1;
+      final sourcePageNumber = source.pageNumbers[i];
+      if (sourcePageNumber == null) {
+        kids.add(
+          '${_addGeneratedPage(page: pages[i], parentObject: newPagesObject, fontObject: fontObject, alphaObject: alphaObject, addObject: addObject)} 0 R',
+        );
+        continue;
+      }
+
+      final sourcePageIndex = sourcePageNumber - 1;
       if (sourcePageIndex < 0 || sourcePageIndex >= _pages.length) {
         throw PdfExportException(
-          'PDF page ${source.pageNumbers[i]} is not available.',
+          'PDF page $sourcePageNumber is not available.',
         );
       }
 
       final pageInfo = _pages[sourcePageIndex];
+      if (!usedSourcePageObjects.add(pageInfo.objectNumber)) {
+        throw const PdfExportException(
+          'Exporting the same source PDF page multiple times is not supported yet.',
+        );
+      }
       final imageObjects = <String, int>{};
       final overlay = _OverlayBuilder(
         page: pages[i],
@@ -142,7 +170,6 @@ class _IncrementalPdfWriter {
           return name;
         },
       ).build();
-      if (overlay.trim().isEmpty) continue;
 
       final streamObject = addObject(_streamObject(overlay));
       final resourceObject = addObject(
@@ -157,12 +184,21 @@ class _IncrementalPdfWriter {
         pageInfo: pageInfo,
         newContentsObject: streamObject,
         newResourcesObject: resourceObject,
+        newParentObject: newPagesObject,
       );
 
-      newOffsets[pageInfo.objectNumber] =
-          _bytes.length + latin1.encode(builder.toString()).length;
-      builder.write('${pageInfo.objectNumber} 0 obj\n$updatedPage\nendobj\n');
+      writeUpdatedObject(pageInfo.objectNumber, updatedPage);
+      kids.add('${pageInfo.objectNumber} 0 R');
     }
+
+    final pagesBody =
+        '<< /Type /Pages /Kids [ ${kids.join(' ')} ] /Count ${kids.length} >>';
+    writeUpdatedObject(newPagesObject, pagesBody);
+    final catalog = _object(_rootObject).dictionary;
+    writeUpdatedObject(
+      _rootObject,
+      _replaceDictionaryEntry(catalog, 'Pages', '$newPagesObject 0 R'),
+    );
 
     final xrefOffset = _bytes.length + latin1.encode(builder.toString()).length;
     builder.write('xref\n');
@@ -649,6 +685,7 @@ class _IncrementalPdfWriter {
     required _PdfPageInfo pageInfo,
     required int newContentsObject,
     required int newResourcesObject,
+    required int newParentObject,
   }) {
     var dict = pageInfo.dictionary;
     final contents = pageInfo.entries['Contents'];
@@ -669,7 +706,47 @@ class _IncrementalPdfWriter {
       'Resources',
       '$newResourcesObject 0 R',
     );
+    dict = _replaceDictionaryEntry(dict, 'Parent', '$newParentObject 0 R');
     return dict;
+  }
+
+  int _addGeneratedPage({
+    required XppPage page,
+    required int parentObject,
+    required int fontObject,
+    required int alphaObject,
+    required int Function(String body) addObject,
+  }) {
+    final pageSize = page.pageSize?.toSize();
+    if (pageSize == null) {
+      throw const PdfExportException('Page size is missing.');
+    }
+    final mediaBox = _PdfBox(0, 0, pageSize.width, pageSize.height);
+    final imageObjects = <String, int>{};
+    final overlay = _OverlayBuilder(
+      page: page,
+      mediaBox: mediaBox,
+      addImageObject: (image) {
+        final name = 'FXPIm${imageObjects.length + 1}';
+        final imageObject = addObject(_imageObject(image));
+        imageObjects[name] = imageObject;
+        return name;
+      },
+    ).build();
+    final content = '${_backgroundCommands(page, mediaBox)}\n$overlay';
+    final contentsObject = addObject(_streamObject(content));
+    final resourcesObject = addObject(
+      _generatedResources(
+        fontObject: fontObject,
+        alphaObject: alphaObject,
+        imageObjects: imageObjects,
+      ),
+    );
+    return addObject(
+      '<< /Type /Page /Parent $parentObject 0 R '
+      '/MediaBox [ 0 0 ${_n(pageSize.width)} ${_n(pageSize.height)} ] '
+      '/Resources $resourcesObject 0 R /Contents $contentsObject 0 R >>',
+    );
   }
 
   String _streamObject(String data) {
@@ -681,6 +758,158 @@ class _IncrementalPdfWriter {
     return '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
         '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} >>\n'
         'stream\n${latin1.decode(image.rgb)}\nendstream';
+  }
+
+  String _generatedResources({
+    required int fontObject,
+    required int alphaObject,
+    required Map<String, int> imageObjects,
+  }) {
+    final entries = <String, String>{
+      'Font': '<< /FXPHelvetica $fontObject 0 R >>',
+      'ExtGState': '<< /FXPHighlight $alphaObject 0 R >>',
+    };
+    if (imageObjects.isNotEmpty) {
+      final buffer = StringBuffer('<< ');
+      imageObjects.forEach((key, value) => buffer.write('/$key $value 0 R '));
+      buffer.write('>>');
+      entries['XObject'] = buffer.toString();
+    }
+
+    final buffer = StringBuffer('<< ');
+    entries.forEach((key, value) => buffer.write('/$key $value '));
+    buffer.write('>>');
+    return buffer.toString();
+  }
+}
+
+class _GeneratedPdfWriter {
+  Uint8List export(XppFile file) {
+    final pages = file.pages ?? <XppPage>[];
+    if (pages.isEmpty) throw const PdfExportException('No pages to export.');
+
+    final builder = StringBuffer('%PDF-1.4\n');
+    final offsets = <int, int>{};
+    var nextObject = 1;
+
+    int addObject(String body) {
+      final objectNumber = nextObject++;
+      offsets[objectNumber] = latin1.encode(builder.toString()).length;
+      builder.write('$objectNumber 0 obj\n$body\nendobj\n');
+      return objectNumber;
+    }
+
+    final catalogObject = nextObject++;
+    final pagesObject = nextObject++;
+    final fontObject = addObject(
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    );
+    final alphaObject = addObject('<< /Type /ExtGState /CA 0.5 /ca 0.5 >>');
+
+    final kids = <String>[];
+    for (final page in pages) {
+      kids.add(
+        '${_addPage(page: page, parentObject: pagesObject, fontObject: fontObject, alphaObject: alphaObject, addObject: addObject)} 0 R',
+      );
+    }
+
+    offsets[pagesObject] = latin1.encode(builder.toString()).length;
+    builder.write(
+      '$pagesObject 0 obj\n'
+      '<< /Type /Pages /Kids [ ${kids.join(' ')} ] /Count ${kids.length} >>\n'
+      'endobj\n',
+    );
+    offsets[catalogObject] = latin1.encode(builder.toString()).length;
+    builder.write(
+      '$catalogObject 0 obj\n'
+      '<< /Type /Catalog /Pages $pagesObject 0 R >>\n'
+      'endobj\n',
+    );
+
+    final xrefOffset = latin1.encode(builder.toString()).length;
+    builder.write('xref\n0 $nextObject\n');
+    builder.write('0000000000 65535 f \n');
+    for (var objectNumber = 1; objectNumber < nextObject; objectNumber++) {
+      builder.write(
+        '${offsets[objectNumber]!.toString().padLeft(10, '0')} 00000 n \n',
+      );
+    }
+    builder.write('trailer\n');
+    builder.write('<< /Size $nextObject /Root $catalogObject 0 R >>\n');
+    builder.write('startxref\n$xrefOffset\n%%EOF\n');
+    return Uint8List.fromList(latin1.encode(builder.toString()));
+  }
+
+  int _addPage({
+    required XppPage page,
+    required int parentObject,
+    required int fontObject,
+    required int alphaObject,
+    required int Function(String body) addObject,
+  }) {
+    final pageSize = page.pageSize?.toSize();
+    if (pageSize == null) {
+      throw const PdfExportException('Page size is missing.');
+    }
+    final mediaBox = _PdfBox(0, 0, pageSize.width, pageSize.height);
+    final imageObjects = <String, int>{};
+    final overlay = _OverlayBuilder(
+      page: page,
+      mediaBox: mediaBox,
+      addImageObject: (image) {
+        final name = 'FXPIm${imageObjects.length + 1}';
+        final imageObject = addObject(_imageObject(image));
+        imageObjects[name] = imageObject;
+        return name;
+      },
+    ).build();
+    final content = '${_backgroundCommands(page, mediaBox)}\n$overlay';
+    final contentsObject = addObject(_streamObject(content));
+    final resourcesObject = addObject(
+      _generatedResources(
+        fontObject: fontObject,
+        alphaObject: alphaObject,
+        imageObjects: imageObjects,
+      ),
+    );
+    return addObject(
+      '<< /Type /Page /Parent $parentObject 0 R '
+      '/MediaBox [ 0 0 ${_n(pageSize.width)} ${_n(pageSize.height)} ] '
+      '/Resources $resourcesObject 0 R /Contents $contentsObject 0 R >>',
+    );
+  }
+
+  String _streamObject(String data) {
+    final bytes = latin1.encode(data);
+    return '<< /Length ${bytes.length} >>\nstream\n$data\nendstream';
+  }
+
+  String _imageObject(_PdfImage image) {
+    return '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
+        '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} >>\n'
+        'stream\n${latin1.decode(image.rgb)}\nendstream';
+  }
+
+  String _generatedResources({
+    required int fontObject,
+    required int alphaObject,
+    required Map<String, int> imageObjects,
+  }) {
+    final entries = <String, String>{
+      'Font': '<< /FXPHelvetica $fontObject 0 R >>',
+      'ExtGState': '<< /FXPHighlight $alphaObject 0 R >>',
+    };
+    if (imageObjects.isNotEmpty) {
+      final buffer = StringBuffer('<< ');
+      imageObjects.forEach((key, value) => buffer.write('/$key $value 0 R '));
+      buffer.write('>>');
+      entries['XObject'] = buffer.toString();
+    }
+
+    final buffer = StringBuffer('<< ');
+    entries.forEach((key, value) => buffer.write('/$key $value '));
+    buffer.write('>>');
+    return buffer.toString();
   }
 }
 
@@ -844,6 +1073,79 @@ class _OverlayBuilder {
   double _x(double x, double scaleX) => mediaBox.left + x * scaleX;
 
   double _y(double y, double scaleY) => mediaBox.top - y * scaleY;
+}
+
+String _backgroundCommands(XppPage page, _PdfBox mediaBox) {
+  final background = page.background;
+  final color = background is XppBackgroundSolid
+      ? background.color ?? const Color(0xffffffff)
+      : const Color(0xffffffff);
+  final buffer = StringBuffer()
+    ..writeln('q')
+    ..writeln(
+      '${_rgb(color)} rg ${_n(mediaBox.left)} ${_n(mediaBox.bottom)} '
+      '${_n(mediaBox.width)} ${_n(mediaBox.height)} re f',
+    );
+
+  if (background is XppBackgroundSolidLined ||
+      background is XppBackgroundSolidRuled) {
+    _appendHorizontalLines(buffer, mediaBox, step: 24);
+  } else if (background is XppBackgroundSolidGraph) {
+    final step = XppPageSize.pt2mm(5).toDouble();
+    _appendHorizontalLines(buffer, mediaBox, step: step);
+    _appendVerticalLines(buffer, mediaBox, step: step);
+  } else if (background is XppBackgroundSolidDot) {
+    _appendDots(buffer, mediaBox, step: XppPageSize.pt2mm(5).toDouble());
+  }
+
+  buffer.writeln('Q');
+  return buffer.toString();
+}
+
+void _appendHorizontalLines(
+  StringBuffer buffer,
+  _PdfBox mediaBox, {
+  required double step,
+}) {
+  buffer.writeln('${_rgb(const Color(0xffdddddd))} RG 1 w');
+  for (var y = step; y < mediaBox.height; y += step) {
+    final pdfY = mediaBox.top - y;
+    buffer.writeln(
+      '${_n(mediaBox.left)} ${_n(pdfY)} m ${_n(mediaBox.right)} ${_n(pdfY)} l S',
+    );
+  }
+}
+
+void _appendVerticalLines(
+  StringBuffer buffer,
+  _PdfBox mediaBox, {
+  required double step,
+}) {
+  buffer.writeln('${_rgb(const Color(0xffdddddd))} RG 1 w');
+  for (var x = step; x < mediaBox.width; x += step) {
+    final pdfX = mediaBox.left + x;
+    buffer.writeln(
+      '${_n(pdfX)} ${_n(mediaBox.bottom)} m ${_n(pdfX)} ${_n(mediaBox.top)} l S',
+    );
+  }
+}
+
+void _appendDots(
+  StringBuffer buffer,
+  _PdfBox mediaBox, {
+  required double step,
+}) {
+  final radius = XppPageSize.pt2mm(.5).toDouble();
+  buffer.writeln('${_rgb(const Color(0xffdddddd))} rg');
+  for (var y = step; y < mediaBox.height; y += step) {
+    final pdfY = mediaBox.top - y;
+    for (var x = step; x < mediaBox.width; x += step) {
+      final pdfX = mediaBox.left + x;
+      buffer.writeln(
+        '${_n(pdfX - radius)} ${_n(pdfY - radius)} ${_n(radius * 2)} ${_n(radius * 2)} re f',
+      );
+    }
+  }
 }
 
 class _PdfObject {
