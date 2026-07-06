@@ -430,20 +430,29 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           onLongPress: () => showDeleteDialog(fileInfo['path']),
           onTap: () async {
             try {
+              final initialPage = _currentPageFromRecentFile(fileInfo);
               final file = await runWithLoadingFileDialog(context, () async {
                 final file = await XppFile.fromXppPickedFile(
                   await XppPickedFile.fromInternalPath(path: fileInfo['path']),
                   (percent) {},
                   showMissingFileDialog,
                 );
-                if (context.mounted) await file.prepareForOpening(context);
+                if (context.mounted) {
+                  await file.prepareForOpening(
+                    context,
+                    currentPage: initialPage,
+                  );
+                }
                 return file;
               });
               if (!context.mounted) return;
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) =>
-                      CanvasPage(file: file, filePath: fileInfo['path']),
+                  builder: (context) => CanvasPage(
+                    file: file,
+                    filePath: fileInfo['path'],
+                    initialPage: initialPage,
+                  ),
                 ),
               );
             } catch (e) {
@@ -500,6 +509,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
     final locale = Localizations.localeOf(context).toString();
     return 'Last modified: ${DateFormat.yMd(locale).add_Hm().format(modified)}';
+  }
+
+  int _currentPageFromRecentFile(Map fileInfo) {
+    final page = fileInfo['currentPage'];
+    if (page is int) return page < 0 ? 0 : page;
+    return int.tryParse(page?.toString() ?? '') ?? 0;
   }
 
   showDeleteDialog(path) {

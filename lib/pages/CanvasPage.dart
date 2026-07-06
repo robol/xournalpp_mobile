@@ -28,10 +28,12 @@ import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 import 'package:xournalpp/widgets/ZoomableWidget.dart';
 
 class CanvasPage extends StatefulWidget {
-  CanvasPage({Key? key, this.file, this.filePath}) : super(key: key);
+  CanvasPage({Key? key, this.file, this.filePath, this.initialPage = 0})
+    : super(key: key);
 
   final XppFile? file;
   final String? filePath;
+  final int initialPage;
 
   @override
   _CanvasPageState createState() => _CanvasPageState();
@@ -360,6 +362,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _setMetadata() {
     _file = widget.file;
     filePath = widget.filePath;
+    currentPage = widget.initialPage
+        .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
+        .toInt();
   }
 
   bool get _isDirty => _revision != _savedRevision;
@@ -1203,6 +1208,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         'name': _file!.title,
         'path': savedPath,
         'modified': DateTime.now().toIso8601String(),
+        'currentPage': currentPage,
       });
       jsonData = jsonEncode(files.toList());
       await prefs.setString(PreferencesKeys.kRecentFiles, jsonData);

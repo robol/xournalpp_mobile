@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
@@ -17,6 +18,7 @@ import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/PdfImage.dart';
 import 'package:xournalpp/src/XppBackground.dart';
+import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 
 import 'XppLayer.dart';
@@ -106,25 +108,33 @@ class XppFile {
   static void openAndEdit({required BuildContext context}) async {
     XppFile file;
     late XppPickedFile rawFile;
+    int initialPage = 0;
     try {
       file = await runWithLoadingFileDialog(context, () async {
         rawFile = await XppPickedFile.importFromStorage(
           type: XppFilePickType.custom,
           fileExtension: 'xopp',
         );
+        initialPage = await _lastOpenedPageForPath(rawFile.path);
         final file = await fromXppPickedFile(
           rawFile,
           (percentage) => null,
           (missingContext, path) => showMissingFileDialog(context, path),
         );
-        if (context.mounted) await file.prepareForOpening(context);
+        if (context.mounted) {
+          await file.prepareForOpening(context, currentPage: initialPage);
+        }
         return file;
       });
 
       if (!context.mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => CanvasPage(file: file, filePath: rawFile.path),
+          builder: (context) => CanvasPage(
+            file: file,
+            filePath: rawFile.path,
+            initialPage: initialPage,
+          ),
         ),
       );
     } catch (e) {
@@ -453,6 +463,28 @@ class XppFile {
     });*/
 
     return file;
+  }
+
+  static Future<int> _lastOpenedPageForPath(String? path) async {
+    if (path == null || path.isEmpty) return 0;
+    final prefs = await SharedPreferences.getInstance();
+    final jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
+    if (jsonData == null || jsonData.isEmpty) return 0;
+
+    try {
+      final files = jsonDecode(jsonData);
+      if (files is! Iterable) return 0;
+      for (final fileInfo in files) {
+        if (fileInfo is! Map || fileInfo['path'] != path) continue;
+        final currentPage = fileInfo['currentPage'];
+        if (currentPage is int) return currentPage < 0 ? 0 : currentPage;
+        return int.tryParse(currentPage?.toString() ?? '') ?? 0;
+      }
+    } catch (_) {
+      return 0;
+    }
+
+    return 0;
   }
 
   /// thumbnail image data
