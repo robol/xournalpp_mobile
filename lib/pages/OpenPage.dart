@@ -11,13 +11,12 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
-import 'package:xournalpp/src/conditional/open_file/open_file_generic.dart'
-    if (dart.library.html) 'package:xournalpp/src/conditional/open_file/open_file_web.dart'
-    if (dart.library.io) 'package:xournalpp/src/conditional/open_file/open_file_io.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
+
+const _androidIntentChannel = MethodChannel('it.robol.xournal.mobile/intent');
 
 class OpenPage extends StatefulWidget {
   @override
@@ -29,8 +28,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   Set recentFiles = Set();
 
   late AnimationController _animationController;
-
-  late List<SharedMediaFile> _sharedFiles;
 
   @override
   void dispose() {
@@ -78,11 +75,22 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       return;
     }
     try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        _androidIntentChannel.setMethodCallHandler((call) async {
+          if (call.method == 'openIntent') {
+            await receivedShareNotification(call.arguments);
+          }
+        });
+        _androidIntentChannel
+            .invokeMapMethod<String, String?>('getInitialOpenIntent')
+            .then(receivedShareNotification)
+            .catchError((_) {});
+      }
+
       // For sharing images coming from outside the app while the app is in the memory
       ReceiveSharingIntent.instance.getMediaStream().listen(
         (List<SharedMediaFile> value) {
           setState(() {
-            _sharedFiles = value;
             receivedShareNotification(value);
           });
         },
@@ -96,7 +104,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           .getInitialMedia()
           .then((List<SharedMediaFile> value) {
             setState(() {
-              _sharedFiles = value;
               receivedShareNotification(value);
             });
           })
@@ -215,7 +222,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     );
   }
 
-  void receivedShareNotification(dynamic data) async {
+  Future<void> receivedShareNotification(dynamic data) async {
     if (data == null ||
         lastIntentData == data ||
         data is List &&
@@ -240,93 +247,148 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         /// TODO: don't copy files we can directly read
         print(data);
         data = [SharedMediaFile(path: data, type: SharedMediaType.file)];
-        _sharedFiles = data as List<SharedMediaFile>;
       }
     }
+    if (data is Map) {
+      final uri = data['uri']?.toString();
+      if (uri == null || uri.isEmpty) return;
+      final token =
+          '$uri|${data['mimeType'] ?? ''}|${data['displayName'] ?? ''}';
+      if (lastIntentData == token) return;
+      lastIntentData = token;
+      await _openExternalFile(
+        uri,
+        mimeType: data['mimeType']?.toString(),
+        displayName: data['displayName']?.toString(),
+      );
+      return;
+    }
     if (data is List && data.isNotEmpty) {
-      bool _aborted = false;
+      await _openExternalFile(data[0].path, mimeType: data[0].mimeType);
+    } else {
+      print('Unsupported runtimeType: ${data.runtimeType.toString()}');
+    }
+  }
+
+  Future<void> _openExternalFile(
+    String path, {
+    String? mimeType,
+    String? displayName,
+  }) async {
+    bool _aborted = false;
+    bool _dialogVisible = true;
+    final name = _externalFileName(path, displayName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(S.of(context).openingFile),
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 24),
+            Expanded(child: Text('${S.of(context).opening} $name ...')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _dialogVisible = false;
+              Navigator.of(context).pop();
+            },
+            child: Text(S.of(context).background),
+          ),
+          TextButton(
+            onPressed: () {
+              _dialogVisible = false;
+              Navigator.of(context).pop();
+              _aborted = true;
+            },
+            child: Text(S.of(context).abort),
+          ),
+        ],
+      ),
+    );
+
+    try {
+      final extension = _externalFileExtension(
+        path,
+        mimeType: mimeType,
+        displayName: displayName,
+      );
+      final pickedFile = await XppPickedFile.fromExternalPath(
+        path: path,
+        fileName: displayName,
+        fileExtension: extension,
+      );
+      final XppFile file;
+      final String? filePath;
+      if (extension == 'pdf') {
+        file = await XppFile.importPdf(pdf: pickedFile);
+        filePath = null;
+      } else {
+        file = await XppFile.fromXppPickedFile(
+          pickedFile,
+          (percentage) => null,
+          showMissingFileDialog,
+        );
+        filePath = pickedFile.path;
+      }
+      if (context.mounted) await file.prepareForOpening(context);
+      if (_aborted || !context.mounted) return;
+      if (_dialogVisible) Navigator.of(context, rootNavigator: true).pop();
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => CanvasPage(file: file, filePath: filePath),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      if (_dialogVisible) Navigator.of(context, rootNavigator: true).pop();
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(S.of(context).openingFile),
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 24),
-              Expanded(
-                child: Text(
-                  S.of(context).opening +
-                      ' ${data[0].path.substring(data[0].path.lastIndexOf('/') + 1, data[0].path.lastIndexOf('.'))} ...',
-                ),
-              ),
-            ],
+          title: Text(S.of(context).errorOpeningFile),
+          content: SelectableText(
+            S.of(context).imVerySorryButICouldntReadTheFile +
+                path +
+                S.of(context).areYouSureIHaveThePermissionAndAreYou +
+                '\n${e.toString()}',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(S.of(context).background),
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: e.toString())),
+              child: Text(S.of(context).copyErrorMessage),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _aborted = true;
-              },
-              child: Text(S.of(context).abort),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(S.of(context).okay),
             ),
           ],
         ),
       );
-      try {
-        XppFile file = await XppFile.fromXppPickedFile(
-          openFileByUri(_sharedFiles[0].path, 'xopp'),
-          (percentage) => null,
-          showMissingFileDialog,
-        );
-        if (context.mounted) await file.prepareForOpening(context);
-        if (_aborted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
-        );
-      } catch (e) {
-        try {
-          final file = await XppFile.importPdf(
-            pdf: openFileByUri(_sharedFiles[0].path, 'pdf'),
-          );
-          if (context.mounted) await file.prepareForOpening(context);
-          if (_aborted) return;
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
-          );
-        } catch (e) {
-          Navigator.of(context).pop();
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(S.of(context).errorOpeningFile),
-              content: SelectableText(
-                S.of(context).imVerySorryButICouldntReadTheFile +
-                    _sharedFiles[0].path +
-                    S.of(context).areYouSureIHaveThePermissionAndAreYou +
-                    '\n${e.toString()}',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: e.toString())),
-                  child: Text(S.of(context).copyErrorMessage),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(S.of(context).okay),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } else {
-      print('Unsupported runtimeType: ${data.runtimeType.toString()}');
     }
+  }
+
+  String _externalFileName(String path, String? displayName) {
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    final decoded = _decodeFileInfoForDisplay(path);
+    final lastSlash = decoded.lastIndexOf('/');
+    return lastSlash < 0 ? decoded : decoded.substring(lastSlash + 1);
+  }
+
+  String _externalFileExtension(
+    String path, {
+    String? mimeType,
+    String? displayName,
+  }) {
+    final name = _externalFileName(path, displayName).toLowerCase();
+    if (name.endsWith('.pdf') ||
+        mimeType == 'application/pdf' ||
+        mimeType == 'application/x-pdf') {
+      return 'pdf';
+    }
+    return 'xopp';
   }
 
   Iterable<Widget> generateRecentFileList(Set files, BuildContext context) {

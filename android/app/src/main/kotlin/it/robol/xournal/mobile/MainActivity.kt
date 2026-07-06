@@ -3,6 +3,7 @@ package it.robol.xournal.mobile
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -10,9 +11,11 @@ import java.io.FileOutputStream
 
 class MainActivity: FlutterActivity() {
     private val storageChannel = "it.robol.xournal.mobile/storage"
+    private val intentChannel = "it.robol.xournal.mobile/intent"
     private val createDocumentRequestCode = 49317
     private var pendingCreateResult: MethodChannel.Result? = null
     private var pendingCreateBytes: ByteArray? = null
+    private var openIntentChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -57,6 +60,21 @@ class MainActivity: FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        openIntentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, intentChannel)
+        openIntentChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialOpenIntent" -> result.success(openIntentPayload(intent))
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openIntentPayload(intent)?.let {
+            openIntentChannel?.invokeMethod("openIntent", it)
+        }
     }
 
     private fun createDocument(fileName: String, bytes: ByteArray, result: MethodChannel.Result) {
@@ -185,5 +203,46 @@ class MainActivity: FlutterActivity() {
         } catch (error: Exception) {
             result.error("write_failed", error.message, uri.toString())
         }
+    }
+
+    private fun openIntentPayload(intent: Intent?): Map<String, String?>? {
+        if (intent == null) return null
+        if (intent.action != Intent.ACTION_VIEW) return null
+
+        val uri = intent.data ?: return null
+        persistReadableIntentPermission(intent, uri)
+
+        return mapOf(
+            "uri" to uri.toString(),
+            "mimeType" to intent.type,
+            "displayName" to displayName(uri)
+        )
+    }
+
+    private fun persistReadableIntentPermission(intent: Intent, uri: Uri) {
+        val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if (flags == 0) return
+
+        try {
+            contentResolver.takePersistableUriPermission(uri, flags)
+        } catch (_: SecurityException) {
+        }
+    }
+
+    private fun displayName(uri: Uri): String? {
+        if (uri.scheme == "content") {
+            try {
+                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            if (index >= 0) return cursor.getString(index)
+                        }
+                    }
+            } catch (_: Exception) {
+            }
+        }
+
+        return uri.lastPathSegment
     }
 }

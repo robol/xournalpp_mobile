@@ -58,6 +58,19 @@ class XppPickedFile {
     );
   }
 
+  static Future<XppPickedFile> fromExternalPath({
+    required String path,
+    String? fileName,
+    String? fileExtension,
+  }) async {
+    return XppPickedFile(
+      await readFileBytes(path),
+      path: path,
+      fileName: fileName ?? _basename(path),
+      fileExtension: fileExtension ?? _extension(fileName ?? path),
+    );
+  }
+
   Future<String?> exportToStorage() async {
     final savedDocumentPath = await saveDocumentBytes(
       bytes,
