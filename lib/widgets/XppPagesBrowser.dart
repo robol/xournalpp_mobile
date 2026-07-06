@@ -35,11 +35,16 @@ class XppPagesBrowser extends StatelessWidget {
         ),
         SizedBox(
           width: 120,
-          child: Text(
-            '${currentPage + 1} / $pageCount',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
+          child: TextButton(
+            onPressed: pageCount > 0
+                ? () => _showJumpToPageDialog(context)
+                : null,
+            child: Text(
+              '${currentPage + 1} / $pageCount',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ),
@@ -63,5 +68,85 @@ class XppPagesBrowser extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _showJumpToPageDialog(BuildContext context) async {
+    final page = await showDialog<int>(
+      context: context,
+      builder: (context) =>
+          _JumpToPageDialog(initialPage: currentPage, pageCount: pageCount),
+    );
+
+    if (page == null || page == currentPage) return;
+    onPageChange?.call(page);
+  }
+}
+
+class _JumpToPageDialog extends StatefulWidget {
+  const _JumpToPageDialog({required this.initialPage, required this.pageCount});
+
+  final int initialPage;
+  final int pageCount;
+
+  @override
+  State<_JumpToPageDialog> createState() => _JumpToPageDialogState();
+}
+
+class _JumpToPageDialogState extends State<_JumpToPageDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.initialPage + 1}');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(S.of(context).movePage),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(
+            labelText: S.of(context).newPageIndex,
+            hintText: '1 - ${widget.pageCount}',
+          ),
+          validator: _validatePage,
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(S.of(context).cancel),
+        ),
+        TextButton(onPressed: _submit, child: Text(S.of(context).okay)),
+      ],
+    );
+  }
+
+  String? _validatePage(String? value) {
+    final page = int.tryParse(value?.trim() ?? '');
+    if (page == null || page < 1 || page > widget.pageCount) {
+      return '1 - ${widget.pageCount}';
+    }
+    return null;
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) return;
+    Navigator.of(context).pop(int.parse(_controller.text.trim()) - 1);
   }
 }
