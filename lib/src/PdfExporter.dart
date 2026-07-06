@@ -97,11 +97,6 @@ class _IncrementalPdfWriter {
     if (_trailer.containsKey('Encrypt')) {
       throw const PdfExportException('Encrypted PDFs are not supported.');
     }
-    if (_trailer.containsKey('Prev')) {
-      throw const PdfExportException(
-        'Incrementally updated PDFs are not supported yet.',
-      );
-    }
     _rootObject = _refNumber(_trailer['Root']);
     _pages = _loadPages();
   }
@@ -204,18 +199,43 @@ class _IncrementalPdfWriter {
       throw const PdfExportException('Could not find PDF startxref.');
     }
     _previousXrefOffset = int.parse(startxrefMatch.group(1)!);
-    if (!_text.startsWith('xref', _previousXrefOffset)) {
-      throw const PdfExportException('PDF xref streams are not supported.');
-    }
-
-    final trailerIndex = _text.indexOf('trailer', _previousXrefOffset);
-    if (trailerIndex < 0)
-      throw const PdfExportException('Could not find PDF trailer.');
 
     _offsets = {};
     var maxObject = 0;
+    _trailer = _parseXrefTableAt(
+      _previousXrefOffset,
+      visitedOffsets: <int>{},
+      onObject: (objectNumber, offset) {
+        _offsets[objectNumber] = offset;
+        maxObject = max(maxObject, objectNumber);
+      },
+    );
+    final trailerSize = int.tryParse(_trailer['Size'] ?? '');
+    _maxObjectNumber = max(
+      maxObject,
+      trailerSize == null ? 0 : trailerSize - 1,
+    );
+  }
+
+  Map<String, String> _parseXrefTableAt(
+    int xrefOffset, {
+    required Set<int> visitedOffsets,
+    required void Function(int objectNumber, int offset) onObject,
+  }) {
+    if (!visitedOffsets.add(xrefOffset)) {
+      throw const PdfExportException('Cyclic PDF xref chain.');
+    }
+    if (!_text.startsWith('xref', xrefOffset)) {
+      throw const PdfExportException('PDF xref streams are not supported.');
+    }
+
+    final trailerIndex = _text.indexOf('trailer', xrefOffset);
+    if (trailerIndex < 0)
+      throw const PdfExportException('Could not find PDF trailer.');
+
+    final localOffsets = <int, int>{};
     final lines = _text
-        .substring(_previousXrefOffset + 4, trailerIndex)
+        .substring(xrefOffset + 4, trailerIndex)
         .split(RegExp(r'\r?\n'));
     for (var i = 0; i < lines.length; i++) {
       final header = RegExp(r'^\s*(\d+)\s+(\d+)\s*$').firstMatch(lines[i]);
@@ -227,15 +247,26 @@ class _IncrementalPdfWriter {
         if (entry.length < 18) continue;
         if (entry.substring(17, 18) != 'n') continue;
         final objectNumber = first + j;
-        _offsets[objectNumber] = int.parse(entry.substring(0, 10));
-        maxObject = max(maxObject, objectNumber);
+        localOffsets[objectNumber] = int.parse(entry.substring(0, 10));
       }
     }
-    _maxObjectNumber = maxObject;
 
     final trailerStart = _text.indexOf('<<', trailerIndex);
     final trailerEnd = _matchingDictionaryEnd(_text, trailerStart);
-    _trailer = _dictionaryEntries(_text.substring(trailerStart, trailerEnd));
+    final trailer = _dictionaryEntries(
+      _text.substring(trailerStart, trailerEnd),
+    );
+    final previousXrefOffset = _integerValue(trailer['Prev']);
+    final previousTrailer = previousXrefOffset == null
+        ? <String, String>{}
+        : _parseXrefTableAt(
+            previousXrefOffset,
+            visitedOffsets: visitedOffsets,
+            onObject: onObject,
+          );
+
+    localOffsets.forEach(onObject);
+    return {...previousTrailer, ...trailer};
   }
 
   List<_PdfPageInfo> _loadPages() {
@@ -734,6 +765,11 @@ int _refNumber(String? value) {
   if (match == null)
     throw const PdfExportException('Expected an indirect PDF reference.');
   return int.parse(match.group(1)!);
+}
+
+int? _integerValue(String? value) {
+  final match = RegExp(r'^\d+$').firstMatch(value?.trim() ?? '');
+  return match == null ? null : int.parse(match.group(0)!);
 }
 
 List<int> _refsInArray(String? value) {
