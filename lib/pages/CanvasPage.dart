@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xournalpp/generated/l10n.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/PdfExporter.dart';
 import 'package:xournalpp/src/PdfImage.dart';
 import 'package:xournalpp/src/XppBackground.dart';
@@ -90,6 +91,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   bool savingFile = false;
   bool _allowPop = false;
   bool _currentPageUpdateScheduled = false;
+  bool _pdfBackgroundPrefetchScheduled = false;
+  int _pdfBackgroundPrefetchGeneration = 0;
   int _revision = 0;
   int _savedRevision = 0;
 
@@ -110,7 +113,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     loadToolSettings();
     _scheduleInputModeRefresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _scrollToPage(currentPage, animated: false);
+      if (!mounted) return;
+      _scrollToPage(currentPage, animated: false);
+      _schedulePdfBackgroundPrefetch();
     });
   }
 
@@ -332,6 +337,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final page = _file!.pages![pageIndex];
     final displayWidth = _pageDisplayWidth(viewportWidth);
     final displayHeight = displayWidth / page.pageSize!.ratio;
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final isActivePage = pageIndex == currentPage;
     final shouldRenderFullQuality = (pageIndex - currentPage).abs() <= 1;
 
@@ -403,6 +409,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                     rasterScale: pageScale,
                     keepAlive: false,
                     fullQualityBackground: shouldRenderFullQuality,
+                    backgroundTargetPixelWidth: displayWidth * devicePixelRatio,
+                    backgroundTargetPixelHeight:
+                        displayHeight * devicePixelRatio,
                     activeTool: isActivePage ? _activeTool : null,
                     selectedContents: isActivePage
                         ? _selectedContents
@@ -471,6 +480,88 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _selectedContents = {};
       _invalidateEraserIndex();
     });
+    _schedulePdfBackgroundPrefetch();
+  }
+
+  void _schedulePdfBackgroundPrefetch() {
+    if (_pdfBackgroundPrefetchScheduled) return;
+    _pdfBackgroundPrefetchScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pdfBackgroundPrefetchScheduled = false;
+      if (mounted) _prefetchPdfBackgroundWindow();
+    });
+  }
+
+  void _prefetchPdfBackgroundWindow() {
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return;
+
+    final generation = ++_pdfBackgroundPrefetchGeneration;
+    final fullQualityPages = <int>{
+      for (var i = currentPage - 1; i <= currentPage + 1; i++)
+        if (i >= 0 && i < pages.length) i,
+    };
+    final thumbnailPages = <int>{
+      for (var i = currentPage - 4; i <= currentPage + 4; i++)
+        if (i >= 0 && i < pages.length && !fullQualityPages.contains(i)) i,
+    };
+
+    for (final pageIndex in [currentPage, currentPage - 1, currentPage + 1]) {
+      if (!fullQualityPages.contains(pageIndex)) continue;
+      unawaited(
+        _prefetchPdfBackgroundPage(
+          pageIndex,
+          PdfBackgroundRenderVariant.full,
+          generation,
+        ),
+      );
+    }
+
+    for (final pageIndex in thumbnailPages) {
+      unawaited(
+        _prefetchPdfBackgroundPage(
+          pageIndex,
+          PdfBackgroundRenderVariant.thumbnail,
+          generation,
+        ),
+      );
+    }
+  }
+
+  Future<void> _prefetchPdfBackgroundPage(
+    int pageIndex,
+    PdfBackgroundRenderVariant variant,
+    int generation,
+  ) async {
+    final pages = _file?.pages;
+    if (pages == null || pageIndex < 0 || pageIndex >= pages.length) return;
+
+    final background = pages[pageIndex].background;
+    if (background is! XppBackgroundPdf) return;
+    final filename = background.filename;
+    if (filename == null || filename.isEmpty) return;
+
+    try {
+      final source = await pdfBackgroundRenderService.sourceForPath(
+        filename,
+        fallback: () => XppPickedFile.fromInternalPath(path: filename),
+      );
+      if (!mounted || generation != _pdfBackgroundPrefetchGeneration) return;
+      final pageSize = pages[pageIndex].pageSize!.toSize();
+      final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+      await pdfBackgroundRenderService.request(
+        source,
+        background.page,
+        variant,
+        targetWidth: pageSize.width * pageScale * devicePixelRatio,
+        targetHeight: pageSize.height * pageScale * devicePixelRatio,
+        priority: pageIndex == currentPage
+            ? PdfBackgroundRenderPriority.active
+            : PdfBackgroundRenderPriority.prefetch,
+      );
+    } catch (_) {
+      // Prefetch should never interrupt scrolling with missing-file UI.
+    }
   }
 
   void _scheduleCurrentPageFromScroll() {
@@ -1051,6 +1142,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       });
 
       _refreshPageStack(currentPage, _file!.pages![currentPage]);
+      _schedulePdfBackgroundPrefetch();
     });
   }
 
@@ -1589,6 +1681,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _pdfBackgroundPrefetchGeneration++;
     _zoomAnimationController.dispose();
     _pagesScrollController.dispose();
     _pagesHorizontalScrollController.dispose();

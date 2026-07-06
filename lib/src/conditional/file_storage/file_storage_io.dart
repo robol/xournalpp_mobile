@@ -64,6 +64,10 @@ Future<Uint8List?> readCacheFile(String key) async {
   return file.readAsBytes();
 }
 
+Future<bool> localPathExists(String path) {
+  return File(path).exists();
+}
+
 Future<String> writeCacheFile(String key, Uint8List bytes) async {
   final file = await _cacheFile(key);
   await file.parent.create(recursive: true);

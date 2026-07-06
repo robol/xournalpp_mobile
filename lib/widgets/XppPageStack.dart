@@ -29,6 +29,8 @@ class XppPageStack extends StatefulWidget {
   final VoidCallback? onDeleteSelection;
   final bool keepAlive;
   final bool fullQualityBackground;
+  final double? backgroundTargetPixelWidth;
+  final double? backgroundTargetPixelHeight;
 
   const XppPageStack({
     Key? key,
@@ -42,6 +44,8 @@ class XppPageStack extends StatefulWidget {
     this.onDeleteSelection,
     this.keepAlive = true,
     this.fullQualityBackground = true,
+    this.backgroundTargetPixelWidth,
+    this.backgroundTargetPixelHeight,
   }) : super(key: key);
 
   @override
@@ -75,16 +79,22 @@ class XppPageStackState extends State<XppPageStack>
       background = const SizedBox.shrink();
     } else if (_lastKnownBackground != pageBackground) {
       _lastKnownBackground = pageBackground;
-      final shouldRenderBackground =
-          widget.fullQualityBackground || pageBackground is! XppBackgroundPdf;
-      _isBackgroundLoading =
-          shouldRenderBackground && pageBackground is XppBackgroundPdf;
-      background = shouldRenderBackground
-          ? pageBackground.render(
-              onLoadingChanged: _handleBackgroundLoadingChanged,
-              fullQuality: widget.fullQualityBackground,
-            )
-          : const SizedBox.shrink();
+      _isBackgroundLoading = pageBackground is XppBackgroundPdf;
+      final pageSize = page!.pageSize!.toSize();
+      final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final targetPixelWidth =
+          widget.backgroundTargetPixelWidth ??
+          pageSize.width * widget.rasterScale * devicePixelRatio;
+      final targetPixelHeight =
+          widget.backgroundTargetPixelHeight ??
+          pageSize.height * widget.rasterScale * devicePixelRatio;
+      background = pageBackground.render(
+        onLoadingChanged: _handleBackgroundLoadingChanged,
+        fullQuality:
+            widget.fullQualityBackground || pageBackground is! XppBackgroundPdf,
+        targetPixelWidth: targetPixelWidth,
+        targetPixelHeight: targetPixelHeight,
+      );
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
     children.add(Positioned.fill(child: background));
@@ -218,7 +228,12 @@ class XppPageStackState extends State<XppPageStack>
   void didUpdateWidget(covariant XppPageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.page != oldWidget.page ||
-        widget.fullQualityBackground != oldWidget.fullQualityBackground) {
+        widget.fullQualityBackground != oldWidget.fullQualityBackground ||
+        widget.rasterScale != oldWidget.rasterScale ||
+        widget.backgroundTargetPixelWidth !=
+            oldWidget.backgroundTargetPixelWidth ||
+        widget.backgroundTargetPixelHeight !=
+            oldWidget.backgroundTargetPixelHeight) {
       setState(() {
         page = widget.page;
         _lastKnownBackground = null;

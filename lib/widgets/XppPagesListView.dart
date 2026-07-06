@@ -3,10 +3,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:xournalpp/generated/l10n.dart';
-import 'package:xournalpp/src/PdfImage.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppPage.dart';
-import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/widgets/ContextualBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 
@@ -214,16 +213,17 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
 
   Future<Uint8List> _loadPdfThumbnail() async {
     final filename = widget.background.filename;
-    if (filename != null && filename.isNotEmpty) {
-      try {
-        final file = await XppPickedFile.fromInternalPath(path: filename);
-        return pdfThumbnailImage(file, widget.background.page);
-      } catch (_) {
-        // Fall through to the missing-file callback below.
-      }
-    }
-
-    final file = await widget.background.onUnavailable(context, filename);
-    return pdfThumbnailImage(file, widget.background.page);
+    final source = await pdfBackgroundRenderService.sourceForPath(
+      filename,
+      fallback: () => widget.background.onUnavailable(context, filename),
+    );
+    return pdfBackgroundRenderService.request(
+      source,
+      widget.background.page,
+      PdfBackgroundRenderVariant.thumbnail,
+      targetWidth: widget.page.pageSize?.width,
+      targetHeight: widget.page.pageSize?.height,
+      priority: PdfBackgroundRenderPriority.prefetch,
+    );
   }
 }

@@ -1,11 +1,12 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:async';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/HexColor.dart';
-import 'package:xournalpp/src/PdfImage.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 
 import 'XppPage.dart';
 
@@ -18,6 +19,8 @@ abstract class XppBackground {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   });
 
   XmlElement toXmlElement();
@@ -40,6 +43,8 @@ class XppBackgroundImage extends XppBackground {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return Container(color: Colors.white);
   }
@@ -90,11 +95,15 @@ class XppBackgroundPdf extends XppBackground {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return (PDfBackgroundWidget(
       provider: this,
       onLoadingChanged: onLoadingChanged,
       fullQuality: fullQuality,
+      targetPixelWidth: targetPixelWidth,
+      targetPixelHeight: targetPixelHeight,
     ));
   }
 
@@ -115,12 +124,16 @@ class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
   final ValueChanged<bool>? onLoadingChanged;
   final bool fullQuality;
+  final double? targetPixelWidth;
+  final double? targetPixelHeight;
 
   const PDfBackgroundWidget({
     Key? key,
     this.provider,
     this.onLoadingChanged,
     this.fullQuality = true,
+    this.targetPixelWidth,
+    this.targetPixelHeight,
   }) : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
@@ -128,31 +141,99 @@ class PDfBackgroundWidget extends StatefulWidget {
 
 class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
-  Future<Uint8List>? _imageFuture;
+  StreamSubscription<PdfBackgroundRenderSnapshot>? _renderSubscription;
+  Uint8List? _imageBytes;
+  Object? _error;
   bool _isLoading = false;
+  int _requestGeneration = 0;
+  String? _subscribedKey;
 
-  Future<Uint8List> _loadPdfImage(XppBackgroundPdf provider) async {
+  Future<PdfBackgroundRenderSource> _loadPdfSource(
+    XppBackgroundPdf provider,
+  ) async {
     final filename = provider.filename;
-    if (filename != null && filename.isNotEmpty) {
-      try {
-        final file = await XppPickedFile.fromInternalPath(path: filename);
-        return widget.fullQuality
-            ? pdfImage(file, provider.page)
-            : pdfThumbnailImage(file, provider.page);
-      } catch (_) {
-        // Fall through to the missing-file callback below.
-      }
-    }
-
-    final file = await provider.onUnavailable(context, filename);
-    return widget.fullQuality
-        ? pdfImage(file, provider.page)
-        : pdfThumbnailImage(file, provider.page);
+    return pdfBackgroundRenderService.sourceForPath(
+      filename,
+      fallback: () => provider.onUnavailable(context, filename),
+    );
   }
 
-  Future<Uint8List> _startLoading(XppBackgroundPdf provider) {
+  Future<void> _startLoading(XppBackgroundPdf provider) async {
+    final generation = ++_requestGeneration;
     _setLoading(true);
-    return _loadPdfImage(provider).whenComplete(() => _setLoading(false));
+    setState(() {
+      _imageBytes = null;
+      _error = null;
+    });
+
+    try {
+      final source = await _loadPdfSource(provider);
+      if (!mounted || generation != _requestGeneration) return;
+
+      final variant = widget.fullQuality
+          ? PdfBackgroundRenderVariant.full
+          : PdfBackgroundRenderVariant.thumbnail;
+      final key = pdfBackgroundRenderService.keyFor(
+        source,
+        provider.page,
+        variant,
+        targetWidth: widget.targetPixelWidth,
+        targetHeight: widget.targetPixelHeight,
+      );
+      _subscribeToKey(key, generation);
+
+      final cached = pdfBackgroundRenderService.peek(key);
+      if (cached != null) {
+        _applyImage(cached);
+        return;
+      }
+
+      final bytes = await pdfBackgroundRenderService.request(
+        source,
+        provider.page,
+        variant,
+        targetWidth: widget.targetPixelWidth,
+        targetHeight: widget.targetPixelHeight,
+        priority: widget.fullQuality
+            ? PdfBackgroundRenderPriority.active
+            : PdfBackgroundRenderPriority.visible,
+      );
+      if (!mounted || generation != _requestGeneration) return;
+      _applyImage(bytes);
+    } catch (error) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() {
+        _error = error;
+        _imageBytes = null;
+      });
+    } finally {
+      if (mounted && generation == _requestGeneration) _setLoading(false);
+    }
+  }
+
+  void _subscribeToKey(String key, int generation) {
+    if (_subscribedKey == key) return;
+    _renderSubscription?.cancel();
+    _subscribedKey = key;
+    _renderSubscription = pdfBackgroundRenderService.watch(key).listen((
+      snapshot,
+    ) {
+      if (!mounted || generation != _requestGeneration) return;
+      if (snapshot.bytes != null) {
+        _applyImage(snapshot.bytes!);
+      } else if (snapshot.error != null) {
+        setState(() => _error = snapshot.error);
+      }
+      _setLoading(snapshot.isLoading);
+    });
+  }
+
+  void _applyImage(Uint8List bytes) {
+    if (!mounted) return;
+    setState(() {
+      _imageBytes = bytes;
+      _error = null;
+    });
   }
 
   void _setLoading(bool isLoading) {
@@ -169,16 +250,15 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     super.build(context);
     final provider = widget.provider;
     if (provider == null) return const SizedBox.shrink();
-    _imageFuture ??= _startLoading(provider);
+    if (_requestGeneration == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startLoading(provider);
+      });
+    }
 
-    return FutureBuilder(
-      future: _imageFuture,
-      builder: (context, AsyncSnapshot<Uint8List> snapshot) {
-        if (snapshot.hasData) return Image.memory(snapshot.data!);
-        if (snapshot.hasError) return const Icon(Icons.picture_as_pdf);
-        return const Center(child: CircularProgressIndicator());
-      },
-    );
+    if (_imageBytes != null) return Image.memory(_imageBytes!);
+    if (_error != null) return const Icon(Icons.picture_as_pdf);
+    return const Center(child: CircularProgressIndicator());
   }
 
   @override
@@ -188,9 +268,27 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.provider != oldWidget.provider ||
-        widget.fullQuality != oldWidget.fullQuality) {
-      _imageFuture = null;
+        widget.fullQuality != oldWidget.fullQuality ||
+        widget.targetPixelWidth != oldWidget.targetPixelWidth ||
+        widget.targetPixelHeight != oldWidget.targetPixelHeight) {
+      _renderSubscription?.cancel();
+      _renderSubscription = null;
+      _subscribedKey = null;
+      _requestGeneration++;
+      final provider = widget.provider;
+      if (provider != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _startLoading(provider);
+        });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+    _renderSubscription?.cancel();
+    super.dispose();
   }
 }
 
@@ -219,6 +317,8 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return _RasterizedSolidBackground(
       style: 'lined',
@@ -241,6 +341,8 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return _RasterizedSolidBackground(
       style: 'ruled',
@@ -263,6 +365,8 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return _RasterizedSolidBackground(
       style: 'graph',
@@ -285,6 +389,8 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return _RasterizedSolidBackground(
       style: 'dotted',
@@ -307,6 +413,8 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) {
     return Container(
       width: size!.width,
@@ -327,6 +435,8 @@ class _NoXppBackground extends XppBackground {
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
     bool fullQuality = true,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
   }) => Container(color: Colors.white);
 
   @override

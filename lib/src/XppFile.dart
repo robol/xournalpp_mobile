@@ -16,6 +16,7 @@ import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/HexColor.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/PdfImage.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/globals.dart';
@@ -70,23 +71,48 @@ class XppFile {
     final selectedPage = pages![currentPage.clamp(0, pages!.length - 1)];
     final selectedBackground = selectedPage.background;
     if (selectedBackground is XppBackgroundPdf) {
-      final pdf = await _pdfFileForBackground(context, selectedBackground);
-      await pdfImage(pdf, selectedBackground.page);
+      final source = await _pdfSourceForBackground(context, selectedBackground);
+      await pdfBackgroundRenderService.request(
+        source,
+        selectedBackground.page,
+        PdfBackgroundRenderVariant.full,
+        targetWidth: selectedPage.pageSize?.width,
+        targetHeight: selectedPage.pageSize?.height,
+        priority: PdfBackgroundRenderPriority.active,
+      );
     }
 
     final visibleCount = pages!.length < thumbnailCount
         ? pages!.length
         : thumbnailCount;
     for (var i = 0; i < visibleCount; i++) {
-      final background = pages![i].background;
+      final page = pages![i];
+      final background = page.background;
       if (background is! XppBackgroundPdf) continue;
       unawaited(
-        _pdfFileForBackground(
-          context,
-          background,
-        ).then((pdf) => pdfThumbnailImage(pdf, background.page)),
+        _pdfSourceForBackground(context, background).then(
+          (source) => pdfBackgroundRenderService.request(
+            source,
+            background.page,
+            PdfBackgroundRenderVariant.thumbnail,
+            targetWidth: page.pageSize?.width,
+            targetHeight: page.pageSize?.height,
+            priority: PdfBackgroundRenderPriority.prefetch,
+          ),
+        ),
       );
     }
+  }
+
+  Future<PdfBackgroundRenderSource> _pdfSourceForBackground(
+    BuildContext context,
+    XppBackgroundPdf background,
+  ) {
+    final filename = background.filename;
+    return pdfBackgroundRenderService.sourceForPath(
+      filename,
+      fallback: () => _pdfFileForBackground(context, background),
+    );
   }
 
   Future<XppPickedFile> _pdfFileForBackground(
