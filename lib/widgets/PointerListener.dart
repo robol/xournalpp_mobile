@@ -32,6 +32,7 @@ class PointerListener extends StatefulWidget {
   final VoidCallback? onSwipeLeft;
   final VoidCallback? onSwipeRight;
   final VoidCallback? onPointerActivity;
+  final void Function(Offset delta)? onPan;
 
   const PointerListener({
     Key? key,
@@ -57,6 +58,7 @@ class PointerListener extends StatefulWidget {
     this.onSwipeLeft,
     this.onSwipeRight,
     this.onPointerActivity,
+    this.onPan,
   }) : super(key: key);
 
   @override
@@ -94,6 +96,9 @@ class PointerListenerState extends State<PointerListener> {
   bool _movingSelection = false;
   Offset? _pageSwipeStart;
   int? _pageSwipePointerDevice;
+  Offset? _panLastPosition;
+  int? _panPointer;
+  bool _twoFingerPanning = false;
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +111,7 @@ class PointerListenerState extends State<PointerListener> {
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
           widget.onPointerActivity?.call();
+          if (_updatePan(data)) return;
           if (_detectTwoFingerGesture(data)) return;
           _updatePageSwipe(data);
           notifyDeviceChange(data);
@@ -122,12 +128,20 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerDown: (data) {
           widget.onPointerActivity?.call();
-          if (_detectTwoFingerGesture(data, shouldPop: true)) return;
+          if (_detectTwoFingerGesture(data, shouldPop: true)) {
+            _startPan(data, twoFinger: true);
+            return;
+          }
 
           setState(() {
             activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
+          if (activeEditingTool == EditingTool.MOVE) {
+            _startPan(data);
+            notifyDeviceChange(data);
+            return;
+          }
           _startPageSwipe(data);
           notifyDeviceChange(data);
           if (isSelect(data)) {
@@ -151,6 +165,9 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
+          if (_finishPan(data)) {
+            poppedContentForCurrentPointer = true;
+          }
           final changedPage = _finishPageSwipe(data);
           if (changedPage) {
             poppedContentForCurrentPointer = true;
@@ -171,6 +188,7 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerCancel: (data) {
+          _finishPan(data);
           _cancelPageSwipe(data);
           if (activeEditingTool == EditingTool.LASER) {
             finishLaserPreview();
@@ -245,6 +263,34 @@ class PointerListenerState extends State<PointerListener> {
 
   bool _consumeContentPointerDown(PointerDownEvent event) =>
       _contentPointerDownDevices.remove(event.device);
+
+  void _startPan(PointerEvent data, {bool twoFinger = false}) {
+    _panLastPosition = data.localPosition;
+    _panPointer = data.pointer;
+    _twoFingerPanning = twoFinger;
+  }
+
+  bool _updatePan(PointerMoveEvent data) {
+    if (_panLastPosition == null) return false;
+    if (_panPointer != data.pointer) return _twoFingerPanning;
+    final delta = data.localPosition - _panLastPosition!;
+    _panLastPosition = data.localPosition;
+    widget.onPan?.call(delta);
+    return true;
+  }
+
+  bool _finishPan(PointerEvent data) {
+    if (_panPointer != null && _panPointer != data.pointer) {
+      pointerTimestamps.remove(data.pointer);
+      return false;
+    }
+    final wasPanning = _panLastPosition != null || _twoFingerPanning;
+    _panLastPosition = null;
+    _panPointer = null;
+    _twoFingerPanning = false;
+    pointerTimestamps.remove(data.pointer);
+    return wasPanning;
+  }
 
   Rect? get _selectionRect {
     if (!_dragSelecting ||
@@ -554,7 +600,7 @@ class PointerListenerState extends State<PointerListener> {
     // detecting two-finger gestures
     final timestamp = DateTime.now();
     bool foundCloseOffset = false;
-    pointerTimestamps.remove(data.device);
+    pointerTimestamps.remove(data.pointer);
     pointerTimestamps.forEach((key, value) {
       if (value.difference(timestamp).inMilliseconds.abs() < 100) {
         foundCloseOffset = true;
@@ -563,7 +609,7 @@ class PointerListenerState extends State<PointerListener> {
     if (shouldPop && foundCloseOffset && !poppedContentForCurrentPointer) {
       poppedContentForCurrentPointer = true;
     }
-    pointerTimestamps[data.device] = timestamp;
+    pointerTimestamps[data.pointer] = timestamp;
     return foundCloseOffset;
   }
 

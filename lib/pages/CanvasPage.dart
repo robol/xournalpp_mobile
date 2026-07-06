@@ -5,13 +5,11 @@ import 'dart:ui';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
-import 'package:vector_math/vector_math_64.dart' show Vector3, Vector4;
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/PdfImage.dart';
 import 'package:xournalpp/src/XppBackground.dart';
@@ -26,7 +24,6 @@ import 'package:xournalpp/widgets/PointerListener.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
-import 'package:xournalpp/widgets/ZoomableWidget.dart';
 
 class CanvasPage extends StatefulWidget {
   CanvasPage({Key? key, this.file, this.filePath, this.initialPage = 0})
@@ -45,7 +42,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _defaultToolColor = 0xFF336699;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
   static const Color _laserColor = Colors.redAccent;
-  static const double _fitWidthHorizontalMargin = 50;
   static const double _penMinWidth = 0.1;
   static const double _penMaxWidth = 3;
   static const int _penWidthDivisions = 29;
@@ -70,8 +66,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double eraserWidth = 20;
   bool drawWithStylusOnly = false;
 
-  TransformationController _zoomController = TransformationController();
-
   Map<PointerDeviceKind?, EditingTool> _toolData = {};
   PointerDeviceKind? _currentDevice = PointerDeviceKind.touch;
 
@@ -80,9 +74,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final Map<int, GlobalKey<PointerListenerState>> _pointerListenerKeys = {};
   final Map<int, GlobalKey> _pageItemKeys = {};
   final GlobalKey<EditingToolBarState> _editingToolbarKey = GlobalKey();
-  final GlobalKey<ZoomableWidgetState> _zoomableKey = GlobalKey();
   final GlobalKey _pagesViewportKey = GlobalKey();
   final ScrollController _pagesScrollController = ScrollController();
+  final ScrollController _pagesHorizontalScrollController = ScrollController();
 
   double pageScale = 1;
   double _lastViewportWidth = 0;
@@ -98,17 +92,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   Set<XppContent> _selectedContents = {};
   List<_SelectionMoveOriginal>? _selectionMoveOriginals;
 
-  Animation<Matrix4>? _animationReset;
-  late AnimationController _controllerReset;
-
   @override
   void initState() {
     _setMetadata();
     super.initState();
-    _controllerReset = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
     _pagesScrollController.addListener(_scheduleCurrentPageFromScroll);
     loadToolSettings();
     _scheduleInputModeRefresh();
@@ -140,18 +127,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           children: [
             Hero(
               tag: 'ZoomArea',
-              child: ZoomableWidget(
-                key: _zoomableKey,
-                controller: _zoomController,
-                pointerScrollPans: false,
-                onInteractionStart: _onInteractionStart,
-                onInteractionUpdate: (details) {
-                  //print(details);
-                  _updatePageScale();
-                },
-                onTransformationChanged: _updatePageScale,
-                child: _buildScrollablePages(),
-              ),
+              child: _buildScrollablePages(),
               /*ColorFiltered(
                   colorFilter: ColorFilter.mode(
                       Theme.of(context).colorScheme.surface.withOpacity(.5),
@@ -301,22 +277,32 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     return LayoutBuilder(
       builder: (context, constraints) {
         _lastViewportWidth = constraints.maxWidth;
-        return Container(
+        final contentWidth = max(
+          constraints.maxWidth,
+          _pageDisplayWidth(constraints.maxWidth) + _pageHorizontalPadding * 2,
+        );
+        return SingleChildScrollView(
           key: _pagesViewportKey,
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              _scheduleCurrentPageFromScroll();
-              return false;
-            },
-            child: ListView.builder(
-              controller: _pagesScrollController,
-              padding: const EdgeInsets.symmetric(vertical: _pageGap),
-              scrollCacheExtent: ScrollCacheExtent.pixels(
-                _estimatedPageExtent(_lastViewportWidth) * 1.5,
+          controller: _pagesHorizontalScrollController,
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: contentWidth,
+            height: constraints.maxHeight,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                _scheduleCurrentPageFromScroll();
+                return false;
+              },
+              child: ListView.builder(
+                controller: _pagesScrollController,
+                padding: const EdgeInsets.symmetric(vertical: _pageGap),
+                scrollCacheExtent: ScrollCacheExtent.pixels(
+                  _estimatedPageExtent(_lastViewportWidth) * 1.5,
+                ),
+                itemCount: pages.length,
+                itemBuilder: (context, index) =>
+                    _buildScrollablePage(context, index, _lastViewportWidth),
               ),
-              itemCount: pages.length,
-              itemBuilder: (context, index) =>
-                  _buildScrollablePage(context, index, _lastViewportWidth),
             ),
           ),
         );
@@ -330,7 +316,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     double viewportWidth,
   ) {
     final page = _file!.pages![pageIndex];
-    final displayWidth = max(1.0, viewportWidth - _pageHorizontalPadding * 2);
+    final displayWidth = _pageDisplayWidth(viewportWidth);
     final displayHeight = displayWidth / page.pageSize!.ratio;
     final isActivePage = pageIndex == currentPage;
 
@@ -351,7 +337,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             child: FittedBox(
               child: PointerListener(
                 key: _pointerListenerKeyFor(pageIndex),
-                translationMatrix: _zoomController.value,
                 toolData: _toolData,
                 strokeWidth: toolWidth,
                 highlighterWidth: highlighterWidth,
@@ -361,6 +346,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 laserColor: _laserColor,
                 drawWithStylusOnly: drawWithStylusOnly,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
+                onPan: _panPages,
                 onDeviceChange: _handleDeviceChange,
                 filterEraser: ({Offset? coordinates, double? radius}) {
                   _activatePageForEditing(pageIndex);
@@ -533,12 +519,42 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     }
   }
 
+  void _panPages(Offset delta) {
+    if (_pagesHorizontalScrollController.hasClients) {
+      final horizontal = _pagesHorizontalScrollController.position;
+      final target = (horizontal.pixels - delta.dx)
+          .clamp(horizontal.minScrollExtent, horizontal.maxScrollExtent)
+          .toDouble();
+      if (target != horizontal.pixels) {
+        _pagesHorizontalScrollController.jumpTo(target);
+      }
+    }
+
+    if (_pagesScrollController.hasClients) {
+      final vertical = _pagesScrollController.position;
+      final target = (vertical.pixels - delta.dy)
+          .clamp(vertical.minScrollExtent, vertical.maxScrollExtent)
+          .toDouble();
+      if (target != vertical.pixels) {
+        _pagesScrollController.jumpTo(target);
+      }
+    }
+  }
+
+  void _clampHorizontalScroll() {
+    if (!_pagesHorizontalScrollController.hasClients) return;
+    final horizontal = _pagesHorizontalScrollController.position;
+    final target = horizontal.pixels
+        .clamp(horizontal.minScrollExtent, horizontal.maxScrollExtent)
+        .toDouble();
+    if (target != horizontal.pixels) {
+      _pagesHorizontalScrollController.jumpTo(target);
+    }
+  }
+
   double _pageScrollOffset(int pageIndex) {
     final pages = _file?.pages ?? <XppPage>[];
-    final displayWidth = max(
-      1.0,
-      _lastViewportWidth - _pageHorizontalPadding * 2,
-    );
+    final displayWidth = _pageDisplayWidth(_lastViewportWidth);
     var offset = _pageGap;
     for (var i = 0; i < pageIndex && i < pages.length; i++) {
       offset += displayWidth / pages[i].pageSize!.ratio + _pageGap;
@@ -549,8 +565,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double _estimatedPageExtent(double viewportWidth) {
     final pages = _file?.pages;
     if (pages == null || pages.isEmpty) return 800;
-    final displayWidth = max(1.0, viewportWidth - _pageHorizontalPadding * 2);
+    final displayWidth = _pageDisplayWidth(viewportWidth);
     return displayWidth / pages[currentPage].pageSize!.ratio + _pageGap;
+  }
+
+  double _pageDisplayWidth(double viewportWidth) {
+    return max(1.0, viewportWidth - _pageHorizontalPadding * 2) * pageScale;
   }
 
   void _refreshPageStack(int pageIndex, XppPage page) {
@@ -764,18 +784,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _setZoomableState() {
     final activeTool = _toolData[_currentDevice];
-    final zoomEnabled =
+    final scrollingEnabled =
         activeTool == null ||
         activeTool == EditingTool.MOVE ||
         (drawWithStylusOnly &&
             _currentDevice == PointerDeviceKind.touch &&
             _isDrawingTool(activeTool));
-    _zoomableKey.currentState!.setState(
-      () => _zoomableKey.currentState!.enabled = zoomEnabled,
-    );
     for (final key in _pointerListenerKeys.values) {
       key.currentState?.setState(() {
-        key.currentState!.drawingEnabled = !zoomEnabled;
+        key.currentState!.drawingEnabled = !scrollingEnabled;
       });
     }
   }
@@ -797,86 +814,20 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         tool == EditingTool.LASER;
   }
 
-  void _updatePageScale() {
-    setState(() => pageScale = _zoomController.value.getMaxScaleOnAxis());
-  }
-
-  void _setScale(double newZoom, {animate = true}) {
+  void _setScale(double newZoom) {
     newZoom = max(.1, min(5, newZoom));
     if (newZoom != pageScale) {
-      pageScale = newZoom;
-      final scaledMatrix = _scaleAroundViewportCenter(newZoom);
-      if (animate) {
-        _animateTransformation(scaledMatrix);
-      } else {
-        _zoomController.value = scaledMatrix;
-      }
-      setState(() {});
+      setState(() => pageScale = newZoom);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scrollToPage(currentPage, animated: false);
+        _clampHorizontalScroll();
+      });
     }
-  }
-
-  Matrix4 _scaleAroundViewportCenter(double targetScale) {
-    final viewportObject = _zoomableKey.currentContext?.findRenderObject();
-    if (viewportObject is! RenderBox) {
-      return _zoomController.value.clone()
-        ..setDiagonal(Vector4(targetScale, targetScale, 1, 1));
-    }
-
-    final matrix = _zoomController.value;
-    final currentScale = matrix.getMaxScaleOnAxis();
-    if (currentScale <= 0) {
-      return matrix.clone()
-        ..setDiagonal(Vector4(targetScale, targetScale, 1, 1));
-    }
-
-    final scaleRatio = targetScale / currentScale;
-    final focalPoint = viewportObject.size.center(Offset.zero);
-    final currentX = matrix.entry(0, 3);
-    final currentY = matrix.entry(1, 3);
-
-    return Matrix4.identity()
-      ..setDiagonal(Vector4(targetScale, targetScale, 1, 1))
-      ..setTranslation(
-        Vector3(
-          focalPoint.dx - (focalPoint.dx - currentX) * scaleRatio,
-          focalPoint.dy - (focalPoint.dy - currentY) * scaleRatio,
-          0,
-        ),
-      );
   }
 
   void _fitPageToWidth() {
-    final viewportObject = _zoomableKey.currentContext?.findRenderObject();
-    final pageObject = _currentPageStackKey.currentContext?.findRenderObject();
-    if (viewportObject is! RenderBox || pageObject is! RenderBox) return;
-
-    final pageLeft = pageObject.localToGlobal(Offset.zero).dx;
-    final pageRight = pageObject
-        .localToGlobal(Offset(pageObject.size.width, 0))
-        .dx;
-    final currentPageWidth = (pageRight - pageLeft).abs();
-    final currentScale = _zoomController.value.getMaxScaleOnAxis();
-    if (currentPageWidth <= 0 || currentScale <= 0) return;
-
-    final unzoomedPageWidth = currentPageWidth / currentScale;
-    final targetWidth = max(
-      1.0,
-      viewportObject.size.width - _fitWidthHorizontalMargin * 2,
-    );
-    final targetScale = max(0.1, min(5.0, targetWidth / unzoomedPageWidth));
-    final centeredTransform = Matrix4.identity()
-      ..setDiagonal(Vector4(targetScale, targetScale, 1, 1))
-      ..setTranslation(
-        Vector3(
-          viewportObject.size.width * (1 - targetScale) / 2,
-          viewportObject.size.height * (1 - targetScale) / 2,
-          0,
-        ),
-      );
-
-    pageScale = targetScale;
-    _animateTransformation(centeredTransform);
-    setState(() {});
+    _setScale(1.0);
   }
 
   void _eraseContentAt({Offset? coordinates, double? radius}) {
@@ -1469,41 +1420,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     }
   }
 
-  void _onAnimationReset() {
-    _zoomController.value = _animationReset!.value;
-    if (!_controllerReset.isAnimating) {
-      _animationReset?.removeListener(_onAnimationReset);
-      _animationReset = null;
-      _controllerReset.reset();
-    }
-  }
-
-  void _animateTransformation(Matrix4 animateTo) {
-    _controllerReset.reset();
-    _animationReset = Matrix4Tween(
-      begin: _zoomController.value,
-      end: animateTo,
-    ).animate(_controllerReset);
-    _animationReset!.addListener(_onAnimationReset);
-    _controllerReset.forward();
-  }
-
-  void _onInteractionStart(ScaleStartDetails details) {
-    // If the user tries to cause a transformation while the reset animation is
-    // running, cancel the reset animation.
-    if (_controllerReset.status == AnimationStatus.forward) {
-      _controllerReset.stop();
-      _animationReset?.removeListener(_onAnimationReset);
-      _animationReset = null;
-      // assign animateTo value to skip to end
-      // _zoomController.value = _animateTo;
-    }
-  }
-
   @override
   void dispose() {
     _pagesScrollController.dispose();
-    _controllerReset.dispose();
+    _pagesHorizontalScrollController.dispose();
     super.dispose();
   }
 
