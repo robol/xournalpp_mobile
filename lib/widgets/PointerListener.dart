@@ -31,6 +31,7 @@ class PointerListener extends StatefulWidget {
   final void Function(Offset delta, {bool done})? onSelectionMove;
   final VoidCallback? onSwipeLeft;
   final VoidCallback? onSwipeRight;
+  final VoidCallback? onPointerActivity;
 
   const PointerListener({
     Key? key,
@@ -55,6 +56,7 @@ class PointerListener extends StatefulWidget {
     this.onSelectionMove,
     this.onSwipeLeft,
     this.onSwipeRight,
+    this.onPointerActivity,
   }) : super(key: key);
 
   @override
@@ -103,6 +105,7 @@ class PointerListenerState extends State<PointerListener> {
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
+          widget.onPointerActivity?.call();
           if (_detectTwoFingerGesture(data)) return;
           _updatePageSwipe(data);
           notifyDeviceChange(data);
@@ -118,6 +121,7 @@ class PointerListenerState extends State<PointerListener> {
           if (isEraser(data)) eraseAt(data);
         },
         onPointerDown: (data) {
+          widget.onPointerActivity?.call();
           if (_detectTwoFingerGesture(data, shouldPop: true)) return;
 
           setState(() {

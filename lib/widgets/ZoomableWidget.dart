@@ -11,6 +11,7 @@ class ZoomableWidget extends StatefulWidget {
   final GestureScaleUpdateCallback? onInteractionUpdate;
   final GestureScaleStartCallback? onInteractionStart;
   final VoidCallback? onTransformationChanged;
+  final bool pointerScrollPans;
 
   const ZoomableWidget({
     Key? key,
@@ -19,6 +20,7 @@ class ZoomableWidget extends StatefulWidget {
     this.onInteractionUpdate,
     this.onInteractionStart,
     this.onTransformationChanged,
+    this.pointerScrollPans = true,
   }) : super(key: key);
 
   @override
@@ -75,6 +77,8 @@ class ZoomableWidgetState extends State<ZoomableWidget> {
       _zoomByScroll(event);
       return;
     }
+
+    if (!widget.pointerScrollPans) return;
 
     final matrix = widget.controller!.value.clone();
     matrix.setTranslation(

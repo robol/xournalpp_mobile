@@ -7,6 +7,7 @@ import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
@@ -54,6 +55,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const double _eraserMinWidth = 1;
   static const double _eraserMaxWidth = 20;
   static const int _eraserWidthDivisions = 19;
+  static const double _pageGap = 24;
+  static const double _pageHorizontalPadding = 16;
 
   XppFile? _file;
   String? filePath;
@@ -73,12 +76,16 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   PointerDeviceKind? _currentDevice = PointerDeviceKind.touch;
 
   /// used fro parent-child communication
-  final GlobalKey<XppPageStackState> _pageStackKey = GlobalKey();
+  final Map<int, GlobalKey<XppPageStackState>> _pageStackKeys = {};
+  final Map<int, GlobalKey<PointerListenerState>> _pointerListenerKeys = {};
+  final Map<int, GlobalKey> _pageItemKeys = {};
   final GlobalKey<EditingToolBarState> _editingToolbarKey = GlobalKey();
-  final GlobalKey<PointerListenerState> _pointerListenerKey = GlobalKey();
   final GlobalKey<ZoomableWidgetState> _zoomableKey = GlobalKey();
+  final GlobalKey _pagesViewportKey = GlobalKey();
+  final ScrollController _pagesScrollController = ScrollController();
 
   double pageScale = 1;
+  double _lastViewportWidth = 0;
 
   bool savingFile = false;
   bool _allowPop = false;
@@ -101,8 +108,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
+    _pagesScrollController.addListener(_scheduleCurrentPageFromScroll);
     loadToolSettings();
     _scheduleInputModeRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToPage(currentPage, animated: false);
+    });
   }
 
   @override
@@ -131,100 +142,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               child: ZoomableWidget(
                 key: _zoomableKey,
                 controller: _zoomController,
+                pointerScrollPans: false,
                 onInteractionStart: _onInteractionStart,
                 onInteractionUpdate: (details) {
                   //print(details);
                   _updatePageScale();
                 },
                 onTransformationChanged: _updatePageScale,
-                child: Center(
-                  child: Card(
-                    elevation: 12,
-                    color: Colors.white,
-                    child: AspectRatio(
-                      aspectRatio: _file!.pages![currentPage].pageSize!.ratio,
-                      child: FittedBox(
-                        child: PointerListener(
-                          key: _pointerListenerKey,
-                          translationMatrix: _zoomController.value,
-                          toolData: _toolData,
-                          strokeWidth: toolWidth,
-                          highlighterWidth: highlighterWidth,
-                          eraserWidth: eraserWidth,
-                          color: toolColor,
-                          highlighterColor: highlighterColor,
-                          laserColor: _laserColor,
-                          drawWithStylusOnly: drawWithStylusOnly,
-                          onDeviceChange: _handleDeviceChange,
-                          filterEraser:
-                              ({Offset? coordinates, double? radius}) {
-                                _eraseContentAt(
-                                  coordinates: coordinates,
-                                  radius: radius,
-                                );
-                              },
-                          filterEraserPath:
-                              ({List<Offset>? coordinates, double? radius}) {
-                                _eraseContentAlongPath(
-                                  coordinates: coordinates,
-                                  radius: radius,
-                                );
-                              },
-                          onSelectionRegionChange: _selectRegion,
-                          onSelectionClear: _clearSelection,
-                          shouldMoveSelection: _shouldMoveSelection,
-                          onSelectionMove: _moveSelection,
-                          onSwipeLeft: () => _switchToPage(currentPage + 1),
-                          onSwipeRight: () => _switchToPage(currentPage - 1),
-                          onNewContent: (newContent) {
-                            if (newContent == null) return;
-
-                            /// TODO: manage layers
-                            final page = _file!.pages![currentPage];
-                            final layer = page.layers![0];
-                            setState(() {
-                              final content = List<XppContent?>.from(
-                                layer.content!,
-                              )..add(newContent);
-                              layer.content = content;
-                              _undoStack.add(
-                                _UndoEntry([
-                                  _LayerOperation.added(
-                                    page: page,
-                                    layer: layer,
-                                    content: newContent,
-                                    index: content.length - 1,
-                                  ),
-                                ]),
-                              );
-                              _markDirty();
-                            });
-                            _eraserIndex?.add(newContent);
-
-                            _pageStackKey.currentState!.setPageData(page);
-                          },
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: XppPageStack(
-                              /// to communicate from [PointerListener] to [XppPageStack]
-                              key: _pageStackKey,
-                              page: _file!.pages![currentPage],
-                              rasterScale: pageScale,
-                              activeTool: _activeTool,
-                              selectedContents: _selectedContents,
-                              onSelectContent: _selectContent,
-                              onDeleteSelection: _deleteSelection,
-                              onReplaceContent: _replaceContent,
-                              onContentPointerDown: (event) =>
-                                  _pointerListenerKey.currentState
-                                      ?.markContentPointerDown(event),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                child: _buildScrollablePages(),
               ),
               /*ColorFiltered(
                   colorFilter: ColorFilter.mode(
@@ -365,6 +290,296 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     currentPage = widget.initialPage
         .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
         .toInt();
+  }
+
+  GlobalKey<XppPageStackState> get _currentPageStackKey =>
+      _pageStackKeyFor(currentPage);
+
+  Widget _buildScrollablePages() {
+    final pages = _file?.pages ?? <XppPage>[];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _lastViewportWidth = constraints.maxWidth;
+        return Container(
+          key: _pagesViewportKey,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              _scheduleCurrentPageFromScroll();
+              return false;
+            },
+            child: ListView.builder(
+              controller: _pagesScrollController,
+              padding: const EdgeInsets.symmetric(vertical: _pageGap),
+              scrollCacheExtent: ScrollCacheExtent.pixels(
+                _estimatedPageExtent(_lastViewportWidth) * 1.5,
+              ),
+              itemCount: pages.length,
+              itemBuilder: (context, index) =>
+                  _buildScrollablePage(context, index, _lastViewportWidth),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildScrollablePage(
+    BuildContext context,
+    int pageIndex,
+    double viewportWidth,
+  ) {
+    final page = _file!.pages![pageIndex];
+    final displayWidth = max(1.0, viewportWidth - _pageHorizontalPadding * 2);
+    final displayHeight = displayWidth / page.pageSize!.ratio;
+    final isActivePage = pageIndex == currentPage;
+
+    return Padding(
+      key: _pageItemKeyFor(pageIndex),
+      padding: const EdgeInsets.only(
+        left: _pageHorizontalPadding,
+        right: _pageHorizontalPadding,
+        bottom: _pageGap,
+      ),
+      child: Center(
+        child: Card(
+          elevation: isActivePage ? 12 : 6,
+          color: Colors.white,
+          child: SizedBox(
+            width: displayWidth,
+            height: displayHeight,
+            child: FittedBox(
+              child: PointerListener(
+                key: _pointerListenerKeyFor(pageIndex),
+                translationMatrix: _zoomController.value,
+                toolData: _toolData,
+                strokeWidth: toolWidth,
+                highlighterWidth: highlighterWidth,
+                eraserWidth: eraserWidth,
+                color: toolColor,
+                highlighterColor: highlighterColor,
+                laserColor: _laserColor,
+                drawWithStylusOnly: drawWithStylusOnly,
+                onPointerActivity: () => _activatePageForEditing(pageIndex),
+                onDeviceChange: _handleDeviceChange,
+                filterEraser: ({Offset? coordinates, double? radius}) {
+                  _activatePageForEditing(pageIndex);
+                  _eraseContentAt(coordinates: coordinates, radius: radius);
+                },
+                filterEraserPath:
+                    ({List<Offset>? coordinates, double? radius}) {
+                      _activatePageForEditing(pageIndex);
+                      _eraseContentAlongPath(
+                        coordinates: coordinates,
+                        radius: radius,
+                      );
+                    },
+                onSelectionRegionChange: (region) {
+                  _activatePageForEditing(pageIndex);
+                  _selectRegion(region);
+                },
+                onSelectionClear: () {
+                  _activatePageForEditing(pageIndex);
+                  _clearSelection();
+                },
+                shouldMoveSelection: (position) {
+                  _activatePageForEditing(pageIndex);
+                  return _shouldMoveSelection(position);
+                },
+                onSelectionMove: (delta, {bool done = false}) {
+                  _activatePageForEditing(pageIndex);
+                  _moveSelection(delta, done: done);
+                },
+                onSwipeLeft: () => _switchToPage(pageIndex + 1),
+                onSwipeRight: () => _switchToPage(pageIndex - 1),
+                onNewContent: (newContent) =>
+                    _addContentToPage(pageIndex, newContent),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: XppPageStack(
+                    key: _pageStackKeyFor(pageIndex),
+                    page: page,
+                    rasterScale: pageScale,
+                    keepAlive: false,
+                    activeTool: isActivePage ? _activeTool : null,
+                    selectedContents: isActivePage
+                        ? _selectedContents
+                        : const <XppContent>{},
+                    onSelectContent: (layer, content) {
+                      _activatePageForEditing(pageIndex);
+                      _selectContent(layer, content);
+                    },
+                    onDeleteSelection: () {
+                      _activatePageForEditing(pageIndex);
+                      _deleteSelection();
+                    },
+                    onReplaceContent: (layer, oldContent, newContent) {
+                      _activatePageForEditing(pageIndex);
+                      _replaceContent(layer, oldContent, newContent);
+                    },
+                    onContentPointerDown: (event) => _pointerListenerKeyFor(
+                      pageIndex,
+                    ).currentState?.markContentPointerDown(event),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  GlobalKey<XppPageStackState> _pageStackKeyFor(int pageIndex) {
+    return _pageStackKeys.putIfAbsent(
+      pageIndex,
+      () => GlobalKey<XppPageStackState>(),
+    );
+  }
+
+  GlobalKey<PointerListenerState> _pointerListenerKeyFor(int pageIndex) {
+    return _pointerListenerKeys.putIfAbsent(
+      pageIndex,
+      () => GlobalKey<PointerListenerState>(),
+    );
+  }
+
+  GlobalKey _pageItemKeyFor(int pageIndex) {
+    return _pageItemKeys.putIfAbsent(pageIndex, GlobalKey.new);
+  }
+
+  void _clearPageWidgetKeys() {
+    _pageStackKeys.clear();
+    _pointerListenerKeys.clear();
+    _pageItemKeys.clear();
+  }
+
+  void _activatePageForEditing(int pageIndex) {
+    _setCurrentPage(pageIndex);
+  }
+
+  void _setCurrentPage(int pageIndex) {
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return;
+    if (pageIndex < 0 || pageIndex >= pages.length) return;
+    if (pageIndex == currentPage) return;
+
+    setState(() {
+      currentPage = pageIndex;
+      _selectedContents = {};
+      _invalidateEraserIndex();
+    });
+  }
+
+  void _scheduleCurrentPageFromScroll() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateCurrentPageFromScroll();
+    });
+  }
+
+  void _updateCurrentPageFromScroll() {
+    final viewportObject = _pagesViewportKey.currentContext?.findRenderObject();
+    if (viewportObject is! RenderBox) return;
+
+    final viewportTop = viewportObject.localToGlobal(Offset.zero).dy;
+    final viewportCenter = viewportTop + viewportObject.size.height / 2;
+    var bestPage = currentPage;
+    var bestDistance = double.infinity;
+
+    for (final entry in _pageItemKeys.entries) {
+      final pageObject = entry.value.currentContext?.findRenderObject();
+      if (pageObject is! RenderBox || !pageObject.attached) continue;
+
+      final pageTop = pageObject.localToGlobal(Offset.zero).dy;
+      final pageCenter = pageTop + pageObject.size.height / 2;
+      final distance = (pageCenter - viewportCenter).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestPage = entry.key;
+      }
+    }
+
+    if (bestPage != currentPage) _setCurrentPage(bestPage);
+  }
+
+  void _scrollToPage(int pageIndex, {bool animated = true}) {
+    if (!_pagesScrollController.hasClients) return;
+
+    final offset = _pageScrollOffset(pageIndex);
+    final maxOffset = _pagesScrollController.position.maxScrollExtent;
+    final target = offset.clamp(0.0, maxOffset).toDouble();
+    if (animated) {
+      _pagesScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _pagesScrollController.jumpTo(target);
+    }
+  }
+
+  double _pageScrollOffset(int pageIndex) {
+    final pages = _file?.pages ?? <XppPage>[];
+    final displayWidth = max(
+      1.0,
+      _lastViewportWidth - _pageHorizontalPadding * 2,
+    );
+    var offset = _pageGap;
+    for (var i = 0; i < pageIndex && i < pages.length; i++) {
+      offset += displayWidth / pages[i].pageSize!.ratio + _pageGap;
+    }
+    return offset;
+  }
+
+  double _estimatedPageExtent(double viewportWidth) {
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return 800;
+    final displayWidth = max(1.0, viewportWidth - _pageHorizontalPadding * 2);
+    return displayWidth / pages[currentPage].pageSize!.ratio + _pageGap;
+  }
+
+  void _refreshPageStack(int pageIndex, XppPage page) {
+    _pageStackKeys[pageIndex]?.currentState?.setPageData(page);
+  }
+
+  Future<Uint8List> _currentPagePng() async {
+    var state = _currentPageStackKey.currentState;
+    if (state != null) return state.toPng();
+
+    _scrollToPage(currentPage, animated: false);
+    await WidgetsBinding.instance.endOfFrame;
+    state = _currentPageStackKey.currentState;
+    if (state == null) {
+      throw StateError('Current page is not available for export.');
+    }
+    return state.toPng();
+  }
+
+  void _addContentToPage(int pageIndex, XppContent? newContent) {
+    if (newContent == null) return;
+    _activatePageForEditing(pageIndex);
+
+    /// TODO: manage layers
+    final page = _file!.pages![pageIndex];
+    final layer = page.layers![0];
+    setState(() {
+      final content = List<XppContent?>.from(layer.content!)..add(newContent);
+      layer.content = content;
+      _undoStack.add(
+        _UndoEntry([
+          _LayerOperation.added(
+            page: page,
+            layer: layer,
+            content: newContent,
+            index: content.length - 1,
+          ),
+        ]),
+      );
+      _markDirty();
+    });
+    _eraserIndex?.add(newContent);
+
+    _refreshPageStack(pageIndex, page);
   }
 
   bool get _isDirty => _revision != _savedRevision;
@@ -543,9 +758,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _zoomableKey.currentState!.setState(
       () => _zoomableKey.currentState!.enabled = zoomEnabled,
     );
-    _pointerListenerKey.currentState!.setState(() {
-      _pointerListenerKey.currentState!.drawingEnabled = !zoomEnabled;
-    });
+    for (final key in _pointerListenerKeys.values) {
+      key.currentState?.setState(() {
+        key.currentState!.drawingEnabled = !zoomEnabled;
+      });
+    }
   }
 
   void _scheduleInputModeRefresh() {
@@ -615,7 +832,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _fitPageToWidth() {
     final viewportObject = _zoomableKey.currentContext?.findRenderObject();
-    final pageObject = _pageStackKey.currentContext?.findRenderObject();
+    final pageObject = _currentPageStackKey.currentContext?.findRenderObject();
     if (viewportObject is! RenderBox || pageObject is! RenderBox) return;
 
     final pageLeft = pageObject.localToGlobal(Offset.zero).dx;
@@ -655,18 +872,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _switchToPage(int pageIndex) {
     final pages = _file?.pages;
     if (pages == null || pages.isEmpty) return;
-    if (pageIndex < 0 ||
-        pageIndex >= pages.length ||
-        pageIndex == currentPage) {
-      return;
-    }
+    if (pageIndex < 0 || pageIndex >= pages.length) return;
 
-    setState(() {
-      currentPage = pageIndex;
-      _selectedContents = {};
-      _invalidateEraserIndex();
-    });
-    _pageStackKey.currentState?.setPageData(pages[currentPage]);
+    _setCurrentPage(pageIndex);
+    _scrollToPage(pageIndex);
   }
 
   void _addPageAfterCurrent() {
@@ -678,9 +887,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         currentPage,
         XppPage.empty(background: Colors.white),
       );
+      _clearPageWidgetKeys();
       _markDirty();
-
-      _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToPage(currentPage);
     });
   }
 
@@ -700,9 +911,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           SnackBar(content: Text(S.of(context).thereWereNoMorePagesWeAddedOne)),
         );
       }
+      _clearPageWidgetKeys();
       _markDirty();
-
-      _pageStackKey.currentState!.setPageData(_file!.pages![currentPage]);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToPage(currentPage, animated: false);
     });
   }
 
@@ -764,10 +977,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         }
         _selectedContents = {};
         _invalidateEraserIndex();
+        _clearPageWidgetKeys();
         _markDirty();
       });
 
-      _pageStackKey.currentState?.setPageData(_file!.pages![currentPage]);
+      _refreshPageStack(currentPage, _file!.pages![currentPage]);
     });
   }
 
@@ -786,7 +1000,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     });
 
     if (undoEntry.page == _file!.pages![currentPage]) {
-      _pageStackKey.currentState!.setPageData(undoEntry.page);
+      _refreshPageStack(currentPage, undoEntry.page);
     }
   }
 
@@ -830,7 +1044,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _invalidateEraserIndex();
       _markDirty();
     });
-    _pageStackKey.currentState!.setPageData(page);
+    _refreshPageStack(currentPage, page);
   }
 
   void _selectContent(XppLayer _, XppContent content) {
@@ -900,7 +1114,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _invalidateEraserIndex();
       _markDirty();
     });
-    _pageStackKey.currentState!.setPageData(page);
+    _refreshPageStack(currentPage, page);
   }
 
   bool _shouldMoveSelection(Offset position) {
@@ -945,7 +1159,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         _invalidateEraserIndex();
         _markDirty();
       });
-      _pageStackKey.currentState!.setPageData(page);
+      _refreshPageStack(currentPage, page);
     }
 
     if (done) _finishSelectionMove();
@@ -1082,7 +1296,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     layer.content = updatedContent;
     _undoStack.add(_UndoEntry(operations));
     _markDirty();
-    _pageStackKey.currentState!.setPageData(page);
+    _refreshPageStack(currentPage, page);
     setState(() {});
   }
 
@@ -1131,7 +1345,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void shareScreenshot() async {
-    Uint8List imageBytes = await _pageStackKey.currentState!.toPng();
+    Uint8List imageBytes = await _currentPagePng();
     String fileName =
         await (XppPickedFile(
           imageBytes,
@@ -1180,7 +1394,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       String path = _file!.title! + '.xopp';
       _file!.previewImage = kIsWeb
           ? kTransparentImage
-          : await _pageStackKey.currentState!.toPng();
+          : await _currentPagePng();
       XppPickedFile file = _file!.toXppPickedFile(filePath: path);
       final savedPath = !saveAs && filePath != null
           ? await file
@@ -1273,6 +1487,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _pagesScrollController.dispose();
     _controllerReset.dispose();
     super.dispose();
   }
