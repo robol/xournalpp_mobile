@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:archive/archive.dart';
 import 'package:image/image.dart' as img;
 import 'package:xournalpp/layer_contents/XppImage.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
@@ -84,6 +85,7 @@ class _IncrementalPdfWriter {
   final Uint8List _bytes;
   late final String _text;
   late final Map<int, int> _offsets;
+  late final Map<int, _CompressedObjectRef> _compressedObjectRefs;
   late final Map<String, String> _trailer;
   late final int _previousXrefOffset;
   late final int _maxObjectNumber;
@@ -201,12 +203,24 @@ class _IncrementalPdfWriter {
     _previousXrefOffset = int.parse(startxrefMatch.group(1)!);
 
     _offsets = {};
+    _compressedObjectRefs = {};
     var maxObject = 0;
-    _trailer = _parseXrefTableAt(
+    _trailer = _parseXrefSectionAt(
       _previousXrefOffset,
       visitedOffsets: <int>{},
       onObject: (objectNumber, offset) {
         _offsets[objectNumber] = offset;
+        _compressedObjectRefs.remove(objectNumber);
+        maxObject = max(maxObject, objectNumber);
+      },
+      onCompressedObject: (objectNumber, ref) {
+        _compressedObjectRefs[objectNumber] = ref;
+        _offsets.remove(objectNumber);
+        maxObject = max(maxObject, objectNumber);
+      },
+      onFreeObject: (objectNumber) {
+        _offsets.remove(objectNumber);
+        _compressedObjectRefs.remove(objectNumber);
         maxObject = max(maxObject, objectNumber);
       },
     );
@@ -217,16 +231,25 @@ class _IncrementalPdfWriter {
     );
   }
 
-  Map<String, String> _parseXrefTableAt(
+  Map<String, String> _parseXrefSectionAt(
     int xrefOffset, {
     required Set<int> visitedOffsets,
     required void Function(int objectNumber, int offset) onObject,
+    required void Function(int objectNumber, _CompressedObjectRef ref)
+    onCompressedObject,
+    required void Function(int objectNumber) onFreeObject,
   }) {
     if (!visitedOffsets.add(xrefOffset)) {
       throw const PdfExportException('Cyclic PDF xref chain.');
     }
     if (!_text.startsWith('xref', xrefOffset)) {
-      throw const PdfExportException('PDF xref streams are not supported.');
+      return _parseXrefStreamAt(
+        xrefOffset,
+        visitedOffsets: visitedOffsets,
+        onObject: onObject,
+        onCompressedObject: onCompressedObject,
+        onFreeObject: onFreeObject,
+      );
     }
 
     final trailerIndex = _text.indexOf('trailer', xrefOffset);
@@ -234,6 +257,7 @@ class _IncrementalPdfWriter {
       throw const PdfExportException('Could not find PDF trailer.');
 
     final localOffsets = <int, int>{};
+    final localFreeObjects = <int>{};
     final lines = _text
         .substring(xrefOffset + 4, trailerIndex)
         .split(RegExp(r'\r?\n'));
@@ -245,9 +269,14 @@ class _IncrementalPdfWriter {
       for (var j = 0; j < count && i + 1 < lines.length; j++) {
         final entry = lines[++i];
         if (entry.length < 18) continue;
-        if (entry.substring(17, 18) != 'n') continue;
         final objectNumber = first + j;
-        localOffsets[objectNumber] = int.parse(entry.substring(0, 10));
+        if (entry.substring(17, 18) == 'n') {
+          localOffsets[objectNumber] = int.parse(entry.substring(0, 10));
+          localFreeObjects.remove(objectNumber);
+        } else if (entry.substring(17, 18) == 'f') {
+          localOffsets.remove(objectNumber);
+          localFreeObjects.add(objectNumber);
+        }
       }
     }
 
@@ -259,13 +288,96 @@ class _IncrementalPdfWriter {
     final previousXrefOffset = _integerValue(trailer['Prev']);
     final previousTrailer = previousXrefOffset == null
         ? <String, String>{}
-        : _parseXrefTableAt(
+        : _parseXrefSectionAt(
             previousXrefOffset,
             visitedOffsets: visitedOffsets,
             onObject: onObject,
+            onCompressedObject: onCompressedObject,
+            onFreeObject: onFreeObject,
           );
 
+    localFreeObjects.forEach(onFreeObject);
     localOffsets.forEach(onObject);
+    return {...previousTrailer, ...trailer};
+  }
+
+  Map<String, String> _parseXrefStreamAt(
+    int xrefOffset, {
+    required Set<int> visitedOffsets,
+    required void Function(int objectNumber, int offset) onObject,
+    required void Function(int objectNumber, _CompressedObjectRef ref)
+    onCompressedObject,
+    required void Function(int objectNumber) onFreeObject,
+  }) {
+    final xrefObject = _objectAtOffset(offset: xrefOffset);
+    final trailer = _dictionaryEntries(xrefObject.dictionary);
+    if (trailer['Type'] != '/XRef') {
+      throw const PdfExportException('Unsupported PDF xref structure.');
+    }
+
+    final previousXrefOffset = _integerValue(trailer['Prev']);
+    final previousTrailer = previousXrefOffset == null
+        ? <String, String>{}
+        : _parseXrefSectionAt(
+            previousXrefOffset,
+            visitedOffsets: visitedOffsets,
+            onObject: onObject,
+            onCompressedObject: onCompressedObject,
+            onFreeObject: onFreeObject,
+          );
+
+    final w = _integersInValue(trailer['W']);
+    if (w.length != 3) {
+      throw const PdfExportException('Invalid PDF xref stream width table.');
+    }
+    final entryWidth = w.fold<int>(0, (sum, width) => sum + width);
+    if (entryWidth == 0) {
+      throw const PdfExportException('Invalid PDF xref stream entry width.');
+    }
+
+    final index = _integersInValue(trailer['Index']);
+    final ranges = index.isEmpty
+        ? <int>[0, _integerValue(trailer['Size']) ?? 0]
+        : index;
+    if (ranges.length.isOdd) {
+      throw const PdfExportException('Invalid PDF xref stream index.');
+    }
+
+    final data = _decodedStreamBytes(xrefObject);
+    var dataOffset = 0;
+    for (var rangeOffset = 0; rangeOffset < ranges.length; rangeOffset += 2) {
+      final firstObject = ranges[rangeOffset];
+      final count = ranges[rangeOffset + 1];
+      for (var i = 0; i < count; i++) {
+        if (dataOffset + entryWidth > data.length) {
+          throw const PdfExportException('Truncated PDF xref stream.');
+        }
+        final type = w[0] == 0 ? 1 : _bigEndianInteger(data, dataOffset, w[0]);
+        dataOffset += w[0];
+        final field2 = _bigEndianInteger(data, dataOffset, w[1]);
+        dataOffset += w[1];
+        final field3 = _bigEndianInteger(data, dataOffset, w[2]);
+        dataOffset += w[2];
+
+        final objectNumber = firstObject + i;
+        if (type == 0) {
+          onFreeObject(objectNumber);
+        } else if (type == 1) {
+          onObject(objectNumber, field2);
+        } else if (type == 2) {
+          onCompressedObject(
+            objectNumber,
+            _CompressedObjectRef(
+              objectStreamObjectNumber: field2,
+              objectIndex: field3,
+            ),
+          );
+        } else {
+          throw PdfExportException('Unsupported PDF xref entry type $type.');
+        }
+      }
+    }
+
     return {...previousTrailer, ...trailer};
   }
 
@@ -316,29 +428,165 @@ class _IncrementalPdfWriter {
   _PdfObject _object(int objectNumber) {
     return _objectCache.putIfAbsent(objectNumber, () {
       final offset = _offsets[objectNumber];
-      if (offset == null)
-        throw PdfExportException('Missing PDF object $objectNumber.');
-      final header = RegExp(
-        '^$objectNumber\\s+\\d+\\s+obj\\s*',
-      ).matchAsPrefix(_text.substring(offset));
-      if (header == null)
-        throw PdfExportException('Invalid PDF object $objectNumber.');
-      final start = offset + header.end;
-      final end = _text.indexOf('endobj', start);
-      if (end < 0)
-        throw PdfExportException('Unterminated PDF object $objectNumber.');
-      final body = _text.substring(start, end).trim();
-      final dictStart = body.indexOf('<<');
-      if (dictStart < 0)
-        throw PdfExportException(
-          'PDF object $objectNumber is not a dictionary.',
+      if (offset != null) {
+        return _objectAtOffset(
+          offset: offset,
+          expectedObjectNumber: objectNumber,
         );
-      final dictEnd = _matchingDictionaryEnd(body, dictStart);
-      return _PdfObject(
-        body: body,
-        dictionary: body.substring(dictStart, dictEnd),
-      );
+      }
+
+      final compressedRef = _compressedObjectRefs[objectNumber];
+      if (compressedRef != null) {
+        return _objectFromObjectStream(objectNumber, compressedRef);
+      }
+
+      throw PdfExportException('Missing PDF object $objectNumber.');
     });
+  }
+
+  _PdfObject _objectAtOffset({required int offset, int? expectedObjectNumber}) {
+    final header = RegExp(
+      r'^(\d+)\s+\d+\s+obj\s*',
+    ).matchAsPrefix(_text.substring(offset));
+    if (header == null) throw const PdfExportException('Invalid PDF object.');
+    final objectNumber = int.parse(header.group(1)!);
+    if (expectedObjectNumber != null && objectNumber != expectedObjectNumber) {
+      throw PdfExportException('Invalid PDF object $expectedObjectNumber.');
+    }
+    final start = offset + header.end;
+    final end = _text.indexOf('endobj', start);
+    if (end < 0)
+      throw PdfExportException('Unterminated PDF object $objectNumber.');
+    final body = _text.substring(start, end).trim();
+    final dictStart = body.indexOf('<<');
+    if (dictStart < 0) {
+      throw PdfExportException('PDF object $objectNumber is not a dictionary.');
+    }
+    final dictEnd = _matchingDictionaryEnd(body, dictStart);
+    return _PdfObject(
+      body: body,
+      dictionary: body.substring(dictStart, dictEnd),
+    );
+  }
+
+  _PdfObject _objectFromObjectStream(
+    int objectNumber,
+    _CompressedObjectRef ref,
+  ) {
+    final objectStream = _object(ref.objectStreamObjectNumber);
+    final objectStreamDictionary = _dictionaryEntries(objectStream.dictionary);
+    if (objectStreamDictionary['Type'] != '/ObjStm') {
+      throw PdfExportException(
+        'PDF object stream ${ref.objectStreamObjectNumber} is invalid.',
+      );
+    }
+    final count = _integerValue(objectStreamDictionary['N']);
+    final first = _integerValue(objectStreamDictionary['First']);
+    if (count == null || first == null || ref.objectIndex >= count) {
+      throw PdfExportException(
+        'PDF object $objectNumber has an invalid object stream reference.',
+      );
+    }
+
+    final streamText = latin1.decode(_decodedStreamBytes(objectStream));
+    if (first < 0 || first > streamText.length) {
+      throw const PdfExportException('Invalid PDF object stream.');
+    }
+    final header = streamText.substring(0, first);
+    final headerNumbers = _integersInValue(header);
+    if (headerNumbers.length < count * 2) {
+      throw const PdfExportException('Invalid PDF object stream header.');
+    }
+
+    final indexedObjectNumber = headerNumbers[ref.objectIndex * 2];
+    if (indexedObjectNumber != objectNumber) {
+      throw PdfExportException('Invalid compressed PDF object $objectNumber.');
+    }
+    final objectOffset = headerNumbers[ref.objectIndex * 2 + 1];
+    final nextObjectOffset = ref.objectIndex + 1 < count
+        ? headerNumbers[(ref.objectIndex + 1) * 2 + 1]
+        : streamText.length - first;
+    final bodyStart = first + objectOffset;
+    final bodyEnd = first + nextObjectOffset;
+    if (bodyStart < first ||
+        bodyEnd < bodyStart ||
+        bodyEnd > streamText.length) {
+      throw const PdfExportException('Invalid PDF object stream offsets.');
+    }
+
+    final body = streamText.substring(bodyStart, bodyEnd).trim();
+    final dictStart = body.indexOf('<<');
+    if (dictStart < 0) {
+      throw PdfExportException('PDF object $objectNumber is not a dictionary.');
+    }
+    final dictEnd = _matchingDictionaryEnd(body, dictStart);
+    return _PdfObject(
+      body: body,
+      dictionary: body.substring(dictStart, dictEnd),
+    );
+  }
+
+  Uint8List _decodedStreamBytes(_PdfObject object) {
+    final entries = _dictionaryEntries(object.dictionary);
+    var data = _rawStreamBytes(object, entries);
+    final filter = entries['Filter'];
+    if (filter == null) return data;
+
+    final filters = _filterNames(filter);
+    for (final filterName in filters) {
+      if (filterName == 'FlateDecode' || filterName == 'Fl') {
+        data = Uint8List.fromList(const ZLibDecoder().decodeBytes(data));
+      } else {
+        throw PdfExportException('Unsupported PDF stream filter /$filterName.');
+      }
+    }
+
+    return _applyDecodeParameters(
+      data,
+      entries['DecodeParms'] ?? entries['DP'],
+    );
+  }
+
+  Uint8List _rawStreamBytes(_PdfObject object, Map<String, String> entries) {
+    final streamIndex = object.body.indexOf('stream', object.dictionary.length);
+    if (streamIndex < 0) {
+      throw const PdfExportException('PDF object stream data is missing.');
+    }
+    var dataStart = streamIndex + 'stream'.length;
+    if (object.body.startsWith('\r\n', dataStart)) {
+      dataStart += 2;
+    } else if (object.body.startsWith('\n', dataStart) ||
+        object.body.startsWith('\r', dataStart)) {
+      dataStart += 1;
+    }
+
+    final dataLength = _integerValue(entries['Length']);
+    if (dataLength != null) {
+      final dataEnd = dataStart + dataLength;
+      if (dataEnd > object.body.length) {
+        throw const PdfExportException('Invalid PDF stream length.');
+      }
+      return Uint8List.fromList(
+        latin1.encode(object.body.substring(dataStart, dataEnd)),
+      );
+    }
+
+    var dataEnd = object.body.indexOf('endstream', dataStart);
+    if (dataEnd < 0) {
+      throw const PdfExportException('Unterminated PDF stream.');
+    }
+    if (dataEnd > dataStart && object.body.codeUnitAt(dataEnd - 1) == 0x0a) {
+      dataEnd--;
+      if (dataEnd > dataStart && object.body.codeUnitAt(dataEnd - 1) == 0x0d) {
+        dataEnd--;
+      }
+    } else if (dataEnd > dataStart &&
+        object.body.codeUnitAt(dataEnd - 1) == 0x0d) {
+      dataEnd--;
+    }
+    return Uint8List.fromList(
+      latin1.encode(object.body.substring(dataStart, dataEnd)),
+    );
   }
 
   String? _resourceDictionary(String? resources) {
@@ -645,6 +893,16 @@ class _PdfImage {
   });
 }
 
+class _CompressedObjectRef {
+  final int objectStreamObjectNumber;
+  final int objectIndex;
+
+  const _CompressedObjectRef({
+    required this.objectStreamObjectNumber,
+    required this.objectIndex,
+  });
+}
+
 int _matchingDictionaryEnd(String text, int start) {
   var depth = 0;
   for (var i = start; i < text.length - 1; i++) {
@@ -770,6 +1028,107 @@ int _refNumber(String? value) {
 int? _integerValue(String? value) {
   final match = RegExp(r'^\d+$').firstMatch(value?.trim() ?? '');
   return match == null ? null : int.parse(match.group(0)!);
+}
+
+List<int> _integersInValue(String? value) {
+  if (value == null) return const [];
+  return RegExp(
+    r'-?\d+',
+  ).allMatches(value).map((match) => int.parse(match.group(0)!)).toList();
+}
+
+int _bigEndianInteger(Uint8List bytes, int offset, int width) {
+  var value = 0;
+  for (var i = 0; i < width; i++) {
+    value = (value << 8) | bytes[offset + i];
+  }
+  return value;
+}
+
+List<String> _filterNames(String value) {
+  return RegExp(
+    r'/([A-Za-z0-9]+)',
+  ).allMatches(value).map((match) => match.group(1)!).toList();
+}
+
+Uint8List _applyDecodeParameters(Uint8List data, String? decodeParameters) {
+  final entries = decodeParameters?.trim().startsWith('<<') == true
+      ? _dictionaryEntries(decodeParameters!)
+      : <String, String>{};
+  final predictor = _integerValue(entries['Predictor']) ?? 1;
+  if (predictor == 1) return data;
+
+  final columns = _integerValue(entries['Columns']);
+  if (columns == null || columns <= 0) {
+    throw const PdfExportException('Invalid PDF predictor columns.');
+  }
+  final colors = _integerValue(entries['Colors']) ?? 1;
+  final bitsPerComponent = _integerValue(entries['BitsPerComponent']) ?? 8;
+  if (colors != 1 || bitsPerComponent != 8) {
+    throw const PdfExportException('Unsupported PDF predictor parameters.');
+  }
+
+  if (predictor == 2) return _applyTiffPredictor(data, columns);
+  if (predictor >= 10 && predictor <= 15) {
+    return _applyPngPredictor(data, columns);
+  }
+  throw PdfExportException('Unsupported PDF predictor $predictor.');
+}
+
+Uint8List _applyTiffPredictor(Uint8List data, int columns) {
+  final output = Uint8List.fromList(data);
+  for (var row = 0; row < output.length; row += columns) {
+    final rowEnd = min(row + columns, output.length);
+    for (var i = row + 1; i < rowEnd; i++) {
+      output[i] = (output[i] + output[i - 1]) & 0xff;
+    }
+  }
+  return output;
+}
+
+Uint8List _applyPngPredictor(Uint8List data, int columns) {
+  final rows = <int>[];
+  var offset = 0;
+  var previousRow = Uint8List(columns);
+  while (offset < data.length) {
+    final predictor = data[offset++];
+    if (offset + columns > data.length) {
+      throw const PdfExportException('Truncated PDF predictor data.');
+    }
+    final row = Uint8List.fromList(data.sublist(offset, offset + columns));
+    offset += columns;
+    for (var i = 0; i < columns; i++) {
+      final left = i == 0 ? 0 : row[i - 1];
+      final up = previousRow[i];
+      final upperLeft = i == 0 ? 0 : previousRow[i - 1];
+      if (predictor == 1) {
+        row[i] = (row[i] + left) & 0xff;
+      } else if (predictor == 2) {
+        row[i] = (row[i] + up) & 0xff;
+      } else if (predictor == 3) {
+        row[i] = (row[i] + ((left + up) >> 1)) & 0xff;
+      } else if (predictor == 4) {
+        row[i] = (row[i] + _paethPredictor(left, up, upperLeft)) & 0xff;
+      } else if (predictor != 0) {
+        throw PdfExportException('Unsupported PNG predictor $predictor.');
+      }
+    }
+    rows.addAll(row);
+    previousRow = row;
+  }
+  return Uint8List.fromList(rows);
+}
+
+int _paethPredictor(int left, int up, int upperLeft) {
+  final estimate = left + up - upperLeft;
+  final leftDistance = (estimate - left).abs();
+  final upDistance = (estimate - up).abs();
+  final upperLeftDistance = (estimate - upperLeft).abs();
+  if (leftDistance <= upDistance && leftDistance <= upperLeftDistance) {
+    return left;
+  }
+  if (upDistance <= upperLeftDistance) return up;
+  return upperLeft;
 }
 
 List<int> _refsInArray(String? value) {
