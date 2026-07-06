@@ -511,10 +511,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       for (var i = currentPage - 1; i <= currentPage + 1; i++)
         if (i >= 0 && i < pages.length) i,
     };
-    final thumbnailPages = <int>{
-      for (var i = currentPage - 4; i <= currentPage + 4; i++)
-        if (i >= 0 && i < pages.length && !fullQualityPages.contains(i)) i,
-    };
 
     for (final pageIndex in [currentPage, currentPage - 1, currentPage + 1]) {
       if (!fullQualityPages.contains(pageIndex)) continue;
@@ -522,16 +518,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         _prefetchPdfBackgroundPage(
           pageIndex,
           PdfBackgroundRenderVariant.full,
-          generation,
-        ),
-      );
-    }
-
-    for (final pageIndex in thumbnailPages) {
-      unawaited(
-        _prefetchPdfBackgroundPage(
-          pageIndex,
-          PdfBackgroundRenderVariant.thumbnail,
           generation,
         ),
       );
