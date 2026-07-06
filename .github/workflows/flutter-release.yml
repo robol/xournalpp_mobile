@@ -60,6 +60,7 @@ jobs:
         run: flutter pub get
 
       - name: Build and upload release artifact
+        if: matrix.build-type != 'apk' && matrix.build-type != 'aab'
         uses: oberhauser-dev/flutter-release-action@v0
         with:
           token: ${{ secrets.FLUTTER_RELEASE_GITHUB_TOKEN }}
@@ -68,3 +69,37 @@ jobs:
           app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           build-type: ${{ matrix.build-type }}
+
+      - name: Build and upload signed APK release artifact
+        if: matrix.build-type == 'apk'
+        uses: oberhauser-dev/flutter-release-action@v0
+        with:
+          token: ${{ secrets.FLUTTER_RELEASE_GITHUB_TOKEN }}
+          app-name: 'xournalpp-mobile'
+          dry-run: false
+          app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          build-type: ${{ matrix.build-type }}
+          android-keystore-file-base64: ${{ secrets.ANDROID_KEYSTORE }}
+          android-keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          android-key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          android-key-password: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Build, release, and publish AAB to Google Play internal testing
+        if: matrix.build-type == 'aab'
+        uses: oberhauser-dev/flutter-release-action@v0
+        with:
+          token: ${{ secrets.FLUTTER_RELEASE_GITHUB_TOKEN }}
+          app-name: 'xournalpp-mobile'
+          dry-run: false
+          app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
+          build-type: ${{ matrix.build-type }}
+          publish-stage: 'internal'
+          publish-distributor: 'android-google-play'
+          publish-android-fastlane-secrets-json-base64: ${{ secrets.ANDROID_GOOGLE_PLAY_JSON }}
+          publish-android-release-status: 'completed'
+          android-keystore-file-base64: ${{ secrets.ANDROID_KEYSTORE }}
+          android-keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          android-key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          android-key-password: ${{ secrets.ANDROID_KEY_PASSWORD }}

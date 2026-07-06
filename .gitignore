@@ -68,6 +68,7 @@ assets/adi-registration.properties
 play-store-key.json
 android/fastlane/.env
 android/fastlane/.env.*
+android/key.properties
 
 Gemfile
 Gemfile.lock
