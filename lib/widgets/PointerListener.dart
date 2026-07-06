@@ -202,6 +202,12 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerSignal: (data) {
+          if (data is PointerScrollEvent) {
+            widget.onPointerActivity?.call();
+            widget.onPan?.call(-data.scrollDelta);
+            notifyDeviceChange(data);
+            return;
+          }
           setState(() {
             activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
@@ -524,11 +530,12 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void notifyDeviceChange(PointerEvent data) {
+    if (widget.onDeviceChange == null) return;
     final deviceToolKnown = widget.toolData.keys.contains(data.kind);
     if (_lastNotifiedDeviceKind == data.kind && deviceToolKnown) return;
 
     _lastNotifiedDeviceKind = data.kind;
-    widget.onDeviceChange!(device: data.device, kind: data.kind);
+    widget.onDeviceChange?.call(device: data.device, kind: data.kind);
   }
 
   bool isPen(PointerEvent data) {
