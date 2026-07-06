@@ -68,13 +68,23 @@ class XppPageStackState extends State<XppPageStack>
     super.build(context);
     List<Widget> children = [];
 
-    if (page!.background != null && _lastKnownBackground != page!.background) {
-      _lastKnownBackground = page!.background;
-      _isBackgroundLoading = page!.background is XppBackgroundPdf;
-      background = page!.background!.render(
-        onLoadingChanged: _handleBackgroundLoadingChanged,
-        fullQuality: widget.fullQualityBackground,
-      );
+    final pageBackground = page!.background;
+    if (pageBackground == null) {
+      _lastKnownBackground = null;
+      _isBackgroundLoading = false;
+      background = const SizedBox.shrink();
+    } else if (_lastKnownBackground != pageBackground) {
+      _lastKnownBackground = pageBackground;
+      final shouldRenderBackground =
+          widget.fullQualityBackground || pageBackground is! XppBackgroundPdf;
+      _isBackgroundLoading =
+          shouldRenderBackground && pageBackground is XppBackgroundPdf;
+      background = shouldRenderBackground
+          ? pageBackground.render(
+              onLoadingChanged: _handleBackgroundLoadingChanged,
+              fullQuality: widget.fullQualityBackground,
+            )
+          : const SizedBox.shrink();
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
     children.add(Positioned.fill(child: background));
@@ -371,6 +381,8 @@ class _RasterizedStrokeRun extends StatefulWidget {
 }
 
 class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
+  static const double _strokeRasterQualityMultiplier = 2.5;
+
   ui.Image? _image;
   int? _requestedSignature;
   int? _cachedSignature;
@@ -416,7 +428,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
         height: widget.pageSize.height,
         fit: BoxFit.fill,
         scale: _imagePixelRatio,
-        filterQuality: FilterQuality.medium,
+        filterQuality: FilterQuality.high,
       ),
     ];
 
@@ -578,7 +590,10 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     final devicePixelRatio =
         mediaQueryRatio ?? View.of(context).devicePixelRatio;
     final effectiveScale = max(1.0, widget.rasterScale);
-    return (devicePixelRatio * effectiveScale).clamp(1.0, 6.0);
+    return max(
+      1.0,
+      devicePixelRatio * effectiveScale * _strokeRasterQualityMultiplier,
+    );
   }
 
   @override

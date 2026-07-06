@@ -65,6 +65,9 @@ debian/xournalpp-mobile
 assets/adi-registration.properties
 
 # fastlane / Google Play credentials
-fastlane/play-store-credentials*.json
-fastlane/.env
-fastlane/.env.*
+play-store-key.json
+android/fastlane/.env
+android/fastlane/.env.*
+
+Gemfile
+Gemfile.lock

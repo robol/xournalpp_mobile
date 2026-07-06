@@ -53,6 +53,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _eraserWidthDivisions = 19;
   static const double _pageGap = 24;
   static const double _pageHorizontalPadding = 16;
+  static const Duration _zoomAnimationDuration = Duration(milliseconds: 180);
 
   XppFile? _file;
   String? filePath;
@@ -77,6 +78,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final GlobalKey _pagesViewportKey = GlobalKey();
   final ScrollController _pagesScrollController = ScrollController();
   final ScrollController _pagesHorizontalScrollController = ScrollController();
+  late final AnimationController _zoomAnimationController;
+  Animation<double>? _zoomAnimation;
+  _ViewportAnchor? _zoomAnimationAnchor;
 
   double pageScale = 1;
   double _lastViewportWidth = 0;
@@ -96,6 +100,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void initState() {
     _setMetadata();
     super.initState();
+    _zoomAnimationController = AnimationController(
+      vsync: this,
+      duration: _zoomAnimationDuration,
+    )..addListener(_handleZoomAnimationTick);
     _pagesScrollController.addListener(_scheduleCurrentPageFromScroll);
     loadToolSettings();
     _scheduleInputModeRefresh();
@@ -890,19 +898,31 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _setScale(double newZoom) {
     newZoom = max(.1, min(5, newZoom));
-    if (newZoom != pageScale) {
-      final anchor = _currentViewportAnchor();
-      setState(() => pageScale = newZoom);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (anchor != null) {
-          _restoreViewportAnchor(anchor);
-        } else {
-          _scrollToPage(currentPage, animated: false);
-        }
-        _clampHorizontalScroll();
-      });
-    }
+    if (newZoom == pageScale) return;
+
+    _zoomAnimationController.stop();
+    _zoomAnimationAnchor = _currentViewportAnchor();
+    _zoomAnimation = Tween<double>(begin: pageScale, end: newZoom).animate(
+      CurvedAnimation(parent: _zoomAnimationController, curve: Curves.easeOut),
+    );
+    _zoomAnimationController.forward(from: 0);
+  }
+
+  void _handleZoomAnimationTick() {
+    final animation = _zoomAnimation;
+    if (animation == null) return;
+
+    setState(() => pageScale = animation.value);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final anchor = _zoomAnimationAnchor;
+      if (anchor != null) {
+        _restoreViewportAnchor(anchor);
+      } else {
+        _scrollToPage(currentPage, animated: false);
+      }
+      _clampHorizontalScroll();
+    });
   }
 
   void _fitPageToWidth() {
@@ -1501,6 +1521,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _zoomAnimationController.dispose();
     _pagesScrollController.dispose();
     _pagesHorizontalScrollController.dispose();
     super.dispose();
