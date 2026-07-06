@@ -16,6 +16,7 @@ class MainActivity: FlutterActivity() {
     private var pendingCreateResult: MethodChannel.Result? = null
     private var pendingCreateBytes: ByteArray? = null
     private var openIntentChannel: MethodChannel? = null
+    private var initialOpenIntentConsumed = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -63,7 +64,7 @@ class MainActivity: FlutterActivity() {
         openIntentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, intentChannel)
         openIntentChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
-                "getInitialOpenIntent" -> result.success(openIntentPayload(intent))
+                "getInitialOpenIntent" -> result.success(consumeInitialOpenIntent())
                 else -> result.notImplemented()
             }
         }
@@ -74,7 +75,20 @@ class MainActivity: FlutterActivity() {
         setIntent(intent)
         openIntentPayload(intent)?.let {
             openIntentChannel?.invokeMethod("openIntent", it)
+            clearStoredOpenIntent()
         }
+    }
+
+    private fun consumeInitialOpenIntent(): Map<String, String?>? {
+        if (initialOpenIntentConsumed) return null
+        initialOpenIntentConsumed = true
+        val payload = openIntentPayload(intent)
+        if (payload != null) clearStoredOpenIntent()
+        return payload
+    }
+
+    private fun clearStoredOpenIntent() {
+        setIntent(Intent(Intent.ACTION_MAIN))
     }
 
     private fun createDocument(fileName: String, bytes: ByteArray, result: MethodChannel.Result) {

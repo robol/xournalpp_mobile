@@ -142,9 +142,10 @@ class _MainDrawerState extends State<MainDrawer> {
 
   Future<void> _openHome() async {
     if (!await _canLeave() || !context.mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (context) => OpenPage()));
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => OpenPage()),
+      (route) => false,
+    );
   }
 
   Future<void> _openFile() async {

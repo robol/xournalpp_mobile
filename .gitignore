@@ -63,3 +63,8 @@ debian/xournalpp-mobile
 .gradle
 
 assets/adi-registration.properties
+
+# fastlane / Google Play credentials
+fastlane/play-store-credentials*.json
+fastlane/.env
+fastlane/.env.*
