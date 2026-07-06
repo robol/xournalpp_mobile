@@ -5,6 +5,7 @@ import 'dart:ui';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -298,35 +299,44 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           constraints.maxWidth,
           _pageDisplayWidth(constraints.maxWidth) + _pageHorizontalPadding * 2,
         );
-        return SingleChildScrollView(
-          key: _pagesViewportKey,
-          controller: _pagesHorizontalScrollController,
-          physics: _viewportScrollPhysics,
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: contentWidth,
-            height: constraints.maxHeight,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                _scheduleCurrentPageFromScroll();
-                return false;
-              },
-              child: ListView.builder(
-                controller: _pagesScrollController,
-                physics: _viewportScrollPhysics,
-                padding: const EdgeInsets.symmetric(vertical: _pageGap),
-                scrollCacheExtent: ScrollCacheExtent.pixels(
-                  _estimatedPageExtent(_lastViewportWidth) * 1.5,
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerSignal: _handleViewportPointerSignal,
+          child: SingleChildScrollView(
+            key: _pagesViewportKey,
+            controller: _pagesHorizontalScrollController,
+            physics: _viewportScrollPhysics,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: contentWidth,
+              height: constraints.maxHeight,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  _scheduleCurrentPageFromScroll();
+                  return false;
+                },
+                child: ListView.builder(
+                  controller: _pagesScrollController,
+                  physics: _viewportScrollPhysics,
+                  padding: const EdgeInsets.symmetric(vertical: _pageGap),
+                  scrollCacheExtent: ScrollCacheExtent.pixels(
+                    _estimatedPageExtent(_lastViewportWidth) * 1.5,
+                  ),
+                  itemCount: pages.length,
+                  itemBuilder: (context, index) =>
+                      _buildScrollablePage(context, index, _lastViewportWidth),
                 ),
-                itemCount: pages.length,
-                itemBuilder: (context, index) =>
-                    _buildScrollablePage(context, index, _lastViewportWidth),
               ),
             ),
           ),
         );
       },
     );
+  }
+
+  void _handleViewportPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    _panPages(-event.scrollDelta);
   }
 
   Widget _buildScrollablePage(
