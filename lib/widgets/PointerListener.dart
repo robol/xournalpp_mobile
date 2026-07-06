@@ -265,7 +265,7 @@ class PointerListenerState extends State<PointerListener> {
       _contentPointerDownDevices.remove(event.device);
 
   void _startPan(PointerEvent data, {bool twoFinger = false}) {
-    _panLastPosition = data.localPosition;
+    _panLastPosition = data.position;
     _panPointer = data.pointer;
     _twoFingerPanning = twoFinger;
   }
@@ -273,8 +273,8 @@ class PointerListenerState extends State<PointerListener> {
   bool _updatePan(PointerMoveEvent data) {
     if (_panLastPosition == null) return false;
     if (_panPointer != data.pointer) return _twoFingerPanning;
-    final delta = data.localPosition - _panLastPosition!;
-    _panLastPosition = data.localPosition;
+    final delta = data.position - _panLastPosition!;
+    _panLastPosition = data.position;
     widget.onPan?.call(delta);
     return true;
   }
