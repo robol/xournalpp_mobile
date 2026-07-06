@@ -15,7 +15,10 @@ abstract class XppBackground {
 
   static XppBackground get none => _NoXppBackground();
 
-  Widget render({ValueChanged<bool>? onLoadingChanged});
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  });
 
   XmlElement toXmlElement();
 }
@@ -34,7 +37,10 @@ class XppBackgroundImage extends XppBackground {
   });
 
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return Container(color: Colors.white);
   }
 
@@ -81,10 +87,14 @@ class XppBackgroundPdf extends XppBackground {
   });
 
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return (PDfBackgroundWidget(
       provider: this,
       onLoadingChanged: onLoadingChanged,
+      fullQuality: fullQuality,
     ));
   }
 
@@ -104,9 +114,14 @@ class XppBackgroundPdf extends XppBackground {
 class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
   final ValueChanged<bool>? onLoadingChanged;
+  final bool fullQuality;
 
-  const PDfBackgroundWidget({Key? key, this.provider, this.onLoadingChanged})
-    : super(key: key);
+  const PDfBackgroundWidget({
+    Key? key,
+    this.provider,
+    this.onLoadingChanged,
+    this.fullQuality = true,
+  }) : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
 }
@@ -121,14 +136,18 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     if (filename != null && filename.isNotEmpty) {
       try {
         final file = await XppPickedFile.fromInternalPath(path: filename);
-        return pdfImage(file, provider.page);
+        return widget.fullQuality
+            ? pdfImage(file, provider.page)
+            : pdfThumbnailImage(file, provider.page);
       } catch (_) {
         // Fall through to the missing-file callback below.
       }
     }
 
     final file = await provider.onUnavailable(context, filename);
-    return pdfImage(file, provider.page);
+    return widget.fullQuality
+        ? pdfImage(file, provider.page)
+        : pdfThumbnailImage(file, provider.page);
   }
 
   Future<Uint8List> _startLoading(XppBackgroundPdf provider) {
@@ -168,7 +187,8 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   @override
   void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.provider != oldWidget.provider) {
+    if (widget.provider != oldWidget.provider ||
+        widget.fullQuality != oldWidget.fullQuality) {
       _imageFuture = null;
     }
   }
@@ -196,7 +216,10 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
 
   XppBackgroundSolidLined({this.color = Colors.white, this.size});
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return _RasterizedSolidBackground(
       style: 'lined',
       color: color,
@@ -215,7 +238,10 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
 
   XppBackgroundSolidRuled({this.color = Colors.white, this.size});
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return _RasterizedSolidBackground(
       style: 'ruled',
       color: color,
@@ -234,7 +260,10 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
 
   XppBackgroundSolidGraph({this.color = Colors.white, this.size});
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return _RasterizedSolidBackground(
       style: 'graph',
       color: color,
@@ -253,7 +282,10 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
 
   XppBackgroundSolidDot({this.color = Colors.white, this.size});
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return _RasterizedSolidBackground(
       style: 'dotted',
       color: color,
@@ -272,7 +304,10 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
 
   XppBackgroundSolidPlain({this.color, this.size});
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) {
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) {
     return Container(
       width: size!.width,
       height: size!.height,
@@ -289,8 +324,10 @@ class _NoXppBackground extends XppBackground {
   XppBackgroundType? type = XppBackgroundType.NONE;
 
   @override
-  Widget render({ValueChanged<bool>? onLoadingChanged}) =>
-      Container(color: Colors.white);
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    bool fullQuality = true,
+  }) => Container(color: Colors.white);
 
   @override
   XmlElement toXmlElement() {

@@ -89,6 +89,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   bool savingFile = false;
   bool _allowPop = false;
+  bool _currentPageUpdateScheduled = false;
   int _revision = 0;
   int _savedRevision = 0;
 
@@ -400,6 +401,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                     page: page,
                     rasterScale: pageScale,
                     keepAlive: false,
+                    fullQualityBackground: isActivePage,
                     activeTool: isActivePage ? _activeTool : null,
                     selectedContents: isActivePage
                         ? _selectedContents
@@ -471,7 +473,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _scheduleCurrentPageFromScroll() {
+    if (_currentPageUpdateScheduled) return;
+    _currentPageUpdateScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _currentPageUpdateScheduled = false;
       if (mounted) _updateCurrentPageFromScroll();
     });
   }
@@ -485,9 +490,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     var bestPage = currentPage;
     var bestDistance = double.infinity;
 
+    final stalePages = <int>[];
     for (final entry in _pageItemKeys.entries) {
       final pageObject = entry.value.currentContext?.findRenderObject();
-      if (pageObject is! RenderBox || !pageObject.attached) continue;
+      if (pageObject is! RenderBox || !pageObject.attached) {
+        stalePages.add(entry.key);
+        continue;
+      }
 
       final pageTop = pageObject.localToGlobal(Offset.zero).dy;
       final pageCenter = pageTop + pageObject.size.height / 2;
@@ -496,6 +505,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         bestDistance = distance;
         bestPage = entry.key;
       }
+    }
+
+    for (final page in stalePages) {
+      _pageItemKeys.remove(page);
+      _pageStackKeys.remove(page);
+      _pointerListenerKeys.remove(page);
     }
 
     if (bestPage != currentPage) _setCurrentPage(bestPage);

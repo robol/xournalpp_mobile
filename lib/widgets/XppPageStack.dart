@@ -28,6 +28,7 @@ class XppPageStack extends StatefulWidget {
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
   final VoidCallback? onDeleteSelection;
   final bool keepAlive;
+  final bool fullQualityBackground;
 
   const XppPageStack({
     Key? key,
@@ -40,6 +41,7 @@ class XppPageStack extends StatefulWidget {
     this.onSelectContent,
     this.onDeleteSelection,
     this.keepAlive = true,
+    this.fullQualityBackground = true,
   }) : super(key: key);
 
   @override
@@ -71,6 +73,7 @@ class XppPageStackState extends State<XppPageStack>
       _isBackgroundLoading = page!.background is XppBackgroundPdf;
       background = page!.background!.render(
         onLoadingChanged: _handleBackgroundLoadingChanged,
+        fullQuality: widget.fullQualityBackground,
       );
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
@@ -204,9 +207,11 @@ class XppPageStackState extends State<XppPageStack>
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.page != oldWidget.page) {
+    if (widget.page != oldWidget.page ||
+        widget.fullQualityBackground != oldWidget.fullQualityBackground) {
       setState(() {
         page = widget.page;
+        _lastKnownBackground = null;
       });
     }
   }
