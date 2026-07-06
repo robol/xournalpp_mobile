@@ -59,7 +59,6 @@ class XppPageStackState extends State<XppPageStack>
 
   XppBackground? _lastKnownBackground;
   Widget background = Container();
-  bool _isBackgroundLoading = false;
 
   @override
   void initState() {
@@ -75,11 +74,9 @@ class XppPageStackState extends State<XppPageStack>
     final pageBackground = page!.background;
     if (pageBackground == null) {
       _lastKnownBackground = null;
-      _isBackgroundLoading = false;
       background = const SizedBox.shrink();
     } else if (_lastKnownBackground != pageBackground) {
       _lastKnownBackground = pageBackground;
-      _isBackgroundLoading = pageBackground is XppBackgroundPdf;
       final pageSize = page!.pageSize!.toSize();
       final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
       final targetPixelWidth =
@@ -89,7 +86,6 @@ class XppPageStackState extends State<XppPageStack>
           widget.backgroundTargetPixelHeight ??
           pageSize.height * widget.rasterScale * devicePixelRatio;
       background = pageBackground.render(
-        onLoadingChanged: _handleBackgroundLoadingChanged,
         fullQuality:
             widget.fullQualityBackground || pageBackground is! XppBackgroundPdf,
         targetPixelWidth: targetPixelWidth,
@@ -115,7 +111,6 @@ class XppPageStackState extends State<XppPageStack>
     );
     final deleteButton = _buildDeleteSelectionButton();
     if (deleteButton != null) children.add(deleteButton);
-    if (_isBackgroundLoading) children.add(_buildLoadingOverlay());
     return RepaintBoundary(
       key: pngKey,
       child: Theme(
@@ -140,20 +135,6 @@ class XppPageStackState extends State<XppPageStack>
         ),
       ),
     );
-  }
-
-  Widget _buildLoadingOverlay() {
-    return Positioned.fill(
-      child: ColoredBox(
-        color: Colors.white70,
-        child: Center(child: CircularProgressIndicator()),
-      ),
-    );
-  }
-
-  void _handleBackgroundLoadingChanged(bool isLoading) {
-    if (!mounted || _isBackgroundLoading == isLoading) return;
-    setState(() => _isBackgroundLoading = isLoading);
   }
 
   Widget? _buildDeleteSelectionButton() {

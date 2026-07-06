@@ -55,6 +55,133 @@ void main() {
     await service.dispose();
   });
 
+  test('completes rendered requests before cache writer finishes', () async {
+    final writerStarted = Completer<void>();
+    final writerRelease = Completer<void>();
+    var writerCompleted = false;
+    final service = _testService(
+      renderer: (_, __, ___) async => Uint8List.fromList([10, 11, 12]),
+      cacheWriter: (_, __) async {
+        writerStarted.complete();
+        await writerRelease.future;
+        writerCompleted = true;
+      },
+    );
+    final source = service.sourceForPickedFile(
+      XppPickedFile(Uint8List.fromList([10]), path: 'cache-wait.pdf'),
+    );
+
+    final bytes = await service.request(
+      source,
+      1,
+      PdfBackgroundRenderVariant.full,
+    );
+
+    expect(bytes, [10, 11, 12]);
+    await writerStarted.future;
+    expect(writerCompleted, isFalse);
+
+    writerRelease.complete();
+    await Future<void>.delayed(Duration.zero);
+    await service.dispose();
+  });
+
+  test('publishes ready snapshot before cache writer finishes', () async {
+    final writerStarted = Completer<void>();
+    final writerRelease = Completer<void>();
+    var writerCompleted = false;
+    final service = _testService(
+      renderer: (_, __, ___) async => Uint8List.fromList([13]),
+      cacheWriter: (_, __) async {
+        writerStarted.complete();
+        await writerRelease.future;
+        writerCompleted = true;
+      },
+    );
+    final source = service.sourceForPickedFile(
+      XppPickedFile(Uint8List.fromList([13]), path: 'snapshot-wait.pdf'),
+    );
+    final key = service.keyFor(source, 1, PdfBackgroundRenderVariant.full);
+    final readySnapshot = Completer<PdfBackgroundRenderSnapshot>();
+    final subscription = service.watch(key).listen((snapshot) {
+      if (snapshot.bytes != null && !readySnapshot.isCompleted) {
+        readySnapshot.complete(snapshot);
+      }
+    });
+
+    final request = service.request(source, 1, PdfBackgroundRenderVariant.full);
+    final snapshot = await readySnapshot.future;
+
+    expect(snapshot.bytes, [13]);
+    expect(await request, [13]);
+    await writerStarted.future;
+    expect(writerCompleted, isFalse);
+
+    writerRelease.complete();
+    await Future<void>.delayed(Duration.zero);
+    await subscription.cancel();
+    await service.dispose();
+  });
+
+  test('cache writer failures do not fail rendered requests', () async {
+    final service = _testService(
+      renderer: (_, __, ___) async => Uint8List.fromList([14]),
+      cacheWriter: (_, __) async {
+        throw StateError('disk full');
+      },
+    );
+    final source = service.sourceForPickedFile(
+      XppPickedFile(Uint8List.fromList([14]), path: 'writer-fails.pdf'),
+    );
+
+    final bytes = await service.request(
+      source,
+      1,
+      PdfBackgroundRenderVariant.full,
+    );
+
+    expect(bytes, [14]);
+    await Future<void>.delayed(Duration.zero);
+    await service.dispose();
+  });
+
+  test(
+    'same-key requests reuse in-flight result while writer is pending',
+    () async {
+      final writerStarted = Completer<void>();
+      final writerRelease = Completer<void>();
+      var renderCount = 0;
+      final service = _testService(
+        renderer: (_, __, ___) async {
+          renderCount++;
+          return Uint8List.fromList([15]);
+        },
+        cacheWriter: (_, __) async {
+          writerStarted.complete();
+          await writerRelease.future;
+        },
+      );
+      final source = service.sourceForPickedFile(
+        XppPickedFile(Uint8List.fromList([15]), path: 'pending-writer.pdf'),
+      );
+
+      expect(
+        await service.request(source, 1, PdfBackgroundRenderVariant.full),
+        [15],
+      );
+      await writerStarted.future;
+      expect(
+        await service.request(source, 1, PdfBackgroundRenderVariant.full),
+        [15],
+      );
+      expect(renderCount, 1);
+
+      writerRelease.complete();
+      await Future<void>.delayed(Duration.zero);
+      await service.dispose();
+    },
+  );
+
   test('reuses an open document session for the same source', () async {
     var openCount = 0;
     final service = _testService(
@@ -98,6 +225,7 @@ void main() {
 
     await service.request(source, 1, PdfBackgroundRenderVariant.thumbnail);
     await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await Future<void>.delayed(Duration.zero);
 
     expect(service.peek(firstKey), isNull);
     expect(service.peek(secondKey), [2]);
@@ -242,15 +370,19 @@ void main() {
 PdfBackgroundRenderService _testService({
   PdfBackgroundPageRenderer? renderer,
   PdfBackgroundDocumentOpener? documentOpener,
+  PdfBackgroundCacheReader? cacheReader,
+  PdfBackgroundCacheWriter? cacheWriter,
   int maxMemoryEntries = 32,
 }) {
   final cache = <String, Uint8List>{};
   return PdfBackgroundRenderService(
     maxMemoryEntries: maxMemoryEntries,
-    cacheReader: (key) async => cache[key],
-    cacheWriter: (key, bytes) async {
-      cache[key] = bytes;
-    },
+    cacheReader: cacheReader ?? (key) async => cache[key],
+    cacheWriter:
+        cacheWriter ??
+        (key, bytes) async {
+          cache[key] = bytes;
+        },
     documentOpener:
         documentOpener ?? (source) async => _FakePdfDocument(source.sourceName),
     renderer:

@@ -158,11 +158,14 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     );
   }
 
-  Future<void> _startLoading(XppBackgroundPdf provider) async {
+  Future<void> _startLoading(
+    XppBackgroundPdf provider, {
+    bool preserveCurrentImage = false,
+  }) async {
     final generation = ++_requestGeneration;
     _setLoading(true);
     setState(() {
-      _imageBytes = null;
+      if (!preserveCurrentImage) _imageBytes = null;
       _error = null;
     });
 
@@ -204,7 +207,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       if (!mounted || generation != _requestGeneration) return;
       setState(() {
         _error = error;
-        _imageBytes = null;
+        if (!preserveCurrentImage) _imageBytes = null;
       });
     } finally {
       if (mounted && generation == _requestGeneration) _setLoading(false);
@@ -258,7 +261,8 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
 
     if (_imageBytes != null) return Image.memory(_imageBytes!);
     if (_error != null) return const Icon(Icons.picture_as_pdf);
-    return const Center(child: CircularProgressIndicator());
+    // return const Center(child: CircularProgressIndicator());
+    return const Center(); // return empty widget to avoid layout shift when loading
   }
 
   @override
@@ -267,18 +271,32 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   @override
   void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.provider != oldWidget.provider ||
+    final providerChanged = !_isSamePdfBackground(
+      widget.provider,
+      oldWidget.provider,
+    );
+    final renderTargetChanged =
         widget.fullQuality != oldWidget.fullQuality ||
         widget.targetPixelWidth != oldWidget.targetPixelWidth ||
-        widget.targetPixelHeight != oldWidget.targetPixelHeight) {
+        widget.targetPixelHeight != oldWidget.targetPixelHeight;
+    if (providerChanged || renderTargetChanged) {
       _renderSubscription?.cancel();
       _renderSubscription = null;
       _subscribedKey = null;
       _requestGeneration++;
+      if (providerChanged) {
+        _imageBytes = null;
+        _error = null;
+      }
       final provider = widget.provider;
       if (provider != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _startLoading(provider);
+          if (mounted) {
+            _startLoading(
+              provider,
+              preserveCurrentImage: !providerChanged && _imageBytes != null,
+            );
+          }
         });
       }
     }
@@ -290,6 +308,12 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     _renderSubscription?.cancel();
     super.dispose();
   }
+}
+
+bool _isSamePdfBackground(XppBackgroundPdf? a, XppBackgroundPdf? b) {
+  if (identical(a, b)) return true;
+  if (a == null || b == null) return false;
+  return a.filename == b.filename && a.domain == b.domain && a.page == b.page;
 }
 
 /// page background for a [XppPage] made from a color and a style

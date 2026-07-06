@@ -223,9 +223,7 @@ class PdfBackgroundRenderService {
     }
 
     final completer = Completer<Uint8List>();
-    _inFlight[key] = completer.future.whenComplete(() {
-      _inFlight.remove(key);
-    });
+    _inFlight[key] = completer.future;
     _queuedTasks.add(
       _PdfRenderTask(
         key: key,
@@ -246,6 +244,7 @@ class PdfBackgroundRenderService {
       if (task.priority != PdfBackgroundRenderPriority.prefetch) continue;
       if (keepKeys.contains(task.key)) continue;
       _queuedTasks.remove(task);
+      _inFlight.remove(task.key);
       task.completer.completeError(StateError('PDF render prefetch canceled.'));
       _emit(PdfBackgroundRenderSnapshot(key: task.key, isLoading: false));
     }
@@ -301,23 +300,41 @@ class PdfBackgroundRenderService {
     try {
       final cached = await _cacheReader(task.key);
       if (cached != null) {
-        _remember(task.key, cached);
         _emit(PdfBackgroundRenderSnapshot(key: task.key, bytes: cached));
         task.completer.complete(cached);
+        _persistRasterInBackground(task, cached, writeCacheFile: false);
         return;
       }
 
       final document = await _sessionFor(task.source).document();
       final bytes = await _renderer(document, task.page, task.size);
-      await _cacheWriter(task.key, bytes);
-      _remember(task.key, bytes);
       _emit(PdfBackgroundRenderSnapshot(key: task.key, bytes: bytes));
       task.completer.complete(bytes);
+      _persistRasterInBackground(task, bytes, writeCacheFile: true);
       await _evictIdleDocuments();
     } catch (error, stackTrace) {
+      if (task.completer.isCompleted) return;
+      _inFlight.remove(task.key);
       _emit(PdfBackgroundRenderSnapshot(key: task.key, error: error));
       task.completer.completeError(error, stackTrace);
     }
+  }
+
+  void _persistRasterInBackground(
+    _PdfRenderTask task,
+    Uint8List bytes, {
+    required bool writeCacheFile,
+  }) {
+    unawaited(
+      Future<void>(() async {
+        try {
+          _remember(task.key, bytes);
+          if (writeCacheFile) await _cacheWriter(task.key, bytes);
+        } catch (_) {}
+      }).whenComplete(() {
+        _inFlight.remove(task.key);
+      }),
+    );
   }
 
   _PdfSourceSession _sessionFor(PdfBackgroundRenderSource source) {
