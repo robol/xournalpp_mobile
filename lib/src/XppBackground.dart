@@ -324,6 +324,8 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
       style: 'lined',
       color: color,
       size: size!.toSize(),
+      targetPixelWidth: targetPixelWidth,
+      targetPixelHeight: targetPixelHeight,
       painter: _LinePainter(color: color),
     );
   }
@@ -348,6 +350,8 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
       style: 'ruled',
       color: color,
       size: size!.toSize(),
+      targetPixelWidth: targetPixelWidth,
+      targetPixelHeight: targetPixelHeight,
       painter: _RuledPainter(color: color),
     );
   }
@@ -372,6 +376,8 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
       style: 'graph',
       color: color,
       size: size!.toSize(),
+      targetPixelWidth: targetPixelWidth,
+      targetPixelHeight: targetPixelHeight,
       painter: _GraphPainter(color: color),
     );
   }
@@ -396,6 +402,8 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
       style: 'dotted',
       color: color,
       size: size!.toSize(),
+      targetPixelWidth: targetPixelWidth,
+      targetPixelHeight: targetPixelHeight,
       painter: _DotPainter(color: color),
     );
   }
@@ -454,12 +462,16 @@ class _RasterizedSolidBackground extends StatefulWidget {
   final String style;
   final Color? color;
   final Size size;
+  final double? targetPixelWidth;
+  final double? targetPixelHeight;
   final CustomPainter painter;
 
   const _RasterizedSolidBackground({
     required this.style,
     required this.color,
     required this.size,
+    required this.targetPixelWidth,
+    required this.targetPixelHeight,
     required this.painter,
   });
 
@@ -478,11 +490,16 @@ class _RasterizedSolidBackgroundState
   @override
   Widget build(BuildContext context) {
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final targetPixelWidth =
+        widget.targetPixelWidth ?? widget.size.width * pixelRatio;
+    final targetPixelHeight =
+        widget.targetPixelHeight ?? widget.size.height * pixelRatio;
     final key = _RasterizedBackgroundKey(
       style: widget.style,
       color: widget.color ?? Colors.white,
       size: widget.size,
-      pixelRatio: pixelRatio,
+      targetPixelWidth: targetPixelWidth.ceil().clamp(1, 100000),
+      targetPixelHeight: targetPixelHeight.ceil().clamp(1, 100000),
     );
     if (_cacheKey != key) {
       _cacheKey = key;
@@ -491,7 +508,8 @@ class _RasterizedSolidBackgroundState
         () => _renderImage(
           color: key.color,
           size: widget.size,
-          pixelRatio: pixelRatio,
+          targetPixelWidth: key.targetPixelWidth,
+          targetPixelHeight: key.targetPixelHeight,
           painter: widget.painter,
         ),
       );
@@ -521,20 +539,21 @@ class _RasterizedSolidBackgroundState
   static Future<ui.Image> _renderImage({
     required Color color,
     required Size size,
-    required double pixelRatio,
+    required int targetPixelWidth,
+    required int targetPixelHeight,
     required CustomPainter painter,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    canvas.scale(pixelRatio);
+    canvas.scale(
+      targetPixelWidth / size.width,
+      targetPixelHeight / size.height,
+    );
     canvas.drawRect(Offset.zero & size, Paint()..color = color);
     painter.paint(canvas, size);
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(
-      (size.width * pixelRatio).ceil().clamp(1, 100000),
-      (size.height * pixelRatio).ceil().clamp(1, 100000),
-    );
+    final image = await picture.toImage(targetPixelWidth, targetPixelHeight);
     picture.dispose();
     return image;
   }
@@ -544,13 +563,15 @@ class _RasterizedBackgroundKey {
   final String style;
   final Color color;
   final Size size;
-  final double pixelRatio;
+  final int targetPixelWidth;
+  final int targetPixelHeight;
 
   const _RasterizedBackgroundKey({
     required this.style,
     required this.color,
     required this.size,
-    required this.pixelRatio,
+    required this.targetPixelWidth,
+    required this.targetPixelHeight,
   });
 
   @override
@@ -559,12 +580,17 @@ class _RasterizedBackgroundKey {
         other.style == style &&
         other.color == color &&
         other.size == size &&
-        other.pixelRatio == pixelRatio;
+        other.targetPixelWidth == targetPixelWidth &&
+        other.targetPixelHeight == targetPixelHeight;
   }
 
   @override
-  int get hashCode => Object.hash(style, color, size, pixelRatio);
+  int get hashCode =>
+      Object.hash(style, color, size, targetPixelWidth, targetPixelHeight);
 }
+
+@visibleForTesting
+typedef RasterizedBackgroundKeyForTest = _RasterizedBackgroundKey;
 
 class _LinePainter extends CustomPainter {
   final Color? color;
