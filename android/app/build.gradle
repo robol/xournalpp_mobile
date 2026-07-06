@@ -34,7 +34,7 @@ def hasReleaseSigningConfig = keystoreProperties['storeFile'] &&
 
 android {
     namespace 'it.robol.xournal.mobile'
-    compileSdk flutter.compileSdkVersion
+    compileSdk 37
     ndkVersion flutter.ndkVersion
 
     sourceSets {
