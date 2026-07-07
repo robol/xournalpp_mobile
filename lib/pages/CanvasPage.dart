@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
@@ -42,6 +43,7 @@ class CanvasPage extends StatefulWidget {
 
 class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const String _exportPdfMenuItem = 'Export PDF...';
+  static const String _sharePdfMenuItem = 'Share PDF...';
   static const Duration _saveOverwriteTimeout = Duration(seconds: 30);
   static const int _defaultToolColor = 0xFF336699;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
@@ -199,12 +201,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 if (item == S.of(context).saveAs) saveFile(saveAs: true);
                 if (item == S.of(context).sharePage) shareScreenshot();
                 if (item == _exportPdfMenuItem) exportPdf();
+                if (item == _sharePdfMenuItem) sharePdf();
               },
               itemBuilder: (BuildContext context) {
                 return {
                   S.of(context).saveAs,
                   if (!kIsWeb) S.of(context).sharePage,
                   if (!kIsWeb) _exportPdfMenuItem,
+                  if (!kIsWeb) _sharePdfMenuItem,
                 }.map((String choice) {
                   return PopupMenuItem<String>(
                     value: choice,
@@ -1533,22 +1537,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
 
     try {
-      final pdfBytes = await exportPdfDocument(
-        _file!,
-        pdfResolver: (background) async {
-          final filename = background.filename;
-          if (filename != null && filename.isNotEmpty) {
-            try {
-              return await XppPickedFile.fromInternalPath(path: filename);
-            } catch (_) {
-              // Fall through to the missing-file callback below.
-            }
-          }
-          return background.onUnavailable(context, filename);
-        },
-      );
-      final title = _file?.title ?? S.of(context).newFile;
-      final fileName = title.endsWith('.pdf') ? title : '$title.pdf';
+      final (:pdfBytes, :fileName) = await _buildPdfExport();
       final savedPath = await XppPickedFile(
         pdfBytes,
         fileExtension: '.pdf',
@@ -1583,6 +1572,73 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         ),
       );
     }
+  }
+
+  Future<void> sharePdf() async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.removeCurrentSnackBar();
+    scaffoldMessenger.clearSnackBars();
+    final exportSnackBar = scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('Exporting PDF...'),
+        duration: Duration(days: 999),
+      ),
+    );
+
+    try {
+      final (:pdfBytes, :fileName) = await _buildPdfExport();
+
+      if (!mounted) return;
+      exportSnackBar.close();
+      scaffoldMessenger.removeCurrentSnackBar();
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              pdfBytes,
+              mimeType: 'application/pdf',
+              name: fileName,
+            ),
+          ],
+        ),
+      );
+    } on PdfExportException catch (error) {
+      if (!mounted) return;
+      exportSnackBar.close();
+      scaffoldMessenger.removeCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      if (!mounted) return;
+      exportSnackBar.close();
+      scaffoldMessenger.removeCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<({Uint8List pdfBytes, String fileName})> _buildPdfExport() async {
+    final pdfBytes = await exportPdfDocument(
+      _file!,
+      pdfResolver: (background) async {
+        final filename = background.filename;
+        if (filename != null && filename.isNotEmpty) {
+          try {
+            return await XppPickedFile.fromInternalPath(path: filename);
+          } catch (_) {
+            // Fall through to the missing-file callback below.
+          }
+        }
+        return background.onUnavailable(context, filename);
+      },
+    );
+    final title = _file?.title ?? S.of(context).newFile;
+    final fileName = title.endsWith('.pdf') ? title : '$title.pdf';
+    return (pdfBytes: pdfBytes, fileName: fileName);
   }
 
   Future<bool> saveFile({bool saveAs = false}) async {
