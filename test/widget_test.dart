@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,5 +40,37 @@ void main() {
 
     expect(find.text('Export PDF...'), findsOneWidget);
     expect(find.text('Share PDF...'), findsOneWidget);
+  });
+
+  testWidgets('canvas menu hides PDF sharing on Linux', (
+    WidgetTester tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: [
+            S.delegate,
+            DefaultMaterialLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: S.delegate.supportedLocales,
+          home: CanvasPage(file: XppFile.empty(title: 'Test document')),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Export PDF...'), findsOneWidget);
+      expect(find.text('Share PDF...'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

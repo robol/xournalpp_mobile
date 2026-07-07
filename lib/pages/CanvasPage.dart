@@ -208,7 +208,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   S.of(context).saveAs,
                   if (!kIsWeb) S.of(context).sharePage,
                   if (!kIsWeb) _exportPdfMenuItem,
-                  if (!kIsWeb) _sharePdfMenuItem,
+                  if (_sharePdfSupported) _sharePdfMenuItem,
                 }.map((String choice) {
                   return PopupMenuItem<String>(
                     value: choice,
@@ -1527,9 +1527,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Future<void> exportPdf() async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.removeCurrentSnackBar();
-    scaffoldMessenger.clearSnackBars();
-    final exportSnackBar = scaffoldMessenger.showSnackBar(
+    _clearSnackBars(scaffoldMessenger);
+    final exportSnackBar = _showSnackBar(
+      scaffoldMessenger,
       SnackBar(
         content: Text('Exporting PDF...'),
         duration: Duration(days: 999),
@@ -1546,9 +1546,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       ).exportToStorage();
 
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
+      _showSnackBar(
+        scaffoldMessenger,
         SnackBar(
           content: Text(
             '${S.of(context).successfullySaved} ${savedPath ?? fileName}',
@@ -1557,14 +1558,18 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       );
     } on PdfExportException catch (error) {
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text(error.message)));
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
+      _showSnackBar(
+        scaffoldMessenger,
+        SnackBar(content: Text(error.message)),
+      );
     } catch (error) {
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
+      _showSnackBar(
+        scaffoldMessenger,
         SnackBar(
           content: Text(
             S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
@@ -1576,9 +1581,19 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Future<void> sharePdf() async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    scaffoldMessenger.removeCurrentSnackBar();
-    scaffoldMessenger.clearSnackBars();
-    final exportSnackBar = scaffoldMessenger.showSnackBar(
+    if (!_sharePdfSupported) {
+      _showSnackBar(
+        scaffoldMessenger,
+        SnackBar(
+          content: Text('PDF sharing is not supported on this platform.'),
+        ),
+      );
+      return;
+    }
+
+    _clearSnackBars(scaffoldMessenger);
+    final exportSnackBar = _showSnackBar(
+      scaffoldMessenger,
       SnackBar(
         content: Text('Exporting PDF...'),
         duration: Duration(days: 999),
@@ -1589,8 +1604,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       final (:pdfBytes, :fileName) = await _buildPdfExport();
 
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
       await SharePlus.instance.share(
         ShareParams(
           files: [
@@ -1604,21 +1619,34 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       );
     } on PdfExportException catch (error) {
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text(error.message)));
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
+      _showSnackBar(
+        scaffoldMessenger,
+        SnackBar(content: Text(error.message)),
+      );
     } catch (error) {
       if (!mounted) return;
-      exportSnackBar.close();
-      scaffoldMessenger.removeCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(
+      _closeSnackBar(exportSnackBar);
+      _removeCurrentSnackBar(scaffoldMessenger);
+      _showSnackBar(
+        scaffoldMessenger,
         SnackBar(
-          content: Text(
-            S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
-          ),
+          content: Text('Unfortunately, there was an error sharing the PDF.'),
         ),
       );
     }
+  }
+
+  bool get _sharePdfSupported {
+    if (kIsWeb) return false;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows => true,
+      TargetPlatform.fuchsia || TargetPlatform.linux => false,
+    };
   }
 
   Future<({Uint8List pdfBytes, String fileName})> _buildPdfExport() async {
@@ -1639,6 +1667,38 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final title = _file?.title ?? S.of(context).newFile;
     final fileName = title.endsWith('.pdf') ? title : '$title.pdf';
     return (pdfBytes: pdfBytes, fileName: fileName);
+  }
+
+  void _clearSnackBars(ScaffoldMessengerState scaffoldMessenger) {
+    try {
+      scaffoldMessenger.removeCurrentSnackBar();
+      scaffoldMessenger.clearSnackBars();
+    } catch (_) {}
+  }
+
+  void _removeCurrentSnackBar(ScaffoldMessengerState scaffoldMessenger) {
+    try {
+      scaffoldMessenger.removeCurrentSnackBar();
+    } catch (_) {}
+  }
+
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _showSnackBar(
+    ScaffoldMessengerState scaffoldMessenger,
+    SnackBar snackBar,
+  ) {
+    try {
+      return scaffoldMessenger.showSnackBar(snackBar);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _closeSnackBar(
+    ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? snackBar,
+  ) {
+    try {
+      snackBar?.close();
+    } catch (_) {}
   }
 
   Future<bool> saveFile({bool saveAs = false}) async {
