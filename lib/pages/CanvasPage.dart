@@ -57,6 +57,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const int _eraserWidthDivisions = 19;
   static const double _pageGap = 24;
   static const double _pageHorizontalPadding = 16;
+  static const double _pageCardMargin = 4;
   static const Duration _zoomAnimationDuration = Duration(milliseconds: 180);
   static const Duration _backgroundRenderCommitDelay = Duration(
     milliseconds: 180,
@@ -466,6 +467,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       ),
       child: Center(
         child: Card(
+          margin: const EdgeInsets.all(_pageCardMargin),
           elevation: isActivePage ? 12 : 6,
           color: Colors.white,
           child: SizedBox(
@@ -888,9 +890,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double _pageScrollOffsetForScale(int pageIndex, double scale) {
     final pages = _file?.pages ?? <XppPage>[];
     final displayWidth = _pageDisplayWidthForScale(_lastViewportWidth, scale);
-    var offset = _pageGap;
+    var offset = _pageGap + _pageCardMargin;
     for (var i = 0; i < pageIndex && i < pages.length; i++) {
-      offset += displayWidth / pages[i].pageSize!.ratio + _pageGap;
+      offset +=
+          displayWidth / pages[i].pageSize!.ratio +
+          _pageGap +
+          _pageCardMargin * 2;
     }
     return offset;
   }
