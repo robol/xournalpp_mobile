@@ -58,6 +58,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const double _pageGap = 24;
   static const double _pageHorizontalPadding = 16;
   static const Duration _zoomAnimationDuration = Duration(milliseconds: 180);
+  static const Duration _backgroundRenderCommitDelay = Duration(
+    milliseconds: 180,
+  );
 
   XppFile? _file;
   String? filePath;
@@ -83,6 +86,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final ScrollController _pagesScrollController = ScrollController();
   final ScrollController _pagesHorizontalScrollController = ScrollController();
   late final AnimationController _zoomAnimationController;
+  Timer? _backgroundRenderCommitTimer;
   Animation<double>? _zoomAnimation;
   _ViewportAnchor? _zoomAnimationAnchor;
 
@@ -1113,6 +1117,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     newZoom = max(.1, min(5, newZoom));
     if (newZoom == pageScale) return;
 
+    _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
     _zoomAnimationAnchor = _currentViewportAnchor();
     _zoomAnimation = Tween<double>(begin: pageScale, end: newZoom).animate(
@@ -1124,6 +1129,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _handlePinchZoomStart(Offset globalFocalPoint) {
+    _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
     _zoomAnimation = null;
     _zoomAnimationAnchor = null;
@@ -1157,13 +1163,21 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _handlePinchZoomEnd() {
     if (!_pinchZoomActive) return;
-    setState(() {
-      _pinchZoomActive = false;
-      _backgroundRenderScale = pageScale;
-    });
+    setState(() => _pinchZoomActive = false);
+    _scheduleBackgroundRenderScaleCommit();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _clampHorizontalScroll();
+    });
+  }
+
+  void _scheduleBackgroundRenderScaleCommit() {
+    _backgroundRenderCommitTimer?.cancel();
+    _backgroundRenderCommitTimer = Timer(_backgroundRenderCommitDelay, () {
+      if (!mounted) return;
+      if (_pinchZoomActive) return;
+      if (_backgroundRenderScale == pageScale) return;
+      setState(() => _backgroundRenderScale = pageScale);
       _schedulePdfBackgroundPrefetch();
     });
   }
@@ -1846,6 +1860,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _backgroundRenderCommitTimer?.cancel();
     _pdfBackgroundPrefetchGeneration++;
     _zoomAnimationController.dispose();
     _pagesScrollController.dispose();

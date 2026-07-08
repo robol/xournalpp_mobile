@@ -253,6 +253,10 @@ void main() {
     );
     await tester.pump();
 
+    expect(background.targetSizes, hasLength(1));
+
+    await tester.pump(const Duration(milliseconds: 200));
+
     expect(background.targetSizes.length, lessThanOrEqualTo(2));
   });
 
