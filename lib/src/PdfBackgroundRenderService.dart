@@ -10,8 +10,7 @@ import 'package:xournalpp/src/conditional/file_storage/file_storage_stub.dart'
     if (dart.library.io) 'package:xournalpp/src/conditional/file_storage/file_storage_io.dart';
 
 enum PdfBackgroundRenderVariant {
-  full('full', pdfFullPageMaxDimension),
-  thumbnail('thumb', pdfThumbnailMaxDimension);
+  full('full', pdfFullPageMaxDimension);
 
   final String cacheVariant;
   final int maxDimension;
@@ -185,8 +184,7 @@ class PdfBackgroundRenderService {
     double? pageWidthPoints,
     double? pageHeightPoints,
   }) {
-    if (variant == PdfBackgroundRenderVariant.full &&
-        pageWidthPoints != null &&
+    if (pageWidthPoints != null &&
         pageHeightPoints != null &&
         pageWidthPoints > 0 &&
         pageHeightPoints > 0) {

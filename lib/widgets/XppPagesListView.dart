@@ -168,14 +168,14 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
   @override
   void initState() {
     super.initState();
-    _imageFuture = _loadPdfThumbnail();
+    _imageFuture = _loadPdfPreview();
   }
 
   @override
   void didUpdateWidget(covariant _PdfPageThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.background != oldWidget.background) {
-      _imageFuture = _loadPdfThumbnail();
+      _imageFuture = _loadPdfPreview();
     }
   }
 
@@ -211,7 +211,7 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
     );
   }
 
-  Future<Uint8List> _loadPdfThumbnail() async {
+  Future<Uint8List> _loadPdfPreview() async {
     final filename = widget.background.filename;
     final source = await pdfBackgroundRenderService.sourceForPath(
       filename,
@@ -220,9 +220,11 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
     return pdfBackgroundRenderService.request(
       source,
       widget.background.page,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       targetWidth: widget.page.pageSize?.width,
       targetHeight: widget.page.pageSize?.height,
+      pageWidthPoints: widget.page.pageSize?.width,
+      pageHeightPoints: widget.page.pageSize?.height,
       priority: PdfBackgroundRenderPriority.prefetch,
     );
   }

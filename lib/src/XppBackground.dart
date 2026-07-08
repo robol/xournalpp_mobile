@@ -18,7 +18,6 @@ abstract class XppBackground {
 
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -44,7 +43,6 @@ class XppBackgroundImage extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -98,17 +96,13 @@ class XppBackgroundPdf extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
     double? pageHeightPoints,
   }) {
-    final variant = fullQuality
-        ? PdfBackgroundRenderVariant.full
-        : PdfBackgroundRenderVariant.thumbnail;
     final snappedSize = pdfBackgroundRenderService.renderSizeFor(
-      variant,
+      PdfBackgroundRenderVariant.full,
       targetWidth: targetPixelWidth,
       targetHeight: targetPixelHeight,
       pageWidthPoints: pageWidthPoints,
@@ -117,7 +111,6 @@ class XppBackgroundPdf extends XppBackground {
     return (PDfBackgroundWidget(
       provider: this,
       onLoadingChanged: onLoadingChanged,
-      fullQuality: fullQuality,
       targetPixelWidth: snappedSize.width.toDouble(),
       targetPixelHeight: snappedSize.height.toDouble(),
       pageWidthPoints: pageWidthPoints,
@@ -141,7 +134,6 @@ class XppBackgroundPdf extends XppBackground {
 class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
   final ValueChanged<bool>? onLoadingChanged;
-  final bool fullQuality;
   final double? targetPixelWidth;
   final double? targetPixelHeight;
   final double? pageWidthPoints;
@@ -151,7 +143,6 @@ class PDfBackgroundWidget extends StatefulWidget {
     Key? key,
     this.provider,
     this.onLoadingChanged,
-    this.fullQuality = true,
     this.targetPixelWidth,
     this.targetPixelHeight,
     this.pageWidthPoints,
@@ -195,13 +186,10 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       final source = await _loadPdfSource(provider);
       if (!mounted || generation != _requestGeneration) return;
 
-      final variant = widget.fullQuality
-          ? PdfBackgroundRenderVariant.full
-          : PdfBackgroundRenderVariant.thumbnail;
       final key = pdfBackgroundRenderService.keyFor(
         source,
         provider.page,
-        variant,
+        PdfBackgroundRenderVariant.full,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
         pageWidthPoints: widget.pageWidthPoints,
@@ -218,14 +206,12 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       final bytes = await pdfBackgroundRenderService.request(
         source,
         provider.page,
-        variant,
+        PdfBackgroundRenderVariant.full,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
         pageWidthPoints: widget.pageWidthPoints,
         pageHeightPoints: widget.pageHeightPoints,
-        priority: widget.fullQuality
-            ? PdfBackgroundRenderPriority.active
-            : PdfBackgroundRenderPriority.visible,
+        priority: PdfBackgroundRenderPriority.active,
       );
       if (!mounted || generation != _requestGeneration) return;
       _applyImage(bytes);
@@ -302,7 +288,6 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       oldWidget.provider,
     );
     final renderTargetChanged =
-        widget.fullQuality != oldWidget.fullQuality ||
         widget.targetPixelWidth != oldWidget.targetPixelWidth ||
         widget.targetPixelHeight != oldWidget.targetPixelHeight ||
         widget.pageWidthPoints != oldWidget.pageWidthPoints ||
@@ -368,7 +353,6 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -396,7 +380,6 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -424,7 +407,6 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -452,7 +434,6 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -480,7 +461,6 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -504,7 +484,6 @@ class _NoXppBackground extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,

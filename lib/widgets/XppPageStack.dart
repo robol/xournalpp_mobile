@@ -29,7 +29,6 @@ class XppPageStack extends StatefulWidget {
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
   final VoidCallback? onDeleteSelection;
   final bool keepAlive;
-  final bool fullQualityBackground;
   final double? backgroundTargetPixelWidth;
   final double? backgroundTargetPixelHeight;
 
@@ -44,7 +43,6 @@ class XppPageStack extends StatefulWidget {
     this.onSelectContent,
     this.onDeleteSelection,
     this.keepAlive = true,
-    this.fullQualityBackground = true,
     this.backgroundTargetPixelWidth,
     this.backgroundTargetPixelHeight,
   }) : super(key: key);
@@ -87,8 +85,6 @@ class XppPageStackState extends State<XppPageStack>
           widget.backgroundTargetPixelHeight ??
           pageSize.height * widget.rasterScale * devicePixelRatio;
       background = pageBackground.render(
-        fullQuality:
-            widget.fullQualityBackground || pageBackground is! XppBackgroundPdf,
         targetPixelWidth: targetPixelWidth,
         targetPixelHeight: targetPixelHeight,
         pageWidthPoints: pageSize.width,
@@ -237,24 +233,18 @@ class XppPageStackState extends State<XppPageStack>
     final targetPixelHeight =
         widget.backgroundTargetPixelHeight ??
         pageSize.height * widget.rasterScale * devicePixelRatio;
-    final fullQuality =
-        widget.fullQualityBackground || background is! XppBackgroundPdf;
-
     if (background is XppBackgroundPdf) {
-      final variant = fullQuality
-          ? PdfBackgroundRenderVariant.full
-          : PdfBackgroundRenderVariant.thumbnail;
       final size = pdfBackgroundRenderService.renderSizeFor(
-        variant,
+        PdfBackgroundRenderVariant.full,
         targetWidth: targetPixelWidth,
         targetHeight: targetPixelHeight,
         pageWidthPoints: pageSize.width,
         pageHeightPoints: pageSize.height,
       );
-      return '${identityHashCode(background)}|$fullQuality|${size.cachePart}';
+      return '${identityHashCode(background)}|${size.cachePart}';
     }
 
-    return '${identityHashCode(background)}|$fullQuality|'
+    return '${identityHashCode(background)}|'
         '${targetPixelWidth.round()}x${targetPixelHeight.round()}';
   }
 }

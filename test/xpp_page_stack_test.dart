@@ -161,7 +161,6 @@ class _RecordingBackground extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -188,7 +187,6 @@ class _RecordingPdfBackground extends XppBackgroundPdf {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,

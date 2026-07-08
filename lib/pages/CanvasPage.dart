@@ -357,7 +357,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         backgroundDisplayWidth / page.pageSize!.ratio;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final isActivePage = pageIndex == currentPage;
-    final shouldRenderFullQuality = (pageIndex - currentPage).abs() <= 1;
 
     return Padding(
       padding: const EdgeInsets.only(
@@ -429,7 +428,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                     page: page,
                     rasterScale: pageScale,
                     keepAlive: false,
-                    fullQualityBackground: shouldRenderFullQuality,
                     backgroundTargetPixelWidth:
                         backgroundDisplayWidth * devicePixelRatio,
                     backgroundTargetPixelHeight:
@@ -519,13 +517,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (pages == null || pages.isEmpty) return;
 
     final generation = ++_pdfBackgroundPrefetchGeneration;
-    final fullQualityPages = <int>{
+    final prefetchPages = <int>{
       for (var i = currentPage - 1; i <= currentPage + 1; i++)
         if (i >= 0 && i < pages.length) i,
     };
 
     for (final pageIndex in [currentPage, currentPage - 1, currentPage + 1]) {
-      if (!fullQualityPages.contains(pageIndex)) continue;
+      if (!prefetchPages.contains(pageIndex)) continue;
       unawaited(
         _prefetchPdfBackgroundPage(
           pageIndex,

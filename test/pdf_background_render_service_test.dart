@@ -42,11 +42,11 @@ void main() {
       XppPickedFile(Uint8List.fromList([4, 5, 6]), path: 'b.pdf'),
     );
 
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
     final cached = await service.request(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
     );
 
     expect(cached, [4, 5, 6]);
@@ -195,8 +195,8 @@ void main() {
       XppPickedFile(Uint8List.fromList([7, 8, 9]), path: 'c.pdf'),
     );
 
-    await service.request(source, 1, PdfBackgroundRenderVariant.thumbnail);
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 1, PdfBackgroundRenderVariant.full);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
 
     expect(openCount, 1);
 
@@ -212,19 +212,15 @@ void main() {
       XppPickedFile(Uint8List.fromList([7, 8, 9]), path: 'd.pdf'),
     );
 
-    final firstKey = service.keyFor(
-      source,
-      1,
-      PdfBackgroundRenderVariant.thumbnail,
-    );
+    final firstKey = service.keyFor(source, 1, PdfBackgroundRenderVariant.full);
     final secondKey = service.keyFor(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
     );
 
-    await service.request(source, 1, PdfBackgroundRenderVariant.thumbnail);
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 1, PdfBackgroundRenderVariant.full);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
     await Future<void>.delayed(Duration.zero);
 
     expect(service.peek(firstKey), isNull);
@@ -271,19 +267,19 @@ void main() {
     final first = service.request(
       source,
       1,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.prefetch,
     );
     final second = service.request(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.prefetch,
     );
     final active = service.request(
       source,
       3,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.active,
     );
 
