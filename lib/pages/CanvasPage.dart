@@ -93,6 +93,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   Timer? _backgroundRenderCommitTimer;
   Timer? _viewportInteractionIdleTimer;
   Animation<double>? _zoomAnimation;
+  _TopScrollPosition? _zoomTopScrollPosition;
   final ValueNotifier<bool> _deferPdfRasterUpdates = ValueNotifier(false);
 
   double pageScale = 1;
@@ -906,6 +907,57 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         _pageCardMargin * 2;
   }
 
+  _TopScrollPosition? _currentTopScrollPosition() {
+    if (!_pagesScrollController.hasClients) return null;
+
+    final pages = _file?.pages ?? <XppPage>[];
+    if (pages.isEmpty) return null;
+
+    final scrollOffset = _pagesScrollController.offset;
+    var pageIndex = 0;
+    for (var i = 0; i < pages.length; i++) {
+      final pageTop = _pageScrollOffsetForScale(i, pageScale);
+      if (pageTop > scrollOffset) break;
+      pageIndex = i;
+    }
+
+    final pageSize = pages[pageIndex].pageSize?.toSize();
+    if (pageSize == null) return null;
+
+    final pageTop = _pageScrollOffsetForScale(pageIndex, pageScale);
+    final displayHeight = _pageDisplayHeightForScale(pageIndex, pageScale);
+    if (displayHeight <= 0) return null;
+
+    return _TopScrollPosition(
+      pageIndex: pageIndex,
+      pageY: ((scrollOffset - pageTop) / displayHeight) * pageSize.height,
+    );
+  }
+
+  void _restoreTopScrollPosition(_TopScrollPosition? position) {
+    if (position == null || !_pagesScrollController.hasClients) return;
+
+    final pages = _file?.pages ?? <XppPage>[];
+    if (position.pageIndex < 0 || position.pageIndex >= pages.length) return;
+
+    final pageSize = pages[position.pageIndex].pageSize?.toSize();
+    if (pageSize == null || pageSize.height <= 0) return;
+
+    final pageTop = _pageScrollOffset(position.pageIndex);
+    final displayHeight = _pageDisplayHeightForScale(
+      position.pageIndex,
+      pageScale,
+    );
+    final target = pageTop + (position.pageY / pageSize.height) * displayHeight;
+    final vertical = _pagesScrollController.position;
+    final clampedTarget = target
+        .clamp(vertical.minScrollExtent, vertical.maxScrollExtent)
+        .toDouble();
+    if (clampedTarget != vertical.pixels) {
+      _pagesScrollController.jumpTo(clampedTarget);
+    }
+  }
+
   double _estimatedPageExtent(double viewportWidth) {
     final pages = _file?.pages;
     if (pages == null || pages.isEmpty) return 800;
@@ -918,6 +970,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   double _pageDisplayWidthForScale(double viewportWidth, double scale) {
     return max(1.0, viewportWidth - _pageHorizontalPadding * 2) * scale;
+  }
+
+  double _pageDisplayHeightForScale(int pageIndex, double scale) {
+    final pages = _file?.pages ?? <XppPage>[];
+    if (pageIndex < 0 || pageIndex >= pages.length) return 0;
+    return _pageDisplayWidthForScale(_lastViewportWidth, scale) /
+        pages[pageIndex].pageSize!.ratio;
   }
 
   void _refreshPageStack(int pageIndex, XppPage page) {
@@ -1169,6 +1228,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _noteViewportInteraction();
     _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
+    _zoomTopScrollPosition = _currentTopScrollPosition();
     _zoomAnimation = Tween<double>(begin: pageScale, end: newZoom).animate(
       CurvedAnimation(parent: _zoomAnimationController, curve: Curves.easeOut),
     );
@@ -1182,6 +1242,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
     _zoomAnimation = null;
+    _zoomTopScrollPosition = null;
     setState(() => _pinchZoomActive = true);
   }
 
@@ -1196,9 +1257,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (nextScale == pageScale && globalFocalDelta == Offset.zero) return;
 
     _noteViewportInteraction();
+    final topScrollPosition = _currentTopScrollPosition();
     setState(() => pageScale = nextScale);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _restoreTopScrollPosition(topScrollPosition);
       _panPages(globalFocalDelta, duringPinch: true);
       _clampHorizontalScroll();
     });
@@ -1234,6 +1297,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _noteViewportInteraction();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _restoreTopScrollPosition(_zoomTopScrollPosition);
       _clampHorizontalScroll();
     });
   }
@@ -2009,6 +2073,13 @@ class _UndoEntry {
 }
 
 enum _UnsavedChangesAction { save, discard, cancel }
+
+class _TopScrollPosition {
+  const _TopScrollPosition({required this.pageIndex, required this.pageY});
+
+  final int pageIndex;
+  final double pageY;
+}
 
 class _ViewportPinchMetrics {
   const _ViewportPinchMetrics({

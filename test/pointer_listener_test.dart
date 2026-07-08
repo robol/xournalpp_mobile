@@ -161,6 +161,63 @@ void main() {
     expect(verticalScrollable.position.pixels, closeTo(2396, 0.1));
   });
 
+  testWidgets('zooming keeps the viewport top on the same document position', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    XppPage pageWithSize(double width, double height) {
+      final size = XppPageSize(width: width, height: height);
+      return XppPage(
+        pageSize: size,
+        background: XppBackgroundSolidLined(size: size),
+        layers: [XppLayer.empty()],
+      );
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          DefaultMaterialLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(
+          file: XppFile(
+            title: 'Document',
+            pages: [
+              pageWithSize(100, 100),
+              pageWithSize(100, 200),
+              pageWithSize(100, 100),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.pumpAndSettle();
+
+    final verticalScrollable = tester
+        .stateList<ScrollableState>(find.byType(Scrollable))
+        .firstWhere((state) => state.position.axis == Axis.vertical);
+
+    expect(verticalScrollable.position.pixels, closeTo(2396, 0.1));
+
+    await tester.tap(find.byIcon(Icons.remove));
+    await tester.pumpAndSettle();
+
+    expect(verticalScrollable.position.pixels, closeTo(2165.6, 0.1));
+  });
+
   testWidgets('canvas pinch zoom works while move tool is selected', (
     WidgetTester tester,
   ) async {
