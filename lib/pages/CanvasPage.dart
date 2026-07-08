@@ -92,6 +92,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   bool savingFile = false;
   bool _pinchZoomActive = false;
+  bool _viewportPinchZooming = false;
+  final Map<int, Offset> _viewportTouchPositions = {};
+  double? _lastViewportPinchDistance;
+  Offset? _lastViewportPinchFocalPoint;
   bool _allowPop = false;
   bool _currentPageUpdateScheduled = false;
   bool _pdfBackgroundPrefetchScheduled = false;
@@ -303,6 +307,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         );
         return Listener(
           behavior: HitTestBehavior.translucent,
+          onPointerDown: _handleViewportPointerDown,
+          onPointerMove: _handleViewportPointerMove,
+          onPointerUp: _handleViewportPointerUp,
+          onPointerCancel: _handleViewportPointerUp,
           onPointerSignal: _handleViewportPointerSignal,
           child: SingleChildScrollView(
             key: _pagesViewportKey,
@@ -339,6 +347,80 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _handleViewportPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
     _panPages(-event.scrollDelta);
+  }
+
+  void _handleViewportPointerDown(PointerDownEvent event) {
+    if (!_canPanViewport || event.kind != PointerDeviceKind.touch) return;
+
+    _viewportTouchPositions[event.pointer] = event.position;
+    if (_viewportPinchZooming || _viewportTouchPositions.length != 2) {
+      return;
+    }
+
+    final metrics = _currentViewportPinchMetrics();
+    if (metrics == null) return;
+
+    _viewportPinchZooming = true;
+    _lastViewportPinchDistance = metrics.distance;
+    _lastViewportPinchFocalPoint = metrics.focalPoint;
+    _handlePinchZoomStart(metrics.focalPoint);
+  }
+
+  void _handleViewportPointerMove(PointerMoveEvent event) {
+    if (event.kind == PointerDeviceKind.touch) {
+      _viewportTouchPositions[event.pointer] = event.position;
+    }
+    if (!_viewportPinchZooming) return;
+
+    final metrics = _currentViewportPinchMetrics();
+    final previousDistance = _lastViewportPinchDistance;
+    final previousFocalPoint = _lastViewportPinchFocalPoint;
+    if (metrics == null ||
+        previousDistance == null ||
+        previousDistance <= 0 ||
+        previousFocalPoint == null) {
+      return;
+    }
+
+    _lastViewportPinchDistance = metrics.distance;
+    _lastViewportPinchFocalPoint = metrics.focalPoint;
+    _handlePinchZoomUpdate(
+      scaleDelta: metrics.distance / previousDistance,
+      globalFocalPoint: metrics.focalPoint,
+      globalFocalDelta: metrics.focalPoint - previousFocalPoint,
+    );
+  }
+
+  void _handleViewportPointerUp(PointerEvent event) {
+    if (event.kind == PointerDeviceKind.touch) {
+      _viewportTouchPositions.remove(event.pointer);
+    }
+
+    if (!_viewportPinchZooming) return;
+    if (_viewportTouchPositions.length >= 2) {
+      final metrics = _currentViewportPinchMetrics();
+      _lastViewportPinchDistance = metrics?.distance;
+      _lastViewportPinchFocalPoint = metrics?.focalPoint;
+      return;
+    }
+
+    _viewportPinchZooming = false;
+    _lastViewportPinchDistance = null;
+    _lastViewportPinchFocalPoint = null;
+    _handlePinchZoomEnd();
+  }
+
+  _ViewportPinchMetrics? _currentViewportPinchMetrics() {
+    if (_viewportTouchPositions.length < 2) return null;
+    final points = _viewportTouchPositions.values.take(2).toList();
+    final focalPoint = Offset(
+      (points[0].dx + points[1].dx) / 2,
+      (points[0].dy + points[1].dy) / 2,
+    );
+    return _ViewportPinchMetrics(
+      focalPoint: focalPoint,
+      distance: (points[1] - points[0]).distance,
+    );
   }
 
   Widget _buildScrollablePage(
@@ -634,7 +716,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     }
   }
 
-  void _panPages(Offset delta) {
+  void _panPages(Offset delta, {bool duringPinch = false}) {
+    if (_pinchZoomActive && !duringPinch) return;
+
     if (_pagesHorizontalScrollController.hasClients) {
       final horizontal = _pagesHorizontalScrollController.position;
       final target = (horizontal.pixels - delta.dx)
@@ -1010,7 +1094,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   EditingTool? get _activeTool => _toolData[_currentDevice];
 
-  ScrollPhysics get _viewportScrollPhysics => _canPanViewport
+  ScrollPhysics get _viewportScrollPhysics =>
+      _canPanViewport && !_pinchZoomActive
       ? const ClampingScrollPhysics()
       : const NeverScrollableScrollPhysics();
 
@@ -1042,7 +1127,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _zoomAnimationController.stop();
     _zoomAnimation = null;
     _zoomAnimationAnchor = null;
-    _pinchZoomActive = true;
+    setState(() => _pinchZoomActive = true);
   }
 
   void _handlePinchZoomUpdate({
@@ -1064,7 +1149,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       if (anchor != null) {
         _restoreViewportAnchor(anchor, targetGlobalPoint: globalFocalPoint);
       } else {
-        _panPages(globalFocalDelta);
+        _panPages(globalFocalDelta, duringPinch: true);
       }
       _clampHorizontalScroll();
     });
@@ -1879,6 +1964,16 @@ class _ViewportAnchor {
   final int pageIndex;
   final double relativeX;
   final double relativeY;
+}
+
+class _ViewportPinchMetrics {
+  const _ViewportPinchMetrics({
+    required this.focalPoint,
+    required this.distance,
+  });
+
+  final Offset focalPoint;
+  final double distance;
 }
 
 class _SelectionMoveOriginal {

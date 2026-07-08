@@ -335,7 +335,6 @@ class PointerListenerState extends State<PointerListener> {
 
     if (_pinchZooming) return true;
     if (_touchPositions.length != 2) return false;
-    if (!_canPanWithPointer(data)) return false;
 
     _cancelPageSwipe(data);
     _cancelSelectionRegion();
