@@ -564,6 +564,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         targetWidth: pageSize.width * _backgroundRenderScale * devicePixelRatio,
         targetHeight:
             pageSize.height * _backgroundRenderScale * devicePixelRatio,
+        pageWidthPoints: pageSize.width,
+        pageHeightPoints: pageSize.height,
         priority: pageIndex == currentPage
             ? PdfBackgroundRenderPriority.active
             : PdfBackgroundRenderPriority.prefetch,

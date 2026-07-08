@@ -78,6 +78,8 @@ class XppFile {
         PdfBackgroundRenderVariant.full,
         targetWidth: selectedPage.pageSize?.width,
         targetHeight: selectedPage.pageSize?.height,
+        pageWidthPoints: selectedPage.pageSize?.width,
+        pageHeightPoints: selectedPage.pageSize?.height,
         priority: PdfBackgroundRenderPriority.active,
       );
     }

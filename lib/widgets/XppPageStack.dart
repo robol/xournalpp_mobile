@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
@@ -90,6 +91,8 @@ class XppPageStackState extends State<XppPageStack>
             widget.fullQualityBackground || pageBackground is! XppBackgroundPdf,
         targetPixelWidth: targetPixelWidth,
         targetPixelHeight: targetPixelHeight,
+        pageWidthPoints: pageSize.width,
+        pageHeightPoints: pageSize.height,
       );
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
@@ -208,24 +211,51 @@ class XppPageStackState extends State<XppPageStack>
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final hasExplicitBackgroundTarget =
-        widget.backgroundTargetPixelWidth != null &&
-        widget.backgroundTargetPixelHeight != null;
-    final rasterScaleAffectsBackground =
-        !hasExplicitBackgroundTarget &&
-        widget.rasterScale != oldWidget.rasterScale;
-    if (widget.page != oldWidget.page ||
-        widget.fullQualityBackground != oldWidget.fullQualityBackground ||
-        rasterScaleAffectsBackground ||
-        widget.backgroundTargetPixelWidth !=
-            oldWidget.backgroundTargetPixelWidth ||
-        widget.backgroundTargetPixelHeight !=
-            oldWidget.backgroundTargetPixelHeight) {
+    final backgroundRenderChanged =
+        _backgroundRenderSignature(widget) !=
+        _backgroundRenderSignature(oldWidget);
+    if (widget.page != oldWidget.page || backgroundRenderChanged) {
       setState(() {
         page = widget.page;
         _lastKnownBackground = null;
       });
     }
+  }
+
+  String? _backgroundRenderSignature(XppPageStack widget) {
+    final page = widget.page;
+    final background = page?.background;
+    final pageSize = page?.pageSize?.toSize();
+    if (background == null || pageSize == null) return null;
+
+    final devicePixelRatio =
+        MediaQuery.maybeDevicePixelRatioOf(context) ??
+        View.of(context).devicePixelRatio;
+    final targetPixelWidth =
+        widget.backgroundTargetPixelWidth ??
+        pageSize.width * widget.rasterScale * devicePixelRatio;
+    final targetPixelHeight =
+        widget.backgroundTargetPixelHeight ??
+        pageSize.height * widget.rasterScale * devicePixelRatio;
+    final fullQuality =
+        widget.fullQualityBackground || background is! XppBackgroundPdf;
+
+    if (background is XppBackgroundPdf) {
+      final variant = fullQuality
+          ? PdfBackgroundRenderVariant.full
+          : PdfBackgroundRenderVariant.thumbnail;
+      final size = pdfBackgroundRenderService.renderSizeFor(
+        variant,
+        targetWidth: targetPixelWidth,
+        targetHeight: targetPixelHeight,
+        pageWidthPoints: pageSize.width,
+        pageHeightPoints: pageSize.height,
+      );
+      return '${identityHashCode(background)}|$fullQuality|${size.cachePart}';
+    }
+
+    return '${identityHashCode(background)}|$fullQuality|'
+        '${targetPixelWidth.round()}x${targetPixelHeight.round()}';
   }
 }
 

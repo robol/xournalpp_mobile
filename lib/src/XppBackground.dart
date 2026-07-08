@@ -21,6 +21,8 @@ abstract class XppBackground {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   });
 
   XmlElement toXmlElement();
@@ -45,6 +47,8 @@ class XppBackgroundImage extends XppBackground {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return Container(color: Colors.white);
   }
@@ -97,13 +101,27 @@ class XppBackgroundPdf extends XppBackground {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
+    final variant = fullQuality
+        ? PdfBackgroundRenderVariant.full
+        : PdfBackgroundRenderVariant.thumbnail;
+    final snappedSize = pdfBackgroundRenderService.renderSizeFor(
+      variant,
+      targetWidth: targetPixelWidth,
+      targetHeight: targetPixelHeight,
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
+    );
     return (PDfBackgroundWidget(
       provider: this,
       onLoadingChanged: onLoadingChanged,
       fullQuality: fullQuality,
-      targetPixelWidth: targetPixelWidth,
-      targetPixelHeight: targetPixelHeight,
+      targetPixelWidth: snappedSize.width.toDouble(),
+      targetPixelHeight: snappedSize.height.toDouble(),
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
     ));
   }
 
@@ -126,6 +144,8 @@ class PDfBackgroundWidget extends StatefulWidget {
   final bool fullQuality;
   final double? targetPixelWidth;
   final double? targetPixelHeight;
+  final double? pageWidthPoints;
+  final double? pageHeightPoints;
 
   const PDfBackgroundWidget({
     Key? key,
@@ -134,6 +154,8 @@ class PDfBackgroundWidget extends StatefulWidget {
     this.fullQuality = true,
     this.targetPixelWidth,
     this.targetPixelHeight,
+    this.pageWidthPoints,
+    this.pageHeightPoints,
   }) : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
@@ -182,6 +204,8 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
         variant,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
+        pageWidthPoints: widget.pageWidthPoints,
+        pageHeightPoints: widget.pageHeightPoints,
       );
       _subscribeToKey(key, generation);
 
@@ -197,6 +221,8 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
         variant,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
+        pageWidthPoints: widget.pageWidthPoints,
+        pageHeightPoints: widget.pageHeightPoints,
         priority: widget.fullQuality
             ? PdfBackgroundRenderPriority.active
             : PdfBackgroundRenderPriority.visible,
@@ -278,7 +304,9 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     final renderTargetChanged =
         widget.fullQuality != oldWidget.fullQuality ||
         widget.targetPixelWidth != oldWidget.targetPixelWidth ||
-        widget.targetPixelHeight != oldWidget.targetPixelHeight;
+        widget.targetPixelHeight != oldWidget.targetPixelHeight ||
+        widget.pageWidthPoints != oldWidget.pageWidthPoints ||
+        widget.pageHeightPoints != oldWidget.pageHeightPoints;
     if (providerChanged || renderTargetChanged) {
       _renderSubscription?.cancel();
       _renderSubscription = null;
@@ -343,6 +371,8 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'lined',
@@ -369,6 +399,8 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'ruled',
@@ -395,6 +427,8 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'graph',
@@ -421,6 +455,8 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'dotted',
@@ -447,6 +483,8 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return Container(
       width: size!.width,
@@ -469,6 +507,8 @@ class _NoXppBackground extends XppBackground {
     bool fullQuality = true,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) => Container(color: Colors.white);
 
   @override
