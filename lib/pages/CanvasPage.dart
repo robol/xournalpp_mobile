@@ -100,6 +100,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   double pageScale = 1;
   double _backgroundRenderScale = 1;
+  double _strokeRasterScale = 1;
   double _lastViewportWidth = 0;
 
   bool savingFile = false;
@@ -536,7 +537,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                       XppPageStack(
                         key: _pageStackKeyFor(pageIndex),
                         page: page,
-                        rasterScale: pageScale,
+                        rasterScale: _strokeRasterScale,
                         keepAlive: false,
                         backgroundTargetPixelWidth:
                             backgroundDisplayWidth * devicePixelRatio,
@@ -1236,6 +1237,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
     _pinchZoomActive = false;
     _backgroundRenderScale = newZoom;
+    _strokeRasterScale = newZoom;
     _zoomAnimationController.forward(from: 0);
   }
 
@@ -1273,7 +1275,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _handlePinchZoomEnd() {
     if (!_pinchZoomActive) return;
-    setState(() => _pinchZoomActive = false);
+    setState(() {
+      _pinchZoomActive = false;
+      _strokeRasterScale = pageScale;
+    });
     _noteViewportInteraction();
     _scheduleBackgroundRenderScaleCommit();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1849,10 +1854,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       if (!mounted) return;
       _closeSnackBar(exportSnackBar);
       _removeCurrentSnackBar(scaffoldMessenger);
-      _showSnackBar(
-        scaffoldMessenger,
-        SnackBar(content: Text(error.message)),
-      );
+      _showSnackBar(scaffoldMessenger, SnackBar(content: Text(error.message)));
     } catch (error) {
       if (!mounted) return;
       _closeSnackBar(exportSnackBar);
@@ -1910,10 +1912,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       if (!mounted) return;
       _closeSnackBar(exportSnackBar);
       _removeCurrentSnackBar(scaffoldMessenger);
-      _showSnackBar(
-        scaffoldMessenger,
-        SnackBar(content: Text(error.message)),
-      );
+      _showSnackBar(scaffoldMessenger, SnackBar(content: Text(error.message)));
     } catch (error) {
       if (!mounted) return;
       _closeSnackBar(exportSnackBar);
