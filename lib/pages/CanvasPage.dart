@@ -934,7 +934,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  void _restoreTopScrollPosition(_TopScrollPosition? position) {
+  void _restoreTopScrollPosition(
+    _TopScrollPosition? position, {
+    required double scale,
+  }) {
     if (position == null || !_pagesScrollController.hasClients) return;
 
     final pages = _file?.pages ?? <XppPage>[];
@@ -943,16 +946,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final pageSize = pages[position.pageIndex].pageSize?.toSize();
     if (pageSize == null || pageSize.height <= 0) return;
 
-    final pageTop = _pageScrollOffset(position.pageIndex);
-    final displayHeight = _pageDisplayHeightForScale(
-      position.pageIndex,
-      pageScale,
-    );
+    final pageTop = _pageScrollOffsetForScale(position.pageIndex, scale);
+    final displayHeight = _pageDisplayHeightForScale(position.pageIndex, scale);
     final target = pageTop + (position.pageY / pageSize.height) * displayHeight;
     final vertical = _pagesScrollController.position;
-    final clampedTarget = target
-        .clamp(vertical.minScrollExtent, vertical.maxScrollExtent)
-        .toDouble();
+    final clampedTarget = max(vertical.minScrollExtent, target).toDouble();
     if (clampedTarget != vertical.pixels) {
       _pagesScrollController.jumpTo(clampedTarget);
     }
@@ -1258,10 +1256,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     _noteViewportInteraction();
     final topScrollPosition = _currentTopScrollPosition();
-    setState(() => pageScale = nextScale);
+    setState(() {
+      pageScale = nextScale;
+      _restoreTopScrollPosition(topScrollPosition, scale: nextScale);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _restoreTopScrollPosition(topScrollPosition);
       _panPages(globalFocalDelta, duringPinch: true);
       _clampHorizontalScroll();
     });
@@ -1293,11 +1293,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final animation = _zoomAnimation;
     if (animation == null) return;
 
-    setState(() => pageScale = animation.value);
+    final nextScale = animation.value;
+    setState(() {
+      pageScale = nextScale;
+      _restoreTopScrollPosition(_zoomTopScrollPosition, scale: nextScale);
+    });
     _noteViewportInteraction();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _restoreTopScrollPosition(_zoomTopScrollPosition);
       _clampHorizontalScroll();
     });
   }
