@@ -42,11 +42,11 @@ void main() {
       XppPickedFile(Uint8List.fromList([4, 5, 6]), path: 'b.pdf'),
     );
 
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
     final cached = await service.request(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
     );
 
     expect(cached, [4, 5, 6]);
@@ -195,8 +195,8 @@ void main() {
       XppPickedFile(Uint8List.fromList([7, 8, 9]), path: 'c.pdf'),
     );
 
-    await service.request(source, 1, PdfBackgroundRenderVariant.thumbnail);
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 1, PdfBackgroundRenderVariant.full);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
 
     expect(openCount, 1);
 
@@ -212,19 +212,15 @@ void main() {
       XppPickedFile(Uint8List.fromList([7, 8, 9]), path: 'd.pdf'),
     );
 
-    final firstKey = service.keyFor(
-      source,
-      1,
-      PdfBackgroundRenderVariant.thumbnail,
-    );
+    final firstKey = service.keyFor(source, 1, PdfBackgroundRenderVariant.full);
     final secondKey = service.keyFor(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
     );
 
-    await service.request(source, 1, PdfBackgroundRenderVariant.thumbnail);
-    await service.request(source, 2, PdfBackgroundRenderVariant.thumbnail);
+    await service.request(source, 1, PdfBackgroundRenderVariant.full);
+    await service.request(source, 2, PdfBackgroundRenderVariant.full);
     await Future<void>.delayed(Duration.zero);
 
     expect(service.peek(firstKey), isNull);
@@ -271,19 +267,19 @@ void main() {
     final first = service.request(
       source,
       1,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.prefetch,
     );
     final second = service.request(
       source,
       2,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.prefetch,
     );
     final active = service.request(
       source,
       3,
-      PdfBackgroundRenderVariant.thumbnail,
+      PdfBackgroundRenderVariant.full,
       priority: PdfBackgroundRenderPriority.active,
     );
 
@@ -295,28 +291,59 @@ void main() {
     await service.dispose();
   });
 
-  test('cache keys include target pixel size buckets', () {
+  test('full page render sizes snap to dpi buckets', () {
+    final service = _testService();
+
+    sizeForDpi(double dpi) => service.renderSizeFor(
+      PdfBackgroundRenderVariant.full,
+      targetWidth: 720 / 72 * dpi,
+      targetHeight: 1080 / 72 * dpi,
+      pageWidthPoints: 720,
+      pageHeightPoints: 1080,
+    );
+
+    expect(sizeForDpi(72).cachePart, '960x1440');
+    expect(sizeForDpi(120).cachePart, '1920x2880');
+    expect(sizeForDpi(220).cachePart, '2000x3000');
+    expect(sizeForDpi(320).cachePart, '2000x3000');
+  });
+
+  test('cache keys reuse full page dpi buckets', () {
     final service = _testService();
     final source = service.sourceForPickedFile(
       XppPickedFile(Uint8List.fromList([1]), path: 'g.pdf'),
     );
 
-    final small = service.keyFor(
+    final first96Dpi = service.keyFor(
       source,
       1,
       PdfBackgroundRenderVariant.full,
       targetWidth: 800,
-      targetHeight: 1000,
+      targetHeight: 1200,
+      pageWidthPoints: 720,
+      pageHeightPoints: 1080,
     );
-    final large = service.keyFor(
+    final second96Dpi = service.keyFor(
+      source,
+      1,
+      PdfBackgroundRenderVariant.full,
+      targetWidth: 900,
+      targetHeight: 1350,
+      pageWidthPoints: 720,
+      pageHeightPoints: 1080,
+    );
+    final dpi192 = service.keyFor(
       source,
       1,
       PdfBackgroundRenderVariant.full,
       targetWidth: 1600,
-      targetHeight: 2000,
+      targetHeight: 2400,
+      pageWidthPoints: 720,
+      pageHeightPoints: 1080,
     );
 
-    expect(small, isNot(large));
+    expect(first96Dpi, second96Dpi);
+    expect(first96Dpi, isNot(dpi192));
   });
 
   test('uses fallback when a direct file path is missing', () async {

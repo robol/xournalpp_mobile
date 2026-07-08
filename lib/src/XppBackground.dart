@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:async';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/HexColor.dart';
@@ -18,9 +19,11 @@ abstract class XppBackground {
 
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   });
 
   XmlElement toXmlElement();
@@ -42,9 +45,11 @@ class XppBackgroundImage extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return Container(color: Colors.white);
   }
@@ -94,16 +99,27 @@ class XppBackgroundPdf extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
+    final snappedSize = pdfBackgroundRenderService.renderSizeFor(
+      PdfBackgroundRenderVariant.full,
+      targetWidth: targetPixelWidth,
+      targetHeight: targetPixelHeight,
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
+    );
     return (PDfBackgroundWidget(
       provider: this,
       onLoadingChanged: onLoadingChanged,
-      fullQuality: fullQuality,
-      targetPixelWidth: targetPixelWidth,
-      targetPixelHeight: targetPixelHeight,
+      deferRasterUpdates: deferRasterUpdates,
+      targetPixelWidth: snappedSize.width.toDouble(),
+      targetPixelHeight: snappedSize.height.toDouble(),
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
     ));
   }
 
@@ -123,17 +139,21 @@ class XppBackgroundPdf extends XppBackground {
 class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
   final ValueChanged<bool>? onLoadingChanged;
-  final bool fullQuality;
+  final ValueListenable<bool>? deferRasterUpdates;
   final double? targetPixelWidth;
   final double? targetPixelHeight;
+  final double? pageWidthPoints;
+  final double? pageHeightPoints;
 
   const PDfBackgroundWidget({
     Key? key,
     this.provider,
     this.onLoadingChanged,
-    this.fullQuality = true,
+    this.deferRasterUpdates,
     this.targetPixelWidth,
     this.targetPixelHeight,
+    this.pageWidthPoints,
+    this.pageHeightPoints,
   }) : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
@@ -143,6 +163,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     with AutomaticKeepAliveClientMixin {
   StreamSubscription<PdfBackgroundRenderSnapshot>? _renderSubscription;
   Uint8List? _imageBytes;
+  Uint8List? _deferredImageBytes;
   Object? _error;
   bool _isLoading = false;
   int _requestGeneration = 0;
@@ -173,15 +194,14 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       final source = await _loadPdfSource(provider);
       if (!mounted || generation != _requestGeneration) return;
 
-      final variant = widget.fullQuality
-          ? PdfBackgroundRenderVariant.full
-          : PdfBackgroundRenderVariant.thumbnail;
       final key = pdfBackgroundRenderService.keyFor(
         source,
         provider.page,
-        variant,
+        PdfBackgroundRenderVariant.full,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
+        pageWidthPoints: widget.pageWidthPoints,
+        pageHeightPoints: widget.pageHeightPoints,
       );
       _subscribeToKey(key, generation);
 
@@ -194,12 +214,12 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       final bytes = await pdfBackgroundRenderService.request(
         source,
         provider.page,
-        variant,
+        PdfBackgroundRenderVariant.full,
         targetWidth: widget.targetPixelWidth,
         targetHeight: widget.targetPixelHeight,
-        priority: widget.fullQuality
-            ? PdfBackgroundRenderPriority.active
-            : PdfBackgroundRenderPriority.visible,
+        pageWidthPoints: widget.pageWidthPoints,
+        pageHeightPoints: widget.pageHeightPoints,
+        priority: PdfBackgroundRenderPriority.active,
       );
       if (!mounted || generation != _requestGeneration) return;
       _applyImage(bytes);
@@ -233,10 +253,23 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
 
   void _applyImage(Uint8List bytes) {
     if (!mounted) return;
+    final deferRasterUpdates = widget.deferRasterUpdates;
+    if (deferRasterUpdates?.value == true) {
+      _deferredImageBytes = bytes;
+      return;
+    }
     setState(() {
       _imageBytes = bytes;
+      _deferredImageBytes = null;
       _error = null;
     });
+  }
+
+  void _handleDeferRasterUpdatesChanged() {
+    if (widget.deferRasterUpdates?.value == true) return;
+    final bytes = _deferredImageBytes;
+    if (bytes == null) return;
+    _applyImage(bytes);
   }
 
   void _setLoading(bool isLoading) {
@@ -271,14 +304,22 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   @override
   void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.deferRasterUpdates != oldWidget.deferRasterUpdates) {
+      oldWidget.deferRasterUpdates?.removeListener(
+        _handleDeferRasterUpdatesChanged,
+      );
+      widget.deferRasterUpdates?.addListener(_handleDeferRasterUpdatesChanged);
+      _handleDeferRasterUpdatesChanged();
+    }
     final providerChanged = !_isSamePdfBackground(
       widget.provider,
       oldWidget.provider,
     );
     final renderTargetChanged =
-        widget.fullQuality != oldWidget.fullQuality ||
         widget.targetPixelWidth != oldWidget.targetPixelWidth ||
-        widget.targetPixelHeight != oldWidget.targetPixelHeight;
+        widget.targetPixelHeight != oldWidget.targetPixelHeight ||
+        widget.pageWidthPoints != oldWidget.pageWidthPoints ||
+        widget.pageHeightPoints != oldWidget.pageHeightPoints;
     if (providerChanged || renderTargetChanged) {
       _renderSubscription?.cancel();
       _renderSubscription = null;
@@ -286,6 +327,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       _requestGeneration++;
       if (providerChanged) {
         _imageBytes = null;
+        _deferredImageBytes = null;
         _error = null;
       }
       final provider = widget.provider;
@@ -306,7 +348,14 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   void dispose() {
     _requestGeneration++;
     _renderSubscription?.cancel();
+    widget.deferRasterUpdates?.removeListener(_handleDeferRasterUpdatesChanged);
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.deferRasterUpdates?.addListener(_handleDeferRasterUpdatesChanged);
   }
 }
 
@@ -340,9 +389,11 @@ class XppBackgroundSolidLined extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'lined',
@@ -366,9 +417,11 @@ class XppBackgroundSolidRuled extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'ruled',
@@ -392,9 +445,11 @@ class XppBackgroundSolidGraph extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'graph',
@@ -418,9 +473,11 @@ class XppBackgroundSolidDot extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return _RasterizedSolidBackground(
       style: 'dotted',
@@ -444,9 +501,11 @@ class XppBackgroundSolidPlain extends XppBackgroundSolid {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     return Container(
       width: size!.width,
@@ -466,9 +525,11 @@ class _NoXppBackground extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
-    bool fullQuality = true,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) => Container(color: Colors.white);
 
   @override

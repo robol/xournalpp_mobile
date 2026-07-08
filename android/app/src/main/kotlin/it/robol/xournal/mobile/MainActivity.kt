@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.view.InputDevice
+import android.view.MotionEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -17,6 +19,16 @@ class MainActivity: FlutterActivity() {
     private var pendingCreateBytes: ByteArray? = null
     private var openIntentChannel: MethodChannel? = null
     private var initialOpenIntentConsumed = false
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (shouldConsumeStylusButtonEvent(event)) return true
+        return super.dispatchGenericMotionEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (shouldConsumeStylusButtonEvent(event)) return true
+        return super.dispatchTouchEvent(event)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -68,6 +80,30 @@ class MainActivity: FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun shouldConsumeStylusButtonEvent(event: MotionEvent): Boolean {
+        if (
+            event.actionMasked != MotionEvent.ACTION_BUTTON_PRESS &&
+            event.actionMasked != MotionEvent.ACTION_BUTTON_RELEASE
+        ) {
+            return false
+        }
+
+        val stylusButtonMask =
+            MotionEvent.BUTTON_STYLUS_PRIMARY or MotionEvent.BUTTON_STYLUS_SECONDARY
+        if (((event.buttonState or event.actionButton) and stylusButtonMask) == 0) return false
+        if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
+            return true
+        }
+
+        for (pointerIndex in 0 until event.pointerCount) {
+            if (event.getToolType(pointerIndex) == MotionEvent.TOOL_TYPE_STYLUS) {
+                return true
+            }
+        }
+
+        return false
     }
 
     override fun onNewIntent(intent: Intent) {

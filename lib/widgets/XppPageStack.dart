@@ -3,11 +3,13 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
+import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
@@ -28,9 +30,9 @@ class XppPageStack extends StatefulWidget {
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
   final VoidCallback? onDeleteSelection;
   final bool keepAlive;
-  final bool fullQualityBackground;
   final double? backgroundTargetPixelWidth;
   final double? backgroundTargetPixelHeight;
+  final ValueListenable<bool>? deferBackgroundRasterUpdates;
 
   const XppPageStack({
     Key? key,
@@ -43,9 +45,9 @@ class XppPageStack extends StatefulWidget {
     this.onSelectContent,
     this.onDeleteSelection,
     this.keepAlive = true,
-    this.fullQualityBackground = true,
     this.backgroundTargetPixelWidth,
     this.backgroundTargetPixelHeight,
+    this.deferBackgroundRasterUpdates,
   }) : super(key: key);
 
   @override
@@ -86,10 +88,11 @@ class XppPageStackState extends State<XppPageStack>
           widget.backgroundTargetPixelHeight ??
           pageSize.height * widget.rasterScale * devicePixelRatio;
       background = pageBackground.render(
-        fullQuality:
-            widget.fullQualityBackground || pageBackground is! XppBackgroundPdf,
+        deferRasterUpdates: widget.deferBackgroundRasterUpdates,
         targetPixelWidth: targetPixelWidth,
         targetPixelHeight: targetPixelHeight,
+        pageWidthPoints: pageSize.width,
+        pageHeightPoints: pageSize.height,
       );
     }
     children.add(const Positioned.fill(child: ColoredBox(color: Colors.white)));
@@ -208,18 +211,47 @@ class XppPageStackState extends State<XppPageStack>
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.page != oldWidget.page ||
-        widget.fullQualityBackground != oldWidget.fullQualityBackground ||
-        widget.rasterScale != oldWidget.rasterScale ||
-        widget.backgroundTargetPixelWidth !=
-            oldWidget.backgroundTargetPixelWidth ||
-        widget.backgroundTargetPixelHeight !=
-            oldWidget.backgroundTargetPixelHeight) {
+    final backgroundRenderChanged =
+        _backgroundRenderSignature(widget) !=
+            _backgroundRenderSignature(oldWidget) ||
+        widget.deferBackgroundRasterUpdates !=
+            oldWidget.deferBackgroundRasterUpdates;
+    if (widget.page != oldWidget.page || backgroundRenderChanged) {
       setState(() {
         page = widget.page;
         _lastKnownBackground = null;
       });
     }
+  }
+
+  String? _backgroundRenderSignature(XppPageStack widget) {
+    final page = widget.page;
+    final background = page?.background;
+    final pageSize = page?.pageSize?.toSize();
+    if (background == null || pageSize == null) return null;
+
+    final devicePixelRatio =
+        MediaQuery.maybeDevicePixelRatioOf(context) ??
+        View.of(context).devicePixelRatio;
+    final targetPixelWidth =
+        widget.backgroundTargetPixelWidth ??
+        pageSize.width * widget.rasterScale * devicePixelRatio;
+    final targetPixelHeight =
+        widget.backgroundTargetPixelHeight ??
+        pageSize.height * widget.rasterScale * devicePixelRatio;
+    if (background is XppBackgroundPdf) {
+      final size = pdfBackgroundRenderService.renderSizeFor(
+        PdfBackgroundRenderVariant.full,
+        targetWidth: targetPixelWidth,
+        targetHeight: targetPixelHeight,
+        pageWidthPoints: pageSize.width,
+        pageHeightPoints: pageSize.height,
+      );
+      return '${identityHashCode(background)}|${size.cachePart}';
+    }
+
+    return '${identityHashCode(background)}|'
+        '${targetPixelWidth.round()}x${targetPixelHeight.round()}';
   }
 }
 

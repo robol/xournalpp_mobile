@@ -10,8 +10,7 @@ import 'package:xournalpp/src/conditional/file_storage/file_storage_stub.dart'
     if (dart.library.io) 'package:xournalpp/src/conditional/file_storage/file_storage_io.dart';
 
 enum PdfBackgroundRenderVariant {
-  full('full', pdfFullPageMaxDimension),
-  thumbnail('thumb', pdfThumbnailMaxDimension);
+  full('full', pdfFullPageMaxDimension);
 
   final String cacheVariant;
   final int maxDimension;
@@ -70,6 +69,9 @@ typedef PdfBackgroundDocumentOpener =
 typedef PdfBackgroundCacheReader = Future<Uint8List?> Function(String key);
 typedef PdfBackgroundCacheWriter =
     Future<void> Function(String key, Uint8List bytes);
+
+const List<double> pdfFullPageDpiBuckets = [96, 192, 256];
+const double _pdfPointsPerInch = 72;
 
 class PdfBackgroundRenderService {
   PdfBackgroundRenderService({
@@ -162,11 +164,15 @@ class PdfBackgroundRenderService {
     PdfBackgroundRenderVariant variant, {
     double? targetWidth,
     double? targetHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
     final size = renderSizeFor(
       variant,
       targetWidth: targetWidth,
       targetHeight: targetHeight,
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
     );
     return pdfImageCacheKey(source.id, page, variant.cacheVariant, size);
   }
@@ -175,15 +181,31 @@ class PdfBackgroundRenderService {
     PdfBackgroundRenderVariant variant, {
     double? targetWidth,
     double? targetHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
   }) {
+    if (pageWidthPoints != null &&
+        pageHeightPoints != null &&
+        pageWidthPoints > 0 &&
+        pageHeightPoints > 0) {
+      return _clampToMaxDimension(
+        _fullPageBucketSizeFor(
+          pageWidthPoints: pageWidthPoints,
+          pageHeightPoints: pageHeightPoints,
+          targetWidth: targetWidth,
+          targetHeight: targetHeight,
+        ),
+        variant.maxDimension,
+      );
+    }
+
     final maxDimension = variant.maxDimension;
     final width = max(1, (targetWidth ?? maxDimension).round());
     final height = max(1, (targetHeight ?? maxDimension).round());
-    final scale = min(1.0, maxDimension / max(width, height));
     return _bucketSize(
-      PdfRenderPixelSize(
-        width: max(1, (width * scale).round()),
-        height: max(1, (height * scale).round()),
+      _clampToMaxDimension(
+        PdfRenderPixelSize(width: width, height: height),
+        maxDimension,
       ),
     );
   }
@@ -205,12 +227,16 @@ class PdfBackgroundRenderService {
     PdfBackgroundRenderVariant variant, {
     double? targetWidth,
     double? targetHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
     PdfBackgroundRenderPriority priority = PdfBackgroundRenderPriority.visible,
   }) {
     final size = renderSizeFor(
       variant,
       targetWidth: targetWidth,
       targetHeight: targetHeight,
+      pageWidthPoints: pageWidthPoints,
+      pageHeightPoints: pageHeightPoints,
     );
     final key = pdfImageCacheKey(source.id, page, variant.cacheVariant, size);
     final cached = peek(key);
@@ -453,6 +479,42 @@ PdfRenderPixelSize _bucketSize(PdfRenderPixelSize size) {
   return PdfRenderPixelSize(
     width: bucketDimension(size.width),
     height: bucketDimension(size.height),
+  );
+}
+
+PdfRenderPixelSize _fullPageBucketSizeFor({
+  required double pageWidthPoints,
+  required double pageHeightPoints,
+  double? targetWidth,
+  double? targetHeight,
+}) {
+  final requestedWidth = targetWidth ?? pageWidthPoints;
+  final requestedHeight = targetHeight ?? pageHeightPoints;
+  final requestedDpi =
+      max(
+        requestedWidth / pageWidthPoints,
+        requestedHeight / pageHeightPoints,
+      ) *
+      _pdfPointsPerInch;
+  final dpi = pdfFullPageDpiBuckets.firstWhere(
+    (bucket) => bucket >= requestedDpi,
+    orElse: () => pdfFullPageDpiBuckets.last,
+  );
+
+  return PdfRenderPixelSize(
+    width: max(1, (pageWidthPoints / _pdfPointsPerInch * dpi).round()),
+    height: max(1, (pageHeightPoints / _pdfPointsPerInch * dpi).round()),
+  );
+}
+
+PdfRenderPixelSize _clampToMaxDimension(
+  PdfRenderPixelSize size,
+  int maxDimension,
+) {
+  final scale = min(1.0, maxDimension / max(size.width, size.height));
+  return PdfRenderPixelSize(
+    width: max(1, (size.width * scale).round()),
+    height: max(1, (size.height * scale).round()),
   );
 }
 
