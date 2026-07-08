@@ -61,6 +61,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   static const Duration _backgroundRenderCommitDelay = Duration(
     milliseconds: 180,
   );
+  static const Duration _viewportInteractionIdleDelay = Duration(
+    milliseconds: 180,
+  );
 
   XppFile? _file;
   String? filePath;
@@ -87,8 +90,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final ScrollController _pagesHorizontalScrollController = ScrollController();
   late final AnimationController _zoomAnimationController;
   Timer? _backgroundRenderCommitTimer;
+  Timer? _viewportInteractionIdleTimer;
   Animation<double>? _zoomAnimation;
   _ViewportAnchor? _zoomAnimationAnchor;
+  final ValueNotifier<bool> _deferPdfRasterUpdates = ValueNotifier(false);
 
   double pageScale = 1;
   double _backgroundRenderScale = 1;
@@ -103,6 +108,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   bool _allowPop = false;
   bool _currentPageUpdateScheduled = false;
   bool _pdfBackgroundPrefetchScheduled = false;
+  bool _pdfBackgroundPrefetchPendingUntilIdle = false;
   int _pdfBackgroundPrefetchGeneration = 0;
   int _revision = 0;
   int _savedRevision = 0;
@@ -326,6 +332,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               height: constraints.maxHeight,
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
+                  if (notification is ScrollStartNotification ||
+                      notification is ScrollUpdateNotification ||
+                      notification is UserScrollNotification) {
+                    _noteViewportInteraction();
+                  }
                   _scheduleCurrentPageFromScroll();
                   return false;
                 },
@@ -350,11 +361,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _handleViewportPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScrollEvent) return;
+    _noteViewportInteraction();
     _panPages(-event.scrollDelta);
   }
 
   void _handleViewportPointerDown(PointerDownEvent event) {
     if (!_canPanViewport || event.kind != PointerDeviceKind.touch) return;
+    _noteViewportInteraction();
 
     _viewportTouchPositions[event.pointer] = event.position;
     if (_viewportPinchZooming || _viewportTouchPositions.length != 2) {
@@ -373,6 +386,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _handleViewportPointerMove(PointerMoveEvent event) {
     if (event.kind == PointerDeviceKind.touch) {
       _viewportTouchPositions[event.pointer] = event.position;
+      _noteViewportInteraction();
     }
     if (!_viewportPinchZooming) return;
 
@@ -518,6 +532,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         backgroundDisplayWidth * devicePixelRatio,
                     backgroundTargetPixelHeight:
                         backgroundDisplayHeight * devicePixelRatio,
+                    deferBackgroundRasterUpdates: _deferPdfRasterUpdates,
                     activeTool: isActivePage ? _activeTool : null,
                     selectedContents: isActivePage
                         ? _selectedContents
@@ -590,11 +605,34 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _schedulePdfBackgroundPrefetch() {
+    if (_deferPdfRasterUpdates.value || _pinchZoomActive) {
+      _pdfBackgroundPrefetchPendingUntilIdle = true;
+      return;
+    }
     if (_pdfBackgroundPrefetchScheduled) return;
     _pdfBackgroundPrefetchScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pdfBackgroundPrefetchScheduled = false;
       if (mounted) _prefetchPdfBackgroundWindow();
+    });
+  }
+
+  void _noteViewportInteraction() {
+    if (!_deferPdfRasterUpdates.value) {
+      _deferPdfRasterUpdates.value = true;
+    }
+    _viewportInteractionIdleTimer?.cancel();
+    _viewportInteractionIdleTimer = Timer(_viewportInteractionIdleDelay, () {
+      if (!mounted) return;
+      if (_pinchZoomActive || _viewportPinchZooming) {
+        _noteViewportInteraction();
+        return;
+      }
+      _deferPdfRasterUpdates.value = false;
+      if (_pdfBackgroundPrefetchPendingUntilIdle) {
+        _pdfBackgroundPrefetchPendingUntilIdle = false;
+        _schedulePdfBackgroundPrefetch();
+      }
     });
   }
 
@@ -722,6 +760,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _panPages(Offset delta, {bool duringPinch = false}) {
     if (_pinchZoomActive && !duringPinch) return;
+    _noteViewportInteraction();
 
     if (_pagesHorizontalScrollController.hasClients) {
       final horizontal = _pagesHorizontalScrollController.position;
@@ -1117,6 +1156,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     newZoom = max(.1, min(5, newZoom));
     if (newZoom == pageScale) return;
 
+    _noteViewportInteraction();
     _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
     _zoomAnimationAnchor = _currentViewportAnchor();
@@ -1129,6 +1169,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _handlePinchZoomStart(Offset globalFocalPoint) {
+    _noteViewportInteraction();
     _backgroundRenderCommitTimer?.cancel();
     _zoomAnimationController.stop();
     _zoomAnimation = null;
@@ -1149,6 +1190,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final nextScale = max(.1, min(5.0, pageScale * scaleDelta));
     if (nextScale == pageScale && globalFocalDelta == Offset.zero) return;
 
+    _noteViewportInteraction();
     setState(() => pageScale = nextScale);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1164,6 +1206,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void _handlePinchZoomEnd() {
     if (!_pinchZoomActive) return;
     setState(() => _pinchZoomActive = false);
+    _noteViewportInteraction();
     _scheduleBackgroundRenderScaleCommit();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1187,6 +1230,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (animation == null) return;
 
     setState(() => pageScale = animation.value);
+    _noteViewportInteraction();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final anchor = _zoomAnimationAnchor;
@@ -1861,6 +1905,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _backgroundRenderCommitTimer?.cancel();
+    _viewportInteractionIdleTimer?.cancel();
+    _deferPdfRasterUpdates.dispose();
     _pdfBackgroundPrefetchGeneration++;
     _zoomAnimationController.dispose();
     _pagesScrollController.dispose();

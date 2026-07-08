@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/src/XppBackground.dart';
@@ -161,6 +162,7 @@ class _RecordingBackground extends XppBackground {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,
@@ -187,6 +189,7 @@ class _RecordingPdfBackground extends XppBackgroundPdf {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,

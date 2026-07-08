@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -628,6 +629,7 @@ class _RecordingPdfBackground extends XppBackgroundPdf {
   @override
   Widget render({
     ValueChanged<bool>? onLoadingChanged,
+    ValueListenable<bool>? deferRasterUpdates,
     double? targetPixelWidth,
     double? targetPixelHeight,
     double? pageWidthPoints,

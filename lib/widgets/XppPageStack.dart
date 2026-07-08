@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -31,6 +32,7 @@ class XppPageStack extends StatefulWidget {
   final bool keepAlive;
   final double? backgroundTargetPixelWidth;
   final double? backgroundTargetPixelHeight;
+  final ValueListenable<bool>? deferBackgroundRasterUpdates;
 
   const XppPageStack({
     Key? key,
@@ -45,6 +47,7 @@ class XppPageStack extends StatefulWidget {
     this.keepAlive = true,
     this.backgroundTargetPixelWidth,
     this.backgroundTargetPixelHeight,
+    this.deferBackgroundRasterUpdates,
   }) : super(key: key);
 
   @override
@@ -85,6 +88,7 @@ class XppPageStackState extends State<XppPageStack>
           widget.backgroundTargetPixelHeight ??
           pageSize.height * widget.rasterScale * devicePixelRatio;
       background = pageBackground.render(
+        deferRasterUpdates: widget.deferBackgroundRasterUpdates,
         targetPixelWidth: targetPixelWidth,
         targetPixelHeight: targetPixelHeight,
         pageWidthPoints: pageSize.width,
@@ -209,7 +213,9 @@ class XppPageStackState extends State<XppPageStack>
     super.didUpdateWidget(oldWidget);
     final backgroundRenderChanged =
         _backgroundRenderSignature(widget) !=
-        _backgroundRenderSignature(oldWidget);
+            _backgroundRenderSignature(oldWidget) ||
+        widget.deferBackgroundRasterUpdates !=
+            oldWidget.deferBackgroundRasterUpdates;
     if (widget.page != oldWidget.page || backgroundRenderChanged) {
       setState(() {
         page = widget.page;
