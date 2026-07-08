@@ -87,9 +87,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   _ViewportAnchor? _zoomAnimationAnchor;
 
   double pageScale = 1;
+  double _backgroundRenderScale = 1;
   double _lastViewportWidth = 0;
 
   bool savingFile = false;
+  bool _pinchZoomActive = false;
   bool _allowPop = false;
   bool _currentPageUpdateScheduled = false;
   bool _pdfBackgroundPrefetchScheduled = false;
@@ -347,6 +349,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final page = _file!.pages![pageIndex];
     final displayWidth = _pageDisplayWidth(viewportWidth);
     final displayHeight = displayWidth / page.pageSize!.ratio;
+    final backgroundDisplayWidth = _pageDisplayWidthForScale(
+      viewportWidth,
+      _backgroundRenderScale,
+    );
+    final backgroundDisplayHeight =
+        backgroundDisplayWidth / page.pageSize!.ratio;
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final isActivePage = pageIndex == currentPage;
     final shouldRenderFullQuality = (pageIndex - currentPage).abs() <= 1;
@@ -378,6 +386,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 drawWithStylusOnly: drawWithStylusOnly,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
                 onPan: _panPages,
+                onPinchZoomStart: _handlePinchZoomStart,
+                onPinchZoomUpdate: _handlePinchZoomUpdate,
+                onPinchZoomEnd: _handlePinchZoomEnd,
                 onDeviceChange: _handleDeviceChange,
                 filterEraser: ({Offset? coordinates, double? radius}) {
                   _activatePageForEditing(pageIndex);
@@ -419,9 +430,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                     rasterScale: pageScale,
                     keepAlive: false,
                     fullQualityBackground: shouldRenderFullQuality,
-                    backgroundTargetPixelWidth: displayWidth * devicePixelRatio,
+                    backgroundTargetPixelWidth:
+                        backgroundDisplayWidth * devicePixelRatio,
                     backgroundTargetPixelHeight:
-                        displayHeight * devicePixelRatio,
+                        backgroundDisplayHeight * devicePixelRatio,
                     activeTool: isActivePage ? _activeTool : null,
                     selectedContents: isActivePage
                         ? _selectedContents
@@ -549,8 +561,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         source,
         background.page,
         variant,
-        targetWidth: pageSize.width * pageScale * devicePixelRatio,
-        targetHeight: pageSize.height * pageScale * devicePixelRatio,
+        targetWidth: pageSize.width * _backgroundRenderScale * devicePixelRatio,
+        targetHeight:
+            pageSize.height * _backgroundRenderScale * devicePixelRatio,
         priority: pageIndex == currentPage
             ? PdfBackgroundRenderPriority.active
             : PdfBackgroundRenderPriority.prefetch,
@@ -680,7 +693,30 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  void _restoreViewportAnchor(_ViewportAnchor anchor) {
+  _ViewportAnchor? _viewportAnchorForGlobalPoint(Offset globalPoint) {
+    if (!_pagesScrollController.hasClients ||
+        !_pagesHorizontalScrollController.hasClients) {
+      return null;
+    }
+
+    final pageObject = _pageItemKeys[currentPage]?.currentContext
+        ?.findRenderObject();
+    if (pageObject is! RenderBox || !pageObject.attached) return null;
+
+    final pageTopLeft = pageObject.localToGlobal(Offset.zero);
+    return _ViewportAnchor(
+      pageIndex: currentPage,
+      relativeX: ((globalPoint.dx - pageTopLeft.dx) / pageObject.size.width)
+          .clamp(0.0, 1.0),
+      relativeY: ((globalPoint.dy - pageTopLeft.dy) / pageObject.size.height)
+          .clamp(0.0, 1.0),
+    );
+  }
+
+  void _restoreViewportAnchor(
+    _ViewportAnchor anchor, {
+    Offset? targetGlobalPoint,
+  }) {
     final viewportObject = _pagesViewportKey.currentContext?.findRenderObject();
     if (viewportObject is! RenderBox) return;
     if (!_pagesScrollController.hasClients ||
@@ -695,12 +731,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final viewportTopLeft = viewportObject.localToGlobal(Offset.zero);
     final viewportCenter =
         viewportTopLeft + viewportObject.size.center(Offset.zero);
+    final targetPoint = targetGlobalPoint ?? viewportCenter;
     final pageTopLeft = pageObject.localToGlobal(Offset.zero);
     final anchoredPoint = Offset(
       pageTopLeft.dx + pageObject.size.width * anchor.relativeX,
       pageTopLeft.dy + pageObject.size.height * anchor.relativeY,
     );
-    final delta = anchoredPoint - viewportCenter;
+    final delta = anchoredPoint - targetPoint;
 
     final vertical = _pagesScrollController.position;
     _pagesScrollController.jumpTo(
@@ -996,7 +1033,54 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _zoomAnimation = Tween<double>(begin: pageScale, end: newZoom).animate(
       CurvedAnimation(parent: _zoomAnimationController, curve: Curves.easeOut),
     );
+    _pinchZoomActive = false;
+    _backgroundRenderScale = newZoom;
     _zoomAnimationController.forward(from: 0);
+  }
+
+  void _handlePinchZoomStart(Offset globalFocalPoint) {
+    _zoomAnimationController.stop();
+    _zoomAnimation = null;
+    _zoomAnimationAnchor = null;
+    _pinchZoomActive = true;
+  }
+
+  void _handlePinchZoomUpdate({
+    required double scaleDelta,
+    required Offset globalFocalPoint,
+    required Offset globalFocalDelta,
+  }) {
+    if (scaleDelta <= 0) return;
+
+    final anchor = _viewportAnchorForGlobalPoint(
+      globalFocalPoint - globalFocalDelta,
+    );
+    final nextScale = max(.1, min(5.0, pageScale * scaleDelta));
+    if (nextScale == pageScale && globalFocalDelta == Offset.zero) return;
+
+    setState(() => pageScale = nextScale);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (anchor != null) {
+        _restoreViewportAnchor(anchor, targetGlobalPoint: globalFocalPoint);
+      } else {
+        _panPages(globalFocalDelta);
+      }
+      _clampHorizontalScroll();
+    });
+  }
+
+  void _handlePinchZoomEnd() {
+    if (!_pinchZoomActive) return;
+    setState(() {
+      _pinchZoomActive = false;
+      _backgroundRenderScale = pageScale;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _clampHorizontalScroll();
+      _schedulePdfBackgroundPrefetch();
+    });
   }
 
   void _handleZoomAnimationTick() {

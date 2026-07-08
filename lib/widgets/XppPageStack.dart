@@ -208,9 +208,15 @@ class XppPageStackState extends State<XppPageStack>
   @override
   void didUpdateWidget(covariant XppPageStack oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final hasExplicitBackgroundTarget =
+        widget.backgroundTargetPixelWidth != null &&
+        widget.backgroundTargetPixelHeight != null;
+    final rasterScaleAffectsBackground =
+        !hasExplicitBackgroundTarget &&
+        widget.rasterScale != oldWidget.rasterScale;
     if (widget.page != oldWidget.page ||
         widget.fullQualityBackground != oldWidget.fullQualityBackground ||
-        widget.rasterScale != oldWidget.rasterScale ||
+        rasterScaleAffectsBackground ||
         widget.backgroundTargetPixelWidth !=
             oldWidget.backgroundTargetPixelWidth ||
         widget.backgroundTargetPixelHeight !=

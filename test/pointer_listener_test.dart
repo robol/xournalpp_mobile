@@ -217,4 +217,174 @@ void main() {
       expect(erasedPaths.single, [const Offset(40, 40), const Offset(50, 50)]);
     },
   );
+
+  testWidgets('two touch pointers moving apart report pinch zoom in', (
+    WidgetTester tester,
+  ) async {
+    final scaleDeltas = <double>[];
+    var starts = 0;
+    var ends = 0;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: PointerListener(
+          toolData: const {PointerDeviceKind.touch: EditingTool.MOVE},
+          onPinchZoomStart: (_) => starts++,
+          onPinchZoomUpdate:
+              ({
+                required scaleDelta,
+                required globalFocalPoint,
+                required globalFocalDelta,
+              }) {
+                scaleDeltas.add(scaleDelta);
+              },
+          onPinchZoomEnd: () => ends++,
+          child: const SizedBox(width: 200, height: 200),
+        ),
+      ),
+    );
+
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 10,
+        position: Offset(80, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 11,
+        position: Offset(120, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerMoveEvent(
+        pointer: 11,
+        position: Offset(140, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerUpEvent(
+        pointer: 11,
+        position: Offset(140, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+
+    expect(starts, 1);
+    expect(scaleDeltas, isNotEmpty);
+    expect(scaleDeltas.last, greaterThan(1));
+    expect(ends, 1);
+  });
+
+  testWidgets('two touch pointers moving together report pinch zoom out', (
+    WidgetTester tester,
+  ) async {
+    final scaleDeltas = <double>[];
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: PointerListener(
+          toolData: const {PointerDeviceKind.touch: EditingTool.MOVE},
+          onPinchZoomUpdate:
+              ({
+                required scaleDelta,
+                required globalFocalPoint,
+                required globalFocalDelta,
+              }) {
+                scaleDeltas.add(scaleDelta);
+              },
+          child: const SizedBox(width: 200, height: 200),
+        ),
+      ),
+    );
+
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 12,
+        position: Offset(70, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 13,
+        position: Offset(130, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerMoveEvent(
+        pointer: 13,
+        position: Offset(110, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+
+    expect(scaleDeltas, isNotEmpty);
+    expect(scaleDeltas.last, lessThan(1));
+  });
+
+  testWidgets('pinch zoom does not save a stroke on touch up', (
+    WidgetTester tester,
+  ) async {
+    final contents = <XppContent>[];
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: PointerListener(
+          toolData: const {PointerDeviceKind.touch: EditingTool.MOVE},
+          strokeWidth: 4,
+          color: Colors.black,
+          onNewContent: (content) {
+            if (content != null) contents.add(content);
+          },
+          child: const SizedBox(width: 200, height: 200),
+        ),
+      ),
+    );
+
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 14,
+        position: Offset(80, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerDownEvent(
+        pointer: 15,
+        position: Offset(120, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerMoveEvent(
+        pointer: 15,
+        position: Offset(140, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerUpEvent(
+        pointer: 15,
+        position: Offset(140, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+    await tester.sendEventToBinding(
+      const PointerUpEvent(
+        pointer: 14,
+        position: Offset(80, 100),
+        kind: PointerDeviceKind.touch,
+      ),
+    );
+
+    expect(contents, isEmpty);
+  });
 }

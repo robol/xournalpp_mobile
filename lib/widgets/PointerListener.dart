@@ -33,6 +33,14 @@ class PointerListener extends StatefulWidget {
   final VoidCallback? onSwipeRight;
   final VoidCallback? onPointerActivity;
   final void Function(Offset delta)? onPan;
+  final void Function(Offset globalFocalPoint)? onPinchZoomStart;
+  final void Function({
+    required double scaleDelta,
+    required Offset globalFocalPoint,
+    required Offset globalFocalDelta,
+  })?
+  onPinchZoomUpdate;
+  final VoidCallback? onPinchZoomEnd;
 
   const PointerListener({
     Key? key,
@@ -59,6 +67,9 @@ class PointerListener extends StatefulWidget {
     this.onSwipeRight,
     this.onPointerActivity,
     this.onPan,
+    this.onPinchZoomStart,
+    this.onPinchZoomUpdate,
+    this.onPinchZoomEnd,
   }) : super(key: key);
 
   @override
@@ -102,6 +113,10 @@ class PointerListenerState extends State<PointerListener> {
   int? _panPointer;
   bool _twoFingerPanning = false;
   final Set<int> _eraserOverridePointers = {};
+  final Map<int, Offset> _touchPositions = {};
+  bool _pinchZooming = false;
+  double? _lastPinchDistance;
+  Offset? _lastPinchFocalPoint;
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +129,7 @@ class PointerListenerState extends State<PointerListener> {
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
           widget.onPointerActivity?.call();
+          if (_updatePinchZoom(data)) return;
           if (_updatePan(data)) return;
           if (_detectTwoFingerGesture(data)) return;
           _updatePageSwipe(data);
@@ -131,6 +147,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerDown: (data) {
           widget.onPointerActivity?.call();
+          if (_startPinchZoomIfNeeded(data)) return;
           if (_detectTwoFingerGesture(data, shouldPop: true)) {
             _startPan(data, twoFinger: true);
             return;
@@ -168,6 +185,9 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
+          if (_finishPinchZoom(data)) {
+            poppedContentForCurrentPointer = true;
+          }
           if (_finishPan(data)) {
             poppedContentForCurrentPointer = true;
           }
@@ -192,6 +212,7 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerCancel: (data) {
+          _finishPinchZoom(data);
           _finishPan(data);
           _cancelPageSwipe(data);
           if (activeEditingTool == EditingTool.LASER) {
@@ -262,6 +283,10 @@ class PointerListenerState extends State<PointerListener> {
     strokePoints.clear();
     eraserPreview.reset();
     _eraserOverridePointers.clear();
+    _touchPositions.clear();
+    _pinchZooming = false;
+    _lastPinchDistance = null;
+    _lastPinchFocalPoint = null;
     _cancelSelectionRegion();
     resetPreview(rebuild: true);
   }
@@ -302,6 +327,92 @@ class PointerListenerState extends State<PointerListener> {
     _twoFingerPanning = false;
     pointerTimestamps.remove(data.pointer);
     return wasPanning;
+  }
+
+  bool _startPinchZoomIfNeeded(PointerDownEvent data) {
+    if (data.kind != PointerDeviceKind.touch) return false;
+    _touchPositions[data.pointer] = data.position;
+
+    if (_pinchZooming) return true;
+    if (_touchPositions.length != 2) return false;
+    if (!_canPanWithPointer(data)) return false;
+
+    _cancelPageSwipe(data);
+    _cancelSelectionRegion();
+    _panLastPosition = null;
+    _panPointer = null;
+    _twoFingerPanning = false;
+    strokePoints.clear();
+    eraserPreview.reset();
+    resetPreview(rebuild: true);
+    poppedContentForCurrentPointer = true;
+
+    final metrics = _currentPinchMetrics();
+    if (metrics == null) return false;
+    _pinchZooming = true;
+    _lastPinchDistance = metrics.distance;
+    _lastPinchFocalPoint = metrics.focalPoint;
+    widget.onPinchZoomStart?.call(metrics.focalPoint);
+    return true;
+  }
+
+  bool _updatePinchZoom(PointerMoveEvent data) {
+    if (data.kind == PointerDeviceKind.touch) {
+      _touchPositions[data.pointer] = data.position;
+    }
+    if (!_pinchZooming) return false;
+
+    final metrics = _currentPinchMetrics();
+    final previousDistance = _lastPinchDistance;
+    final previousFocalPoint = _lastPinchFocalPoint;
+    if (metrics == null ||
+        previousDistance == null ||
+        previousDistance <= 0 ||
+        previousFocalPoint == null) {
+      return true;
+    }
+
+    _lastPinchDistance = metrics.distance;
+    _lastPinchFocalPoint = metrics.focalPoint;
+    widget.onPinchZoomUpdate?.call(
+      scaleDelta: metrics.distance / previousDistance,
+      globalFocalPoint: metrics.focalPoint,
+      globalFocalDelta: metrics.focalPoint - previousFocalPoint,
+    );
+    return true;
+  }
+
+  bool _finishPinchZoom(PointerEvent data) {
+    if (data.kind == PointerDeviceKind.touch) {
+      _touchPositions.remove(data.pointer);
+    }
+
+    if (!_pinchZooming) return false;
+    if (_touchPositions.length >= 2) {
+      final metrics = _currentPinchMetrics();
+      _lastPinchDistance = metrics?.distance;
+      _lastPinchFocalPoint = metrics?.focalPoint;
+      return true;
+    }
+
+    _pinchZooming = false;
+    _lastPinchDistance = null;
+    _lastPinchFocalPoint = null;
+    widget.onPinchZoomEnd?.call();
+    return true;
+  }
+
+  _PinchMetrics? _currentPinchMetrics() {
+    if (_touchPositions.length < 2) return null;
+    final points = _touchPositions.values.take(2).toList();
+    final focalPoint = Offset(
+      (points[0].dx + points[1].dx) / 2,
+      (points[0].dy + points[1].dy) / 2,
+    );
+    return _PinchMetrics(
+      focalPoint: focalPoint,
+      distance: (points[1] - points[0]).distance,
+    );
   }
 
   Rect? get _selectionRect {
@@ -650,4 +761,11 @@ class PointerListenerState extends State<PointerListener> {
     eraserPreview.dispose();
     super.dispose();
   }
+}
+
+class _PinchMetrics {
+  final Offset focalPoint;
+  final double distance;
+
+  const _PinchMetrics({required this.focalPoint, required this.distance});
 }
