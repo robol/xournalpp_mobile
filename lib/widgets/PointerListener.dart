@@ -128,6 +128,7 @@ class PointerListenerState extends State<PointerListener> {
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
+          if (!mounted) return;
           widget.onPointerActivity?.call();
           if (_updatePinchZoom(data)) return;
           if (_updatePan(data)) return;
@@ -146,6 +147,7 @@ class PointerListenerState extends State<PointerListener> {
           if (isEraser(data)) eraseAt(data);
         },
         onPointerDown: (data) {
+          if (!mounted) return;
           widget.onPointerActivity?.call();
           if (_startPinchZoomIfNeeded(data)) return;
           if (_detectTwoFingerGesture(data, shouldPop: true)) {
@@ -153,7 +155,7 @@ class PointerListenerState extends State<PointerListener> {
             return;
           }
 
-          setState(() {
+          _setStateIfMounted(() {
             activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
@@ -185,6 +187,7 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerUp: (data) {
+          if (!mounted) return;
           if (_finishPinchZoom(data)) {
             poppedContentForCurrentPointer = true;
           }
@@ -212,6 +215,7 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerCancel: (data) {
+          if (!mounted) return;
           _finishPinchZoom(data);
           _finishPan(data);
           _cancelPageSwipe(data);
@@ -228,13 +232,14 @@ class PointerListenerState extends State<PointerListener> {
           }
         },
         onPointerSignal: (data) {
+          if (!mounted) return;
           if (data is PointerScrollEvent) {
             widget.onPointerActivity?.call();
             widget.onPan?.call(-data.scrollDelta);
             notifyDeviceChange(data);
             return;
           }
-          setState(() {
+          _setStateIfMounted(() {
             activeEditingTool = getEditingToolFromPointer(data);
             tool = getToolFromPointer(data);
           });
@@ -449,7 +454,7 @@ class PointerListenerState extends State<PointerListener> {
 
     _dragSelecting = true;
     widget.onSelectionRegionChange?.call(_selectionRect);
-    setState(() {});
+    _setStateIfMounted(() {});
   }
 
   void _finishSelectionRegion() {
@@ -471,7 +476,7 @@ class PointerListenerState extends State<PointerListener> {
     _dragSelecting = false;
     _selectionMoveLastPosition = null;
     _movingSelection = false;
-    setState(() {});
+    _setStateIfMounted(() {});
   }
 
   void _cancelSelectionRegion() {
@@ -482,7 +487,7 @@ class PointerListenerState extends State<PointerListener> {
     _dragSelecting = false;
     _selectionMoveLastPosition = null;
     _movingSelection = false;
-    setState(() {});
+    _setStateIfMounted(() {});
   }
 
   void _startPageSwipe(PointerDownEvent data) {
@@ -604,7 +609,7 @@ class PointerListenerState extends State<PointerListener> {
 
   void finishLaserPreview() {
     strokePreview.finish(fadeOutDuration: _laserPreviewFadeOutDuration);
-    setState(() {});
+    _setStateIfMounted(() {});
   }
 
   void addStrokePoint(PointerEvent data) {
@@ -635,14 +640,19 @@ class PointerListenerState extends State<PointerListener> {
       fadeOutDuration: activeEditingTool == EditingTool.LASER
           ? _laserPreviewFadeOutDuration
           : null,
-      onChunkReady: () => setState(() {}),
+      onChunkReady: () => _setStateIfMounted(() {}),
     );
   }
 
   void resetPreview({bool rebuild = false}) {
     strokePreview.reset();
 
-    if (rebuild) setState(() {});
+    if (rebuild) _setStateIfMounted(() {});
+  }
+
+  void _setStateIfMounted(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
   }
 
   void notifyDeviceChange(PointerEvent data) {
