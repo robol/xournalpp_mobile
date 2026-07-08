@@ -70,6 +70,8 @@ class PointerListenerState extends State<PointerListener> {
   static const double _laserWidth = 20;
   static const double _pageSwipeMinDistance = 80;
   static const double _pageSwipeHorizontalBias = 1.5;
+  static const int _stylusButtonMask =
+      kPrimaryStylusButton | kSecondaryStylusButton;
 
   bool drawingEnabled = true;
 
@@ -99,6 +101,7 @@ class PointerListenerState extends State<PointerListener> {
   Offset? _panLastPosition;
   int? _panPointer;
   bool _twoFingerPanning = false;
+  final Set<int> _eraserOverridePointers = {};
 
   @override
   Widget build(BuildContext context) {
@@ -183,6 +186,7 @@ class PointerListenerState extends State<PointerListener> {
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
           strokePoints.clear();
+          _eraserOverridePointers.remove(data.pointer);
           if (activeEditingTool != EditingTool.LASER) {
             resetPreview(rebuild: true);
           }
@@ -195,6 +199,7 @@ class PointerListenerState extends State<PointerListener> {
           }
           _cancelSelectionRegion();
           strokePoints.clear();
+          _eraserOverridePointers.remove(data.pointer);
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
           if (activeEditingTool != EditingTool.LASER) {
@@ -256,6 +261,7 @@ class PointerListenerState extends State<PointerListener> {
   void clearPoints() {
     strokePoints.clear();
     eraserPreview.reset();
+    _eraserOverridePointers.clear();
     _cancelSelectionRegion();
     resetPreview(rebuild: true);
   }
@@ -580,7 +586,24 @@ class PointerListenerState extends State<PointerListener> {
       return EditingTool.MOVE;
     }
 
+    if (_usesStylusButtonEraser(data, tool)) {
+      _eraserOverridePointers.add(data.pointer);
+      return EditingTool.ERASER;
+    }
+
+    if (_eraserOverridePointers.contains(data.pointer)) {
+      return EditingTool.ERASER;
+    }
+
     return tool;
+  }
+
+  bool _usesStylusButtonEraser(PointerEvent data, EditingTool? tool) {
+    if (data.kind != PointerDeviceKind.stylus) return false;
+    if (tool != EditingTool.STYLUS && tool != EditingTool.HIGHLIGHT) {
+      return false;
+    }
+    return data.buttons & _stylusButtonMask != 0;
   }
 
   bool _isNonStylusPointer(PointerEvent data) {
