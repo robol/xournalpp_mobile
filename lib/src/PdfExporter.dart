@@ -171,6 +171,8 @@ class _IncrementalPdfWriter {
         },
       ).build();
 
+      final savedGraphicsStateObject = addObject(_streamObject('q'));
+      final restoredGraphicsStateObject = addObject(_streamObject('Q'));
       final streamObject = addObject(_streamObject(overlay));
       final resourceObject = addObject(
         _mergedResources(
@@ -182,6 +184,8 @@ class _IncrementalPdfWriter {
       );
       final updatedPage = _updatedPageObject(
         pageInfo: pageInfo,
+        savedGraphicsStateObject: savedGraphicsStateObject,
+        restoredGraphicsStateObject: restoredGraphicsStateObject,
         newContentsObject: streamObject,
         newResourcesObject: resourceObject,
         newParentObject: newPagesObject,
@@ -683,6 +687,8 @@ class _IncrementalPdfWriter {
 
   String _updatedPageObject({
     required _PdfPageInfo pageInfo,
+    required int savedGraphicsStateObject,
+    required int restoredGraphicsStateObject,
     required int newContentsObject,
     required int newResourcesObject,
     required int newParentObject,
@@ -697,8 +703,8 @@ class _IncrementalPdfWriter {
     final newContents = contents == null
         ? '$newContentsObject 0 R'
         : contents.startsWith('[')
-        ? '${contents.substring(0, contents.length - 1)} $newContentsObject 0 R ]'
-        : '[ $contents $newContentsObject 0 R ]';
+        ? '[ $savedGraphicsStateObject 0 R ${contents.substring(1, contents.length - 1)} $restoredGraphicsStateObject 0 R $newContentsObject 0 R ]'
+        : '[ $savedGraphicsStateObject 0 R $contents $restoredGraphicsStateObject 0 R $newContentsObject 0 R ]';
 
     dict = _replaceDictionaryEntry(dict, 'Contents', newContents);
     dict = _replaceDictionaryEntry(

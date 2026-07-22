@@ -51,7 +51,7 @@ void main() {
     expect(exported.length, greaterThan(_minimalPdf().length));
     expect(text, startsWith('%PDF-1.4'));
     expect(text, contains('/Prev'));
-    expect(text, contains('/Contents [ 4 0 R'));
+    expect(text, contains(_isolatedContentsPattern()));
     expect(text, isNot(contains(RegExp(r'/Resources\d'))));
     expect(text, contains(RegExp(r'/Resources \d+ 0 R')));
     expect(text, contains('/FXPHelvetica'));
@@ -115,7 +115,7 @@ void main() {
 
     expect(text, contains('/Prev'));
     expect(text, contains('/Info 5 0 R'));
-    expect(text, contains('/Contents [ 4 0 R'));
+    expect(text, contains(_isolatedContentsPattern()));
     expect(text, contains('/ProcSet [/PDF]'));
     expect(text, contains('/FXPHelvetica'));
   });
@@ -139,7 +139,7 @@ void main() {
     final text = latin1.decode(exported);
 
     expect(text, contains('/Prev'));
-    expect(text, contains('/Contents [ 4 0 R'));
+    expect(text, contains(_isolatedContentsPattern()));
     expect(text, contains('/FXPHelvetica'));
   });
 
@@ -162,8 +162,33 @@ void main() {
     final text = latin1.decode(exported);
 
     expect(text, contains('/Prev'));
-    expect(text, contains('/Contents [ 4 0 R'));
+    expect(text, contains(_isolatedContentsPattern()));
     expect(text, contains('/FXPHelvetica'));
+  });
+
+  test('exportPdfDocument isolates source page graphics state', () async {
+    final pdfPath = await _writePdf(_leakyTransformPdf());
+    final file = _pdfBackedFile(
+      pdfPath,
+      content: [
+        XppStrokePen(
+          color: const Color(0xff336699),
+          points: [
+            XppStrokePoint(x: 10, y: 20, width: 2),
+            XppStrokePoint(x: 80, y: 90, width: 2),
+          ],
+        ),
+      ],
+    );
+
+    final exported = await exportPdfDocument(file);
+    final text = latin1.decode(exported);
+
+    expect(text, contains('1 0 0 -1 0 200 cm'));
+    expect(text, contains('10 180 m 80 110 l S'));
+    expect(text, contains(_isolatedContentsPattern()));
+    expect(text, contains('stream\nq\nendstream'));
+    expect(text, contains('stream\nQ\nendstream'));
   });
 
   test('exportPdfDocument exports non-PDF-backed notebooks', () async {
@@ -231,7 +256,7 @@ void main() {
     expect(text, startsWith('%PDF-1.4'));
     expect(text, contains('/Prev'));
     expect(text, contains('/Count 2'));
-    expect(text, contains('/Contents [ 4 0 R'));
+    expect(text, contains(_isolatedContentsPattern()));
     expect(text, contains('(Generated page) Tj'));
   });
 
@@ -335,6 +360,10 @@ Future<XppPickedFile> _pickedPdf(String path) async {
   return XppPickedFile.fromInternalPath(path: path);
 }
 
+RegExp _isolatedContentsPattern() {
+  return RegExp(r'/Contents \[ \d+ 0 R 4 0 R \d+ 0 R \d+ 0 R \]');
+}
+
 Uint8List _minimalPdf({bool encrypted = false}) {
   final buffer = StringBuffer('%PDF-1.4\n');
   final offsets = <int>[0];
@@ -362,6 +391,38 @@ Uint8List _minimalPdf({bool encrypted = false}) {
     '<< /Size ${objects.length + 1} /Root 1 0 R'
     '${encrypted ? ' /Encrypt 5 0 R' : ''} >>\n',
   );
+  buffer.write('startxref\n$xrefOffset\n%%EOF\n');
+  return Uint8List.fromList(latin1.encode(buffer.toString()));
+}
+
+Uint8List _leakyTransformPdf() {
+  final buffer = StringBuffer('%PDF-1.4\n');
+  final offsets = <int>[0];
+  final objects = <String>[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] '
+        '/Resources << >> /Contents 4 0 R >>',
+    '<< /Length 48 >>\n'
+        'stream\n'
+        '1 0 0 -1 0 200 cm\n'
+        'q 1 1 1 rg 0 0 200 200 re f Q\n'
+        'endstream',
+  ];
+
+  for (var i = 0; i < objects.length; i++) {
+    offsets.add(latin1.encode(buffer.toString()).length);
+    buffer.write('${i + 1} 0 obj\n${objects[i]}\nendobj\n');
+  }
+
+  final xrefOffset = latin1.encode(buffer.toString()).length;
+  buffer.write('xref\n0 ${objects.length + 1}\n');
+  buffer.write('0000000000 65535 f \n');
+  for (final offset in offsets.skip(1)) {
+    buffer.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+  }
+  buffer.write('trailer\n');
+  buffer.write('<< /Size ${objects.length + 1} /Root 1 0 R >>\n');
   buffer.write('startxref\n$xrefOffset\n%%EOF\n');
   return Uint8List.fromList(latin1.encode(buffer.toString()));
 }
