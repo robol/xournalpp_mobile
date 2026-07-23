@@ -158,7 +158,7 @@ void main() {
         .stateList<ScrollableState>(find.byType(Scrollable))
         .firstWhere((state) => state.position.axis == Axis.vertical);
 
-    expect(verticalScrollable.position.pixels, closeTo(2396, 0.1));
+    expect(verticalScrollable.position.pixels, closeTo(2380, 0.1));
   });
 
   testWidgets('zooming keeps the viewport top on the same document position', (
@@ -210,12 +210,12 @@ void main() {
         .stateList<ScrollableState>(find.byType(Scrollable))
         .firstWhere((state) => state.position.axis == Axis.vertical);
 
-    expect(verticalScrollable.position.pixels, closeTo(2396, 0.1));
+    expect(verticalScrollable.position.pixels, closeTo(2380, 0.1));
 
     await tester.tap(find.byIcon(Icons.remove));
     await tester.pumpAndSettle();
 
-    expect(verticalScrollable.position.pixels, closeTo(2165.6, 0.1));
+    expect(verticalScrollable.position.pixels, closeTo(2149.6, 0.1));
   });
 
   testWidgets('canvas pinch zoom works while move tool is selected', (

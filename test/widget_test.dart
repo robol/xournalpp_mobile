@@ -8,6 +8,12 @@ import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 
 void main() {
+  test('PDF export adds annotated suffix to the suggested file name', () {
+    expect(annotatedPdfFileName('Document'), 'Document_annotated.pdf');
+    expect(annotatedPdfFileName('Document.xopp'), 'Document_annotated.pdf');
+    expect(annotatedPdfFileName('Document.pdf'), 'Document_annotated.pdf');
+  });
+
   testWidgets('app opens to the document launcher', (
     WidgetTester tester,
   ) async {

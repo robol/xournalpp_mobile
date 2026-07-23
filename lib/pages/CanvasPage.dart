@@ -29,6 +29,15 @@ import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 
+@visibleForTesting
+String annotatedPdfFileName(String title) {
+  final baseName = title.replaceFirst(
+    RegExp(r'\.(?:xopp|pdf)$', caseSensitive: false),
+    '',
+  );
+  return '${baseName}_annotated.pdf';
+}
+
 class CanvasPage extends StatefulWidget {
   CanvasPage({Key? key, this.file, this.filePath, this.initialPage = 0})
     : super(key: key);
@@ -1953,7 +1962,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       },
     );
     final title = _file?.title ?? S.of(context).newFile;
-    final fileName = title.endsWith('.pdf') ? title : '$title.pdf';
+    final fileName = annotatedPdfFileName(title);
     return (pdfBytes: pdfBytes, fileName: fileName);
   }
 
