@@ -119,6 +119,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double? _lastViewportPinchDistance;
   Offset? _lastViewportPinchFocalPoint;
   bool _allowPop = false;
+  bool _confirmingLeave = false;
   bool _currentPageUpdateScheduled = false;
   bool _pdfBackgroundPrefetchScheduled = false;
   bool _pdfBackgroundPrefetchPendingUntilIdle = false;
@@ -154,16 +155,23 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     return PopScope(
       canPop: _allowPop || !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (!await _confirmLeave()) return;
-        _allowPop = true;
-        if (!context.mounted) return;
-        final navigator = Navigator.of(context);
-        if (navigator.canPop()) {
-          navigator.pop(result);
-        } else {
-          await SystemNavigator.pop();
+        if (didPop || _confirmingLeave) return;
+        _confirmingLeave = true;
+        if (!await _confirmLeave()) {
+          _confirmingLeave = false;
+          return;
         }
+        if (!context.mounted) return;
+        setState(() => _allowPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!context.mounted) return;
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            navigator.pop(result);
+          } else {
+            await SystemNavigator.pop();
+          }
+        });
       },
       child: Scaffold(
         drawer: MainDrawer(onLeaveRequested: _confirmLeave),
@@ -1035,7 +1043,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _refreshPageStack(pageIndex, page);
   }
 
-  bool get _isDirty => _revision != _savedRevision;
+  bool get _isDirty => filePath == null || _revision != _savedRevision;
 
   void _markDirty() {
     _revision++;
