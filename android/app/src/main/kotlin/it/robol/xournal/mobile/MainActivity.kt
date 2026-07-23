@@ -26,6 +26,13 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        normalizeSamsungStylusButtonEvent(event)?.let { normalizedEvent ->
+            return try {
+                super.dispatchTouchEvent(normalizedEvent)
+            } finally {
+                normalizedEvent.recycle()
+            }
+        }
         if (shouldConsumeStylusButtonEvent(event)) return true
         return super.dispatchTouchEvent(event)
     }
@@ -82,6 +89,35 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun normalizeSamsungStylusButtonEvent(event: MotionEvent): MotionEvent? {
+        if (
+            event.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY == 0 ||
+            !isStylusEvent(event)
+        ) {
+            return null
+        }
+
+        val normalizedAction =
+            when (event.actionMasked) {
+                samsungStylusActionDown -> MotionEvent.ACTION_DOWN
+                samsungStylusActionMove -> MotionEvent.ACTION_MOVE
+                samsungStylusActionUp -> MotionEvent.ACTION_UP
+                else -> return null
+            }
+        return MotionEvent.obtain(event).apply {
+            action = normalizedAction
+        }
+    }
+
+    private fun isStylusEvent(event: MotionEvent): Boolean {
+        if ((event.source and InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS) {
+            return true
+        }
+        return (0 until event.pointerCount).any {
+            event.getToolType(it) == MotionEvent.TOOL_TYPE_STYLUS
+        }
+    }
+
     private fun shouldConsumeStylusButtonEvent(event: MotionEvent): Boolean {
         if (
             event.actionMasked != MotionEvent.ACTION_BUTTON_PRESS &&
@@ -104,6 +140,12 @@ class MainActivity: FlutterActivity() {
         }
 
         return false
+    }
+
+    companion object {
+        private const val samsungStylusActionDown = 211
+        private const val samsungStylusActionUp = 212
+        private const val samsungStylusActionMove = 213
     }
 
     override fun onNewIntent(intent: Intent) {
