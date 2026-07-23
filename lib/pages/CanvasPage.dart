@@ -848,7 +848,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (!_pagesScrollController.hasClients) return;
 
     final offset = _pageScrollOffset(pageIndex);
-    print("Scrolling to page $pageIndex with offset $offset");
     final maxOffset = _pagesScrollController.position.maxScrollExtent;
     final target = offset.clamp(0.0, maxOffset).toDouble();
     if (animated) {
