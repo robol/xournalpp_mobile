@@ -164,6 +164,8 @@ class _PdfPageThumbnail extends StatefulWidget {
 
 class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
   Future<Uint8List>? _imageFuture;
+  final Object _requestOwner = Object();
+  int _generation = 0;
 
   @override
   void initState() {
@@ -175,6 +177,7 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
   void didUpdateWidget(covariant _PdfPageThumbnail oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.background != oldWidget.background) {
+      pdfBackgroundRenderService.cancelRequests(_requestOwner);
       _imageFuture = _loadPdfPreview();
     }
   }
@@ -212,20 +215,36 @@ class _PdfPageThumbnailState extends State<_PdfPageThumbnail> {
   }
 
   Future<Uint8List> _loadPdfPreview() async {
-    final filename = widget.background.filename;
-    final source = await pdfBackgroundRenderService.sourceForPath(
-      filename,
-      fallback: () => widget.background.onUnavailable(context, filename),
-    );
+    final generation = ++_generation;
+    final background = widget.background;
+    final pageSize = widget.page.pageSize;
+    final filename = background.filename;
+    final scope = context.getInheritedWidgetOfExactType<PdfSourceScope>();
+    final source =
+        await (scope?.resolve(background) ??
+            pdfBackgroundRenderService.sourceForPath(
+              filename,
+              fallback: () => background.onUnavailable(context, filename),
+              isCurrent: () => mounted && generation == _generation,
+            ));
+    if (!mounted || generation != _generation) throw const PdfRenderCanceled();
     return pdfBackgroundRenderService.request(
       source,
-      widget.background.page,
+      background.page,
       PdfBackgroundRenderVariant.full,
-      targetWidth: widget.page.pageSize?.width,
-      targetHeight: widget.page.pageSize?.height,
-      pageWidthPoints: widget.page.pageSize?.width,
-      pageHeightPoints: widget.page.pageSize?.height,
+      targetWidth: pageSize?.width,
+      targetHeight: pageSize?.height,
+      pageWidthPoints: pageSize?.width,
+      pageHeightPoints: pageSize?.height,
       priority: PdfBackgroundRenderPriority.prefetch,
+      owner: _requestOwner,
     );
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    pdfBackgroundRenderService.cancelRequests(_requestOwner);
+    super.dispose();
   }
 }

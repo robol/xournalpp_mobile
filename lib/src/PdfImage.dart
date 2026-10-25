@@ -152,15 +152,12 @@ class _PdfImageEncodeRequest {
 }
 
 String pdfBytesSignature(Uint8List bytes) {
-  final buffer = StringBuffer(bytes.length);
-  final sampleLength = bytes.length < 64 ? bytes.length : 64;
-  for (var i = 0; i < sampleLength; i++) {
-    buffer.writeCharCode(bytes[i]);
+  // Include the whole document: equal-size edits often leave its ends intact.
+  var hash = 0x811c9dc5;
+  for (final byte in bytes) {
+    hash = ((hash ^ byte) * 0x01000193) & 0xffffffff;
   }
-  for (var i = bytes.length - sampleLength; i < bytes.length; i++) {
-    if (i >= sampleLength && i >= 0) buffer.writeCharCode(bytes[i]);
-  }
-  return buffer.toString();
+  return '${bytes.length}:${hash.toRadixString(16)}';
 }
 
 String stablePdfHash(String value) {

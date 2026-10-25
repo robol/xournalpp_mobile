@@ -136,6 +136,20 @@ class XppBackgroundPdf extends XppBackground {
   }
 }
 
+/// Recovery belongs to the editor, whose context survives page virtualization.
+class PdfSourceScope extends InheritedWidget {
+  final Future<PdfBackgroundRenderSource> Function(XppBackgroundPdf) resolve;
+
+  const PdfSourceScope({
+    super.key,
+    required this.resolve,
+    required super.child,
+  });
+
+  @override
+  bool updateShouldNotify(PdfSourceScope oldWidget) => false;
+}
+
 class PDfBackgroundWidget extends StatefulWidget {
   final XppBackgroundPdf? provider;
   final ValueChanged<bool>? onLoadingChanged;
@@ -144,6 +158,7 @@ class PDfBackgroundWidget extends StatefulWidget {
   final double? targetPixelHeight;
   final double? pageWidthPoints;
   final double? pageHeightPoints;
+  final PdfBackgroundRenderService? renderService;
 
   const PDfBackgroundWidget({
     Key? key,
@@ -154,13 +169,13 @@ class PDfBackgroundWidget extends StatefulWidget {
     this.targetPixelHeight,
     this.pageWidthPoints,
     this.pageHeightPoints,
+    this.renderService,
   }) : super(key: key);
   @override
   _PDfBackgroundWidgetState createState() => _PDfBackgroundWidgetState();
 }
 
-class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
-    with AutomaticKeepAliveClientMixin {
+class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget> {
   StreamSubscription<PdfBackgroundRenderSnapshot>? _renderSubscription;
   Uint8List? _imageBytes;
   Uint8List? _deferredImageBytes;
@@ -168,14 +183,21 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   bool _isLoading = false;
   int _requestGeneration = 0;
   String? _subscribedKey;
+  final Object _requestOwner = Object();
+  PdfBackgroundRenderService get _service =>
+      widget.renderService ?? pdfBackgroundRenderService;
 
   Future<PdfBackgroundRenderSource> _loadPdfSource(
     XppBackgroundPdf provider,
+    int generation,
   ) async {
+    final scope = context.getInheritedWidgetOfExactType<PdfSourceScope>();
+    if (scope != null) return scope.resolve(provider);
     final filename = provider.filename;
-    return pdfBackgroundRenderService.sourceForPath(
+    return _service.sourceForPath(
       filename,
       fallback: () => provider.onUnavailable(context, filename),
+      isCurrent: () => mounted && generation == _requestGeneration,
     );
   }
 
@@ -191,10 +213,10 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     });
 
     try {
-      final source = await _loadPdfSource(provider);
+      final source = await _loadPdfSource(provider, generation);
       if (!mounted || generation != _requestGeneration) return;
 
-      final key = pdfBackgroundRenderService.keyFor(
+      final key = _service.keyFor(
         source,
         provider.page,
         PdfBackgroundRenderVariant.full,
@@ -205,13 +227,13 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       );
       _subscribeToKey(key, generation);
 
-      final cached = pdfBackgroundRenderService.peek(key);
+      final cached = _service.peek(key);
       if (cached != null) {
         _applyImage(cached);
         return;
       }
 
-      final bytes = await pdfBackgroundRenderService.request(
+      final bytes = await _service.request(
         source,
         provider.page,
         PdfBackgroundRenderVariant.full,
@@ -220,6 +242,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
         pageWidthPoints: widget.pageWidthPoints,
         pageHeightPoints: widget.pageHeightPoints,
         priority: PdfBackgroundRenderPriority.active,
+        owner: _requestOwner,
       );
       if (!mounted || generation != _requestGeneration) return;
       _applyImage(bytes);
@@ -238,9 +261,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     if (_subscribedKey == key) return;
     _renderSubscription?.cancel();
     _subscribedKey = key;
-    _renderSubscription = pdfBackgroundRenderService.watch(key).listen((
-      snapshot,
-    ) {
+    _renderSubscription = _service.watch(key).listen((snapshot) {
       if (!mounted || generation != _requestGeneration) return;
       if (snapshot.bytes != null) {
         _applyImage(snapshot.bytes!);
@@ -254,7 +275,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   void _applyImage(Uint8List bytes) {
     if (!mounted) return;
     final deferRasterUpdates = widget.deferRasterUpdates;
-    if (deferRasterUpdates?.value == true) {
+    if (deferRasterUpdates?.value == true && _imageBytes != null) {
       _deferredImageBytes = bytes;
       return;
     }
@@ -275,20 +296,25 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   void _setLoading(bool isLoading) {
     if (_isLoading == isLoading) return;
     _isLoading = isLoading;
+    final generation = _requestGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _requestGeneration ||
+          _isLoading != isLoading)
+        return;
       widget.onLoadingChanged?.call(isLoading);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final provider = widget.provider;
     if (provider == null) return const SizedBox.shrink();
     if (_requestGeneration == 0) {
+      final generation = ++_requestGeneration;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _startLoading(provider);
+        if (mounted && generation == _requestGeneration)
+          _startLoading(provider);
       });
     }
 
@@ -297,9 +323,6 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
     // return const Center(child: CircularProgressIndicator());
     return const Center(); // return empty widget to avoid layout shift when loading
   }
-
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   void didUpdateWidget(covariant PDfBackgroundWidget oldWidget) {
@@ -320,11 +343,17 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
         widget.targetPixelHeight != oldWidget.targetPixelHeight ||
         widget.pageWidthPoints != oldWidget.pageWidthPoints ||
         widget.pageHeightPoints != oldWidget.pageHeightPoints;
-    if (providerChanged || renderTargetChanged) {
+    if (providerChanged ||
+        renderTargetChanged ||
+        widget.renderService != oldWidget.renderService) {
+      (oldWidget.renderService ?? pdfBackgroundRenderService).cancelRequests(
+        _requestOwner,
+      );
       _renderSubscription?.cancel();
       _renderSubscription = null;
       _subscribedKey = null;
-      _requestGeneration++;
+      final generation = ++_requestGeneration;
+      _deferredImageBytes = null;
       if (providerChanged) {
         _imageBytes = null;
         _deferredImageBytes = null;
@@ -333,7 +362,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
       final provider = widget.provider;
       if (provider != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
+          if (mounted && generation == _requestGeneration) {
             _startLoading(
               provider,
               preserveCurrentImage: !providerChanged && _imageBytes != null,
@@ -347,6 +376,7 @@ class _PDfBackgroundWidgetState extends State<PDfBackgroundWidget>
   @override
   void dispose() {
     _requestGeneration++;
+    _service.cancelRequests(_requestOwner);
     _renderSubscription?.cancel();
     widget.deferRasterUpdates?.removeListener(_handleDeferRasterUpdatesChanged);
     super.dispose();

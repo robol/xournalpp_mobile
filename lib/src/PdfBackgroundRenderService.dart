@@ -69,6 +69,12 @@ typedef PdfBackgroundDocumentOpener =
 typedef PdfBackgroundCacheReader = Future<Uint8List?> Function(String key);
 typedef PdfBackgroundCacheWriter =
     Future<void> Function(String key, Uint8List bytes);
+typedef PdfBackgroundSourceRevision = Future<String?> Function(String path);
+typedef PdfBackgroundSourceReader = Future<Uint8List> Function(String path);
+
+class PdfRenderCanceled implements Exception {
+  const PdfRenderCanceled();
+}
 
 const List<double> pdfFullPageDpiBuckets = [96, 192, 256];
 const double _pdfPointsPerInch = 72;
@@ -79,12 +85,16 @@ class PdfBackgroundRenderService {
     PdfBackgroundDocumentOpener? documentOpener,
     PdfBackgroundCacheReader? cacheReader,
     PdfBackgroundCacheWriter? cacheWriter,
+    PdfBackgroundSourceRevision? sourceRevision,
+    PdfBackgroundSourceReader? sourceReader,
     int maxMemoryEntries = 40,
     int maxOpenDocuments = 3,
   }) : _renderer = renderer ?? renderPdfDocumentPageBytes,
        _documentOpener = documentOpener ?? _openDefaultDocument,
        _cacheReader = cacheReader ?? readCacheFile,
        _cacheWriter = cacheWriter ?? _writeDefaultCacheFile,
+       _sourceRevision = sourceRevision ?? localFileRevision,
+       _sourceReader = sourceReader ?? readFileBytes,
        _maxMemoryEntries = maxMemoryEntries,
        _maxOpenDocuments = maxOpenDocuments;
 
@@ -92,68 +102,72 @@ class PdfBackgroundRenderService {
   final PdfBackgroundDocumentOpener _documentOpener;
   final PdfBackgroundCacheReader _cacheReader;
   final PdfBackgroundCacheWriter _cacheWriter;
+  final PdfBackgroundSourceRevision _sourceRevision;
+  final PdfBackgroundSourceReader _sourceReader;
   final int _maxMemoryEntries;
   final int _maxOpenDocuments;
 
   final _memoryCache = LinkedHashMap<String, Uint8List>();
-  final _sourceFutures = <String, Future<PdfBackgroundRenderSource>>{};
   final _sessions = LinkedHashMap<String, _PdfSourceSession>();
   final _inFlight = <String, Future<Uint8List>>{};
   final _queuedTasks = <_PdfRenderTask>[];
   final _controllers =
       <String, StreamController<PdfBackgroundRenderSnapshot>>{};
   bool _isProcessingQueue = false;
+  bool _disposed = false;
+  _PdfRenderTask? _activeTask;
+  Completer<void>? _queueDrained;
+  Future<void>? _disposeFuture;
 
   Future<PdfBackgroundRenderSource> sourceForPath(
     String? path, {
     required Future<XppPickedFile> Function() fallback,
-  }) {
-    final cacheKey = path == null || path.isEmpty ? 'missing' : path;
-    final existing = _sourceFutures[cacheKey];
-    if (existing != null) return existing;
+    bool Function()? isCurrent,
+  }) async {
+    void checkCurrent() {
+      _checkNotDisposed();
+      if (isCurrent != null && !isCurrent()) throw const PdfRenderCanceled();
+    }
 
-    late Future<PdfBackgroundRenderSource> sourceFuture;
-    sourceFuture =
-        () async {
-          if (_canOpenFileDirectly(path) && await localPathExists(path!)) {
-            return _registerFileSource(path);
-          }
-          final picked = await fallback();
-          return sourceForPickedFile(picked);
-        }().catchError((error) {
-          if (identical(_sourceFutures[cacheKey], sourceFuture)) {
-            _sourceFutures.remove(cacheKey);
-          }
-          throw error;
-        });
-    _sourceFutures[cacheKey] = sourceFuture;
-    return sourceFuture;
+    checkCurrent();
+    if (path != null && path.isNotEmpty) {
+      Uint8List? bytes;
+      try {
+        final readable =
+            !_canOpenFileDirectly(path) || await _sourceRevision(path) != null;
+        checkCurrent();
+        if (readable) bytes = await _sourceReader(path);
+      } on PdfRenderCanceled {
+        rethrow;
+      } catch (_) {
+        // Storage providers and local files both fall back to recovery only
+        // after an actual read failure. Never retain a failed selection.
+      }
+      checkCurrent();
+      if (bytes != null) {
+        return sourceForPickedFile(XppPickedFile(bytes, path: path));
+      }
+    }
+    // Do not share UI callbacks across callers or retain successful lookups
+    // forever. The document owner can deduplicate recovery within its lifetime.
+    final picked = await fallback();
+    checkCurrent();
+    return sourceForPickedFile(picked);
   }
 
   PdfBackgroundRenderSource sourceForPickedFile(XppPickedFile pdf) {
+    _checkNotDisposed();
     final path = pdf.path;
-    if (_canOpenFileDirectly(path)) {
-      return _registerFileSource(path!);
-    }
-
-    final bytes = pdf.toUint8List();
+    // Identity and native rendering must refer to exactly the same snapshot,
+    // even if the path is replaced or the caller mutates its input later.
+    final bytes = Uint8List.fromList(pdf.toUint8List()).asUnmodifiableView();
     final sourceName =
         path ?? pdf.fileName ?? 'memory:${identityHashCode(pdf)}';
     return _registerSource(
       PdfBackgroundRenderSource(
-        id: stablePdfHash(path ?? pdfBytesSignature(bytes)),
+        id: stablePdfHash('${path ?? "memory"}:${pdfBytesSignature(bytes)}'),
         sourceName: sourceName,
         bytes: bytes,
-      ),
-    );
-  }
-
-  PdfBackgroundRenderSource _registerFileSource(String path) {
-    return _registerSource(
-      PdfBackgroundRenderSource(
-        id: stablePdfHash(path),
-        sourceName: path,
-        filePath: path,
       ),
     );
   }
@@ -218,6 +232,7 @@ class PdfBackgroundRenderService {
   }
 
   Stream<PdfBackgroundRenderSnapshot> watch(String key) {
+    _checkNotDisposed();
     return _controllerFor(key).stream;
   }
 
@@ -230,7 +245,10 @@ class PdfBackgroundRenderService {
     double? pageWidthPoints,
     double? pageHeightPoints,
     PdfBackgroundRenderPriority priority = PdfBackgroundRenderPriority.visible,
+    Object? owner,
   }) {
+    if (_disposed)
+      return Future.error(StateError('PDF render service disposed.'));
     final size = renderSizeFor(
       variant,
       targetWidth: targetWidth,
@@ -244,7 +262,14 @@ class PdfBackgroundRenderService {
 
     final existing = _inFlight[key];
     if (existing != null) {
-      _raiseQueuedPriority(key, priority);
+      for (final task in [
+        ..._queuedTasks,
+        if (_activeTask != null) _activeTask!,
+      ]) {
+        if (task.key == key && !task.completer.isCompleted) {
+          task.addOwner(owner, priority);
+        }
+      }
       return existing;
     }
 
@@ -258,21 +283,39 @@ class PdfBackgroundRenderService {
         size: size,
         priority: priority,
         completer: completer,
+        owner: owner,
       ),
     );
     _emit(PdfBackgroundRenderSnapshot(key: key, isLoading: true));
     _processQueue();
-    return _inFlight[key]!;
+    return completer.future;
+  }
+
+  /// Release only this consumer. A shared visible request must remain alive.
+  void cancelRequests(Object owner) {
+    for (final task in [
+      ..._queuedTasks,
+      if (_activeTask != null) _activeTask!,
+    ]) {
+      task.owners.remove(owner);
+      if (task.owners.isEmpty && !task.completer.isCompleted) _cancelTask(task);
+    }
+  }
+
+  void _cancelTask(_PdfRenderTask task) {
+    _queuedTasks.remove(task);
+    if (identical(_inFlight[task.key], task.completer.future)) {
+      _inFlight.remove(task.key);
+    }
+    task.completer.completeError(const PdfRenderCanceled());
+    _emit(PdfBackgroundRenderSnapshot(key: task.key, isLoading: false));
   }
 
   void cancelPrefetchesExcept(Set<String> keepKeys) {
     for (final task in List<_PdfRenderTask>.from(_queuedTasks)) {
       if (task.priority != PdfBackgroundRenderPriority.prefetch) continue;
       if (keepKeys.contains(task.key)) continue;
-      _queuedTasks.remove(task);
-      _inFlight.remove(task.key);
-      task.completer.completeError(StateError('PDF render prefetch canceled.'));
-      _emit(PdfBackgroundRenderSnapshot(key: task.key, isLoading: false));
+      _cancelTask(task);
     }
   }
 
@@ -280,34 +323,45 @@ class PdfBackgroundRenderService {
     _memoryCache.clear();
   }
 
-  Future<void> dispose() async {
-    for (final task in _queuedTasks) {
-      task.completer.completeError(StateError('PDF render service disposed.'));
+  Future<void> dispose() => _disposeFuture ??= _dispose();
+
+  Future<void> _dispose() async {
+    _disposed = true;
+    for (final task in [
+      ..._queuedTasks,
+      if (_activeTask != null) _activeTask!,
+    ]) {
+      if (!task.completer.isCompleted) _cancelTask(task);
     }
-    _queuedTasks.clear();
-    for (final session in _sessions.values) {
-      await session.dispose();
-    }
-    for (final controller in _controllers.values) {
-      await controller.close();
-    }
+    // A native render cannot safely be interrupted by closing its document.
+    await _queueDrained?.future;
+    final sessions = _sessions.values.toList();
+    final controllers = _controllers.values.toList();
     _controllers.clear();
     _sessions.clear();
     _memoryCache.clear();
     _inFlight.clear();
+    for (final session in sessions) {
+      await session.dispose();
+    }
+    for (final controller in controllers) {
+      await controller.close();
+    }
+  }
+
+  void _checkNotDisposed() {
+    if (_disposed) throw StateError('PDF render service disposed.');
   }
 
   PdfBackgroundRenderSource _registerSource(PdfBackgroundRenderSource source) {
-    _sessions.putIfAbsent(
-      source.id,
-      () => _PdfSourceSession(source: source, opener: _documentOpener),
-    );
+    _checkNotDisposed();
     return source;
   }
 
   Future<void> _processQueue() async {
     if (_isProcessingQueue) return;
     _isProcessingQueue = true;
+    _queueDrained = Completer<void>();
     try {
       while (_queuedTasks.isNotEmpty) {
         _queuedTasks.sort(
@@ -315,16 +369,20 @@ class PdfBackgroundRenderService {
         );
         final task = _queuedTasks.removeAt(0);
         if (task.completer.isCompleted) continue;
+        _activeTask = task;
         await _runTask(task);
+        _activeTask = null;
       }
     } finally {
       _isProcessingQueue = false;
+      _queueDrained!.complete();
     }
   }
 
   Future<void> _runTask(_PdfRenderTask task) async {
     try {
       final cached = await _cacheReader(task.key);
+      if (_disposed || task.completer.isCompleted) return;
       if (cached != null) {
         _emit(PdfBackgroundRenderSnapshot(key: task.key, bytes: cached));
         task.completer.complete(cached);
@@ -333,16 +391,21 @@ class PdfBackgroundRenderService {
       }
 
       final document = await _sessionFor(task.source).document();
+      if (_disposed || task.completer.isCompleted) return;
       final bytes = await _renderer(document, task.page, task.size);
+      if (_disposed || task.completer.isCompleted) return;
       _emit(PdfBackgroundRenderSnapshot(key: task.key, bytes: bytes));
       task.completer.complete(bytes);
       _persistRasterInBackground(task, bytes, writeCacheFile: true);
-      await _evictIdleDocuments();
     } catch (error, stackTrace) {
       if (task.completer.isCompleted) return;
       _inFlight.remove(task.key);
       _emit(PdfBackgroundRenderSnapshot(key: task.key, error: error));
       task.completer.completeError(error, stackTrace);
+    } finally {
+      // Canceled and failed work can also have opened a native document.
+      // The awaited open/render above has finished, so eviction is now safe.
+      await _evictIdleDocuments();
     }
   }
 
@@ -354,11 +417,14 @@ class PdfBackgroundRenderService {
     unawaited(
       Future<void>(() async {
         try {
+          if (_disposed) return;
           _remember(task.key, bytes);
           if (writeCacheFile) await _cacheWriter(task.key, bytes);
         } catch (_) {}
       }).whenComplete(() {
-        _inFlight.remove(task.key);
+        if (identical(_inFlight[task.key], task.completer.future)) {
+          _inFlight.remove(task.key);
+        }
       }),
     );
   }
@@ -376,14 +442,6 @@ class PdfBackgroundRenderService {
       final oldestKey = _sessions.keys.first;
       final oldest = _sessions.remove(oldestKey);
       await oldest?.dispose();
-    }
-  }
-
-  void _raiseQueuedPriority(String key, PdfBackgroundRenderPriority priority) {
-    for (final task in _queuedTasks) {
-      if (task.key != key) continue;
-      if (task.priority.order < priority.order) task.priority = priority;
-      return;
     }
   }
 
@@ -427,7 +485,10 @@ class _PdfSourceSession {
 
   Future<PdfDocument> document() {
     touch();
-    return _documentFuture ??= opener(source);
+    return _documentFuture ??= opener(source).catchError((Object error) {
+      _documentFuture = null;
+      throw error;
+    });
   }
 
   void touch() {
@@ -448,7 +509,17 @@ class _PdfRenderTask {
   final PdfBackgroundRenderSource source;
   final int? page;
   final PdfRenderPixelSize size;
-  PdfBackgroundRenderPriority priority;
+  final owners = <Object?, PdfBackgroundRenderPriority>{};
+  PdfBackgroundRenderPriority get priority => owners.values.fold(
+    PdfBackgroundRenderPriority.prefetch,
+    (a, b) => a.order >= b.order ? a : b,
+  );
+  void addOwner(Object? owner, PdfBackgroundRenderPriority priority) {
+    final previous = owners[owner];
+    if (previous == null || priority.order > previous.order)
+      owners[owner] = priority;
+  }
+
   final Completer<Uint8List> completer;
 
   _PdfRenderTask({
@@ -456,9 +527,12 @@ class _PdfRenderTask {
     required this.source,
     required this.page,
     required this.size,
-    required this.priority,
+    required PdfBackgroundRenderPriority priority,
+    Object? owner,
     required this.completer,
-  });
+  }) {
+    addOwner(owner, priority);
+  }
 }
 
 final pdfBackgroundRenderService = PdfBackgroundRenderService();

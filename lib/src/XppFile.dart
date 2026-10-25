@@ -28,6 +28,51 @@ import 'XppPage.dart';
 class XppFile {
   XppFile({this.title, this.pages, this.previewImage});
 
+  // Successful snapshots live with this notebook, not the global renderer.
+  // Reopening a notebook resolves fresh bytes. Failed lookups remain retryable.
+  final _pdfSources =
+      <
+        (PdfBackgroundRenderService, Object),
+        Future<PdfBackgroundRenderSource>
+      >{};
+
+  Future<PdfBackgroundRenderSource>? resolvedPdfSource(
+    XppBackgroundPdf background,
+    PdfBackgroundRenderService service,
+  ) => _pdfSources[(service, background.filename ?? background)];
+
+  Future<PdfBackgroundRenderSource> resolvePdfSource(
+    BuildContext context,
+    XppBackgroundPdf background, {
+    PdfBackgroundRenderService? renderService,
+  }) {
+    final service = renderService ?? pdfBackgroundRenderService;
+    final sourcesInDocument =
+        pages
+            ?.map((page) => page.background)
+            .whereType<XppBackgroundPdf>()
+            .map((background) => background.filename ?? background)
+            .toSet() ??
+        {};
+    _pdfSources.removeWhere((key, _) => !sourcesInDocument.contains(key.$2));
+    final key = (service, background.filename ?? background);
+    return _pdfSources.putIfAbsent(key, () {
+      late final Future<PdfBackgroundRenderSource> pending;
+      pending = service
+          .sourceForPath(
+            background.filename,
+            fallback: () =>
+                background.onUnavailable(context, background.filename),
+            isCurrent: () => context.mounted,
+          )
+          .catchError((Object error, StackTrace stack) {
+            if (identical(_pdfSources[key], pending)) _pdfSources.remove(key);
+            Error.throwWithStackTrace(error, stack);
+          });
+      return pending;
+    });
+  }
+
   /// create an empty [XppFile]
   static XppFile empty({
     String? title,
@@ -65,14 +110,19 @@ class XppFile {
     BuildContext context, {
     int currentPage = 0,
     int thumbnailCount = 0,
+    PdfBackgroundRenderService? renderService,
   }) async {
     if (pages == null || pages!.isEmpty) return;
 
     final selectedPage = pages![currentPage.clamp(0, pages!.length - 1)];
     final selectedBackground = selectedPage.background;
     if (selectedBackground is XppBackgroundPdf) {
-      final source = await _pdfSourceForBackground(context, selectedBackground);
-      await pdfBackgroundRenderService.request(
+      final source = await resolvePdfSource(
+        context,
+        selectedBackground,
+        renderService: renderService,
+      );
+      await (renderService ?? pdfBackgroundRenderService).request(
         source,
         selectedBackground.page,
         PdfBackgroundRenderVariant.full,
@@ -92,46 +142,22 @@ class XppFile {
       final background = page.background;
       if (background is! XppBackgroundPdf) continue;
       unawaited(
-        _pdfSourceForBackground(context, background).then(
-          (source) => pdfBackgroundRenderService.request(
-            source,
-            background.page,
-            PdfBackgroundRenderVariant.full,
-            targetWidth: page.pageSize?.width,
-            targetHeight: page.pageSize?.height,
-            pageWidthPoints: page.pageSize?.width,
-            pageHeightPoints: page.pageSize?.height,
-            priority: PdfBackgroundRenderPriority.prefetch,
-          ),
-        ),
+        resolvePdfSource(context, background, renderService: renderService)
+            .then(
+              (source) => (renderService ?? pdfBackgroundRenderService).request(
+                source,
+                background.page,
+                PdfBackgroundRenderVariant.full,
+                targetWidth: page.pageSize?.width,
+                targetHeight: page.pageSize?.height,
+                pageWidthPoints: page.pageSize?.width,
+                pageHeightPoints: page.pageSize?.height,
+                priority: PdfBackgroundRenderPriority.prefetch,
+              ),
+            )
+            .catchError((Object _) => Uint8List(0)),
       );
     }
-  }
-
-  Future<PdfBackgroundRenderSource> _pdfSourceForBackground(
-    BuildContext context,
-    XppBackgroundPdf background,
-  ) {
-    final filename = background.filename;
-    return pdfBackgroundRenderService.sourceForPath(
-      filename,
-      fallback: () => _pdfFileForBackground(context, background),
-    );
-  }
-
-  Future<XppPickedFile> _pdfFileForBackground(
-    BuildContext context,
-    XppBackgroundPdf background,
-  ) async {
-    final filename = background.filename;
-    if (filename != null && filename.isNotEmpty) {
-      try {
-        return await XppPickedFile.fromInternalPath(path: filename);
-      } catch (_) {
-        // Fall through to the missing-file callback below.
-      }
-    }
-    return background.onUnavailable(context, filename);
   }
 
   /// showing a [open] dialog and pushes a [CanvasPage] to the provided [BuildContext]'s [Navigator]

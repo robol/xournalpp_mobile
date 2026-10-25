@@ -3,7 +3,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart'
+    show ValueListenable, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -16,6 +17,9 @@ import 'package:xournalpp/src/XppPageContentWidget.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppPageStack extends StatefulWidget {
+  @visibleForTesting
+  static Future<ui.Image> Function(ui.Picture, int, int)? debugRasterizePicture;
+
   final XppPage? page;
   final double rasterScale;
   final void Function(
@@ -475,6 +479,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   }
 
   void _rasterizeIfNeeded() {
+    if (!mounted) return;
     final pixelRatio = _rasterPixelRatio();
     final signature = _strokeRunSignature(
       widget.strokes,
@@ -518,7 +523,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     });
   }
 
-  void _startRasterization(
+  Future<void> _startRasterization(
     List<XppStroke> strokes,
     Size pageSize,
     double pixelRatio,
@@ -526,19 +531,18 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     int generation,
     ui.Image? baseImage,
     int? cachedPrefixLength,
-  ) {
+  ) async {
     _rasterizationInProgress = true;
-    _rasterize(
-      strokes,
-      pageSize,
-      pixelRatio,
-      baseImage: baseImage,
-      cachedPrefixLength: cachedPrefixLength,
-    ).then((image) {
-      _rasterizationInProgress = false;
+    try {
+      final image = await _rasterize(
+        strokes,
+        pageSize,
+        pixelRatio,
+        baseImage: baseImage,
+        cachedPrefixLength: cachedPrefixLength,
+      );
       if (!mounted || generation != _generation) {
         image.dispose();
-        _rerasterizeIfRequested();
         return;
       }
 
@@ -550,12 +554,18 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
         _cachedSignature = signature;
         _cachedStrokeIdentities = strokes.map(identityHashCode).toList();
       });
+    } catch (_) {
+      // Vector painting remains available. Permit a later update to retry,
+      // without spinning indefinitely on an allocation/native-render failure.
+      if (generation == _generation) _requestedSignature = null;
+    } finally {
+      _rasterizationInProgress = false;
       _rerasterizeIfRequested();
-    });
+    }
   }
 
   void _rerasterizeIfRequested() {
-    if (!_rasterizeAfterCurrent) return;
+    if (!mounted || !_rasterizeAfterCurrent) return;
     _rasterizeAfterCurrent = false;
     _requestedSignature = null;
     _rasterizeIfNeeded();
@@ -581,9 +591,16 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     final picture = recorder.endRecording();
     final width = (pageSize.width * pixelRatio).ceil().clamp(1, 100000);
     final height = (pageSize.height * pixelRatio).ceil().clamp(1, 100000);
-    final image = await picture.toImage(width, height);
-    picture.dispose();
-    return image;
+    try {
+      return await (XppPageStack.debugRasterizePicture?.call(
+            picture,
+            width,
+            height,
+          ) ??
+          picture.toImage(width, height));
+    } finally {
+      picture.dispose();
+    }
   }
 
   int _strokeRunSignature(
@@ -627,6 +644,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   @override
   void dispose() {
     _generation++;
+    _rasterizeAfterCurrent = false;
     _rasterizeTimer?.cancel();
     _image?.dispose();
     super.dispose();

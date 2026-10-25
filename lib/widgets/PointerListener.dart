@@ -41,6 +41,7 @@ class PointerListener extends StatefulWidget {
   })?
   onPinchZoomUpdate;
   final VoidCallback? onPinchZoomEnd;
+  final bool viewportGesturesExternallyManaged;
 
   const PointerListener({
     Key? key,
@@ -70,6 +71,7 @@ class PointerListener extends StatefulWidget {
     this.onPinchZoomStart,
     this.onPinchZoomUpdate,
     this.onPinchZoomEnd,
+    this.viewportGesturesExternallyManaged = false,
   }) : super(key: key);
 
   @override
@@ -117,6 +119,21 @@ class PointerListenerState extends State<PointerListener> {
   bool _pinchZooming = false;
   double? _lastPinchDistance;
   Offset? _lastPinchFocalPoint;
+  final Set<int> _suppressedTouchPointers = {};
+
+  /// Called synchronously when the canvas starts a pinch, including across pages.
+  void cancelForViewportGesture() {
+    _suppressedTouchPointers.addAll(_touchPositions.keys);
+    strokePoints.clear();
+    eraserPreview.reset();
+    _panLastPosition = null;
+    _panPointer = null;
+    _twoFingerPanning = false;
+    _pageSwipeStart = null;
+    _pageSwipePointerDevice = null;
+    _cancelSelectionRegion();
+    resetPreview(rebuild: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +146,7 @@ class PointerListenerState extends State<PointerListener> {
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
           if (!mounted) return;
+          if (_suppressedTouchPointers.contains(data.pointer)) return;
           widget.onPointerActivity?.call();
           if (_updatePinchZoom(data)) return;
           if (_updatePan(data)) return;
@@ -148,6 +166,10 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerDown: (data) {
           if (!mounted) return;
+          if (widget.viewportGesturesExternallyManaged &&
+              data.kind == PointerDeviceKind.touch) {
+            _touchPositions[data.pointer] = data.position;
+          }
           widget.onPointerActivity?.call();
           if (_startPinchZoomIfNeeded(data)) return;
           if (_detectTwoFingerGesture(data, shouldPop: true)) {
@@ -160,7 +182,10 @@ class PointerListenerState extends State<PointerListener> {
             tool = getToolFromPointer(data);
           });
           if (activeEditingTool == EditingTool.MOVE) {
-            _startPan(data);
+            if (!widget.viewportGesturesExternallyManaged ||
+                data.kind != PointerDeviceKind.touch) {
+              _startPan(data);
+            }
             notifyDeviceChange(data);
             return;
           }
@@ -188,6 +213,10 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerUp: (data) {
           if (!mounted) return;
+          if (_suppressedTouchPointers.remove(data.pointer)) {
+            _touchPositions.remove(data.pointer);
+            return;
+          }
           if (_finishPinchZoom(data)) {
             poppedContentForCurrentPointer = true;
           }
@@ -216,6 +245,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerCancel: (data) {
           if (!mounted) return;
+          _suppressedTouchPointers.remove(data.pointer);
           _finishPinchZoom(data);
           _finishPan(data);
           _cancelPageSwipe(data);
@@ -234,8 +264,9 @@ class PointerListenerState extends State<PointerListener> {
         onPointerSignal: (data) {
           if (!mounted) return;
           if (data is PointerScrollEvent) {
-            widget.onPointerActivity?.call();
-            widget.onPan?.call(-data.scrollDelta);
+            GestureBinding.instance.pointerSignalResolver.register(data, (_) {
+              widget.onPan?.call(-data.scrollDelta);
+            });
             notifyDeviceChange(data);
             return;
           }
@@ -335,6 +366,7 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   bool _startPinchZoomIfNeeded(PointerDownEvent data) {
+    if (widget.viewportGesturesExternallyManaged) return false;
     if (data.kind != PointerDeviceKind.touch) return false;
     _touchPositions[data.pointer] = data.position;
 
@@ -361,6 +393,7 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   bool _updatePinchZoom(PointerMoveEvent data) {
+    if (widget.viewportGesturesExternallyManaged) return false;
     if (data.kind == PointerDeviceKind.touch) {
       _touchPositions[data.pointer] = data.position;
     }
@@ -745,6 +778,7 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   bool _detectTwoFingerGesture(PointerEvent data, {bool shouldPop = false}) {
+    if (widget.viewportGesturesExternallyManaged) return false;
     if (data.kind != PointerDeviceKind.touch) return false;
     if (!_canPanWithPointer(data)) return false;
 

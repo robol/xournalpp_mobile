@@ -158,7 +158,11 @@ void main() {
         .stateList<ScrollableState>(find.byType(Scrollable))
         .firstWhere((state) => state.position.axis == Axis.vertical);
 
-    expect(verticalScrollable.position.pixels, closeTo(2380, 0.1));
+    // 760px page width, 32px between page tops, and 28px initial inset.
+    expect(
+      verticalScrollable.position.pixels,
+      closeTo(28 + 760 * 3 + 32 * 2, 0.1),
+    );
   });
 
   testWidgets('zooming keeps the viewport top on the same document position', (
@@ -210,12 +214,18 @@ void main() {
         .stateList<ScrollableState>(find.byType(Scrollable))
         .firstWhere((state) => state.position.axis == Axis.vertical);
 
-    expect(verticalScrollable.position.pixels, closeTo(2380, 0.1));
+    expect(
+      verticalScrollable.position.pixels,
+      closeTo(28 + 760 * 3 + 32 * 2, 0.1),
+    );
 
     await tester.tap(find.byIcon(Icons.remove));
     await tester.pumpAndSettle();
 
-    expect(verticalScrollable.position.pixels, closeTo(2149.6, 0.1));
+    expect(
+      verticalScrollable.position.pixels,
+      closeTo(28 + 760 * .9 * 3 + 32 * 2, 0.1),
+    );
   });
 
   testWidgets('canvas pinch zoom works while move tool is selected', (
@@ -282,7 +292,7 @@ void main() {
       ),
     );
 
-    expect(canvasState.pageScale, greaterThan(1));
+    expect(canvasState.pageScale, closeTo(1.5, .001));
   });
 
   testWidgets('canvas pinch zoom does not rerender PDF background until end', (

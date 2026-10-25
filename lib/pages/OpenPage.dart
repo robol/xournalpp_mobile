@@ -553,22 +553,23 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   }
 }
 
-final Map<String, Future<XppPickedFile>> _missingFileSelections = {};
+final Map<(BuildContext, String?), Future<XppPickedFile>>
+_missingFileSelections = {};
 
 Future<XppPickedFile> showMissingFileDialog(
   BuildContext context,
   String? path,
 ) async {
-  final cacheKey = path ?? '__missing_pdf__';
+  if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
+  final cacheKey = (context, path);
   final existingSelection = _missingFileSelections[cacheKey];
   if (existingSelection != null) return existingSelection;
 
   late Future<XppPickedFile> selection;
-  selection = _resolveMissingPdfFile(context, path).catchError((error) {
+  selection = _resolveMissingPdfFile(context, path).whenComplete(() {
     if (identical(_missingFileSelections[cacheKey], selection)) {
       _missingFileSelections.remove(cacheKey);
     }
-    throw error;
   });
   _missingFileSelections[cacheKey] = selection;
   return selection;
@@ -579,6 +580,7 @@ Future<XppPickedFile> _resolveMissingPdfFile(
   String? path,
 ) async {
   final mappedPath = await _mappedMissingPdfPath(path);
+  if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
   if (mappedPath != null) {
     try {
       return await XppPickedFile.fromInternalPath(path: mappedPath);
@@ -588,6 +590,7 @@ Future<XppPickedFile> _resolveMissingPdfFile(
   }
 
   final file = await _pickMissingPdfFile(context, path);
+  if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
   await _rememberMissingPdfMapping(path, file.path);
   return file;
 }
@@ -596,6 +599,7 @@ Future<XppPickedFile> _pickMissingPdfFile(
   BuildContext context,
   String? path,
 ) async {
+  if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
   final shouldPick = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -621,6 +625,8 @@ Future<XppPickedFile> _pickMissingPdfFile(
   if (shouldPick != true) {
     throw UnsupportedError('Missing PDF file was not selected.');
   }
+
+  if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
 
   return XppPickedFile.importFromStorage(
     type: XppFilePickType.custom,

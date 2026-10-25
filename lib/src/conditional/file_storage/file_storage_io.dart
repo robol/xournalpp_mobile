@@ -68,6 +68,13 @@ Future<bool> localPathExists(String path) {
   return File(path).exists();
 }
 
+Future<String?> localFileRevision(String path) async {
+  final stat = await File(path).stat();
+  if (stat.type != FileSystemEntityType.file) return null;
+  return '${stat.size}:${stat.modified.microsecondsSinceEpoch}:'
+      '${stat.changed.microsecondsSinceEpoch}';
+}
+
 Future<String> writeCacheFile(String key, Uint8List bytes) async {
   final file = await _cacheFile(key);
   await file.parent.create(recursive: true);

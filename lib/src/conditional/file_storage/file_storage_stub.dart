@@ -31,6 +31,8 @@ Future<String> writeCacheFile(String key, Uint8List bytes) async {
 
 Future<bool> localPathExists(String path) async => false;
 
+Future<String?> localFileRevision(String path) async => null;
+
 Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) {
   throw UnsupportedError(
     'Writing temporary local files is not supported here.',
