@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
@@ -28,9 +29,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   Set recentFiles = Set();
 
   late AnimationController _animationController;
+  StreamSubscription<List<SharedMediaFile>>? _mediaSubscription;
 
   @override
   void dispose() {
+    _mediaSubscription?.cancel();
+    _androidIntentChannel.setMethodCallHandler(null);
     _animationController.dispose();
     super.dispose();
   }
@@ -48,6 +52,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
     SharedPreferences.getInstance()
         .then((prefs) {
+          if (!mounted) return;
           String? jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
           if (jsonData != null) {
             recentFiles = (jsonDecode(jsonData) as List).reversed
@@ -59,6 +64,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           });
         })
         .catchError((e) {
+          if (!mounted) return;
           print('No SharedPreferences available for this platform.');
           setState(() {
             _loadedRecent = true;
@@ -88,24 +94,22 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       }
 
       // For sharing images coming from outside the app while the app is in the memory
-      ReceiveSharingIntent.instance.getMediaStream().listen(
-        (List<SharedMediaFile> value) {
-          setState(() {
-            receivedShareNotification(value);
-          });
-        },
-        onError: (err) {
-          print("getIntentDataStream error: $err");
-        },
-      );
+      _mediaSubscription = ReceiveSharingIntent.instance
+          .getMediaStream()
+          .listen(
+            (List<SharedMediaFile> value) {
+              if (mounted) unawaited(receivedShareNotification(value));
+            },
+            onError: (err) {
+              print("getIntentDataStream error: $err");
+            },
+          );
 
       // For sharing images coming from outside the app while the app is closed
       ReceiveSharingIntent.instance
           .getInitialMedia()
           .then((List<SharedMediaFile> value) {
-            setState(() {
-              receivedShareNotification(value);
-            });
+            if (mounted) return receivedShareNotification(value);
           })
           .catchError((e) {});
     } catch (e) {}
@@ -224,10 +228,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
   Future<void> receivedShareNotification(dynamic data) async {
     if (data == null ||
+        data is List && data.isEmpty ||
         lastIntentData == data ||
         data is List &&
             data.isNotEmpty &&
             lastIntentData is List &&
+            lastIntentData.isNotEmpty &&
             data[0].path == lastIntentData[0].path)
       return;
     lastIntentData = data;
@@ -334,7 +340,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         filePath = pickedFile.path;
       }
       if (context.mounted) await file.prepareForOpening(context);
-      if (_aborted || !context.mounted) return;
+      if (_aborted || !context.mounted) {
+        if (_aborted) lastIntentData = null;
+        return;
+      }
       if (_dialogVisible) Navigator.of(context, rootNavigator: true).pop();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -342,6 +351,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         ),
       );
     } catch (e) {
+      lastIntentData = null;
       if (!context.mounted) return;
       if (_dialogVisible) Navigator.of(context, rootNavigator: true).pop();
       showDialog(
@@ -456,17 +466,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                 ),
               );
             } catch (e) {
-              setState(() {
-                recentFiles.removeWhere(
-                  (element) => element['path'] == fileInfo['path'],
-                );
-              });
-              SharedPreferences.getInstance().then((prefs) {
-                prefs.setString(
-                  PreferencesKeys.kRecentFiles,
-                  jsonEncode(recentFiles.toList()),
-                );
-              });
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -532,7 +531,19 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           ),
           TextButton(
             onPressed: () async {
-              XppPickedFile.delete(path: path);
+              try {
+                await XppPickedFile.delete(path: path);
+              } catch (error) {
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${S.of(context).errorOpeningFile} $error'),
+                  ),
+                );
+                return;
+              }
+              if (!context.mounted) return;
               setState(() {
                 recentFiles.removeWhere((element) => element['path'] == path);
               });

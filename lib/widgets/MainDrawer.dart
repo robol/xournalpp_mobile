@@ -8,7 +8,6 @@ import 'package:xournalpp/pages/SettingsPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
-import 'package:xournalpp/widgets/QuotaTile.dart';
 
 class MainDrawer extends StatefulWidget {
   final Future<bool> Function()? onLeaveRequested;
@@ -24,8 +23,10 @@ class _MainDrawerState extends State<MainDrawer> {
 
   @override
   void initState() {
-    PackageInfo.fromPlatform().then((value) => info = value);
     super.initState();
+    PackageInfo.fromPlatform().then((value) {
+      if (mounted) setState(() => info = value);
+    });
   }
 
   @override
@@ -71,7 +72,6 @@ class _MainDrawerState extends State<MainDrawer> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                QuotaTile(),
                 Divider(),
                 ListTile(
                   leading: Icon(Icons.settings),

@@ -8,7 +8,6 @@ import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
-import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppImage extends XppContent {
   Offset? topLeft = Offset(0, 0);
@@ -70,7 +69,6 @@ class XppImage extends XppContent {
       selectionMode: selectionMode,
       selected: selected,
       onSelect: onSelect,
-      tool: EditingTool.IMAGE,
     );
   }
 
@@ -101,16 +99,4 @@ class XppImage extends XppContent {
     ],
     [XmlText(base64Encode(data!))],
   );
-
-  @override
-  bool inRegion({Offset? topLeft, Offset? bottomRight}) {
-    // TODO: implement inRegion
-    throw UnimplementedError();
-  }
-
-  @override
-  bool shouldSelectAt({Offset? coordinates, EditingTool? tool}) {
-    // TODO: implement shouldSelectAt
-    throw UnimplementedError();
-  }
 }

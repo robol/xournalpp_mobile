@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
-import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 import 'XppPageContentWidget.dart';
 
@@ -36,10 +35,6 @@ abstract class XppContent {
   });
 
   XmlElement toXmlElement();
-
-  bool shouldSelectAt({Offset? coordinates, EditingTool? tool});
-
-  bool inRegion({Offset? topLeft, Offset? bottomRight});
 
   /// return [true] in case it should be fully deleted
   XppContentEraseData eraseWhere({Offset? coordinates, double? radius}) =>

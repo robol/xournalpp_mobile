@@ -5,7 +5,6 @@ import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
-import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppTexImage extends XppContent {
   Offset? topLeft = Offset(0, 0);
@@ -25,13 +24,13 @@ class XppTexImage extends XppContent {
     Offset? topLeft,
     Color? color,
   }) async {
-    var laTeXController = TextEditingController(text: text);
+    final laTeXController = TextEditingController(text: text);
     bool? result = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Enter LaTeX code'),
         content: TextField(
-          controller: laTeXController = laTeXController,
+          controller: laTeXController,
           decoration: InputDecoration(
             border: OutlineInputBorder(),
             labelText: 'LaTeX code',
@@ -50,12 +49,10 @@ class XppTexImage extends XppContent {
         ],
       ),
     );
-    if (result == false) throw (UnsupportedError('Aborted.'));
-    return (XppTexImage(
-      text: laTeXController.text,
-      topLeft: topLeft,
-      color: color,
-    ));
+    final enteredText = laTeXController.text;
+    laTeXController.dispose();
+    if (result != true) throw UnsupportedError('Aborted.');
+    return XppTexImage(text: enteredText, topLeft: topLeft, color: color);
   }
 
   @override
@@ -79,7 +76,6 @@ class XppTexImage extends XppContent {
       selectionMode: selectionMode,
       selected: selected,
       onSelect: onSelect,
-      tool: EditingTool.LATEX,
     );
   }
 
@@ -116,16 +112,4 @@ class XppTexImage extends XppContent {
     ],
     [XmlText(XppText.encodeText(text!))],
   );
-
-  @override
-  bool inRegion({Offset? topLeft, Offset? bottomRight}) {
-    // TODO: implement inRegion
-    throw UnimplementedError();
-  }
-
-  @override
-  bool shouldSelectAt({Offset? coordinates, EditingTool? tool}) {
-    // TODO: implement shouldSelectAt
-    throw UnimplementedError();
-  }
 }

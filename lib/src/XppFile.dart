@@ -248,12 +248,12 @@ class XppFile {
 
     /// extracting the document title
     final rawTitle = _decodePathForFileName(
-      rawFile.path ?? rawFile.fileName ?? 'Untitled',
-    );
-    String title = rawTitle.substring(
-      rawTitle.lastIndexOf('/') + 1,
-      rawTitle.lastIndexOf('.'),
-    );
+      rawFile.fileName ?? rawFile.path ?? 'Untitled',
+    ).split(RegExp(r'[/\\]')).last;
+    final extensionStart = rawTitle.lastIndexOf('.');
+    final title = extensionStart > 0
+        ? rawTitle.substring(0, extensionStart)
+        : rawTitle;
 
     /// decoding file bytes from GZip to a UTF-8 [Uint8List]
     List<int> bytes = GZipDecoder().decodeBytes(rawFile.toUint8List().toList());
@@ -349,6 +349,18 @@ class XppFile {
       Iterable<XmlElement> layerElements = pageElement.findElements('layer');
       layerElements.forEach((XmlElement layer) {
         Map<int, XppContent?> content = {};
+        for (final child in layer.children.whereType<XmlElement>()) {
+          if (!{
+            'image',
+            'text',
+            'teximage',
+            'stroke',
+          }.contains(child.name.local)) {
+            throw UnsupportedError(
+              'Unsupported Xournal content: ${child.name.local}',
+            );
+          }
+        }
 
         /// unfortunately, it's not possible to forEach threw all child **elements**, but only threw
         /// all **nodes** (including text nodes etc.). Let's workaround...
@@ -442,23 +454,24 @@ class XppFile {
               break;
             case "eraser":
               tool = XppStrokeTool.ERASER;
-              return;
+              break;
             case "highlighter":
               tool = XppStrokeTool.HIGHLIGHTER;
               break;
             default:
-              print(
-                "Unsupported XppStrokeType: " +
-                    strokeElement.getAttribute('tool')!,
+              throw UnsupportedError(
+                'Unsupported Xournal stroke tool: ${strokeElement.getAttribute('tool')}',
               );
-              break;
           }
           Color color = parseColor(strokeElement.getAttribute('color'));
           List<XppStrokePoint> points = [];
           List<String> rawWidth = strokeElement
               .getAttribute('width')!
-              .split(' ');
-          List<String> rawPoints = strokeElement.innerText.trim().split(' ');
+              .trim()
+              .split(RegExp(r'\s+'));
+          List<String> rawPoints = strokeElement.innerText.trim().split(
+            RegExp(r'\s+'),
+          );
           for (int i = 0; i < rawPoints.length / 2; i++) {
             points.add(
               XppStrokePoint(
@@ -470,24 +483,24 @@ class XppFile {
               ),
             );
           }
-          if (points.isEmpty) return;
+          if (points.isEmpty) throw FormatException('Stroke has no points.');
           content[int.parse(strokeElement.getAttribute('counter')!)] =
               XppStroke.byTool(tool: tool, color: color, points: points);
         });
 
         layers.add(
           XppLayer(
-            content: List.generate(
-              content.keys.length,
-              (index) => content[index],
-            ),
+            content:
+                (content.entries.toList()
+                      ..sort((a, b) => a.key.compareTo(b.key)))
+                    .map((entry) => entry.value)
+                    .toList(),
           ),
         );
         layerIndex++;
         percentCompleted =
-            (((pageIndex - 1) / pageElements.length) +
-                (layerIndex / layerElements.length)) -
-            1;
+            ((pageIndex - 1) + layerIndex / layerElements.length) /
+            pageElements.length;
         //print(percentCompleted);
         try {
           percentageCallback!(percentCompleted);

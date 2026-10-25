@@ -115,6 +115,16 @@ Offset pasteOffsetForVisiblePage(
   return Offset(left - copiedBounds.left, top - copiedBounds.top);
 }
 
+@visibleForTesting
+void resizePageForPdfIfEmpty(XppPage page, XppPageSize pdfSize) {
+  final hasContent =
+      page.layers?.any(
+        (layer) => layer.content?.any((content) => content != null) ?? false,
+      ) ??
+      false;
+  if (!hasContent) page.pageSize = pdfSize;
+}
+
 class CanvasPage extends StatefulWidget {
   CanvasPage({
     Key? key,
@@ -219,7 +229,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   int _revision = 0;
   int _savedRevision = 0;
 
-  _EraserContentIndex? _eraserIndex;
+  final Map<XppLayer, _EraserContentIndex> _eraserIndexes = {};
   final List<_UndoEntry> _undoStack = [];
   Set<XppContent> _selectedContents = {};
   List<({XppLayer layer, XppContent content})>? _copiedContents;
@@ -1257,7 +1267,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     /// TODO: manage layers
     final page = _file!.pages![pageIndex];
-    final layer = page.layers![0];
+    final layer = page.layers!.last;
     setState(() {
       final content = List<XppContent?>.from(layer.content!)..add(newContent);
       layer.content = content;
@@ -1273,7 +1283,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       );
       _markDirty();
     });
-    _eraserIndex?.add(newContent);
+    _eraserIndexes[layer]?.add(newContent);
 
     _refreshPageStack(pageIndex, page);
   }
@@ -1774,7 +1784,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           final page = i < _file!.pages!.length
               ? _file!.pages![i]
               : XppPage.empty(background: Colors.white);
-          page.pageSize = pageSizes[i];
+          resizePageForPdfIfEmpty(page, pageSizes[i]);
           page.background = XppBackgroundPdf(
             onUnavailable: (context, String? path) async =>
                 XppPickedFile.fromInternalPath(path: pdfPath),
@@ -2171,42 +2181,39 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (coordinates == null || coordinates.isEmpty || radius == null) return;
 
     final page = _file!.pages![currentPage];
-    final layer = page.layers![0];
-    final eraserIndex = _eraserIndexForLayer(layer);
-    final eraseCandidates = <XppContent>{};
-    for (final coordinate in coordinates) {
-      final eraserRect = Rect.fromCircle(
-        center: coordinate,
-        radius: radius / 2,
-      );
-      eraseCandidates.addAll(eraserIndex.query(eraserRect));
-    }
-    if (eraseCandidates.isEmpty) return;
-
-    final List<XppContent?> updatedContent = [];
     final operations = <_LayerOperation>[];
-    bool erasedAnything = false;
-
-    for (var index = 0; index < layer.content!.length; index++) {
-      final content = layer.content![index];
-      if (content == null) {
-        updatedContent.add(null);
-        continue;
+    for (final layer in page.layers ?? <XppLayer>[]) {
+      final eraserIndex = _eraserIndexForLayer(layer);
+      final eraseCandidates = <XppContent>{};
+      for (final coordinate in coordinates) {
+        eraseCandidates.addAll(
+          eraserIndex.query(
+            Rect.fromCircle(center: coordinate, radius: radius / 2),
+          ),
+        );
       }
+      if (eraseCandidates.isEmpty) continue;
 
-      if (!eraseCandidates.contains(content)) {
-        updatedContent.add(content);
-        continue;
-      }
+      final updatedContent = <XppContent?>[];
+      var erasedFromLayer = false;
+      for (var index = 0; index < layer.content!.length; index++) {
+        final content = layer.content![index];
+        if (content == null || !eraseCandidates.contains(content)) {
+          updatedContent.add(content);
+          continue;
+        }
 
-      final delta = _eraseContentWithPath(
-        content: content,
-        coordinates: coordinates,
-        radius: radius,
-      );
+        final delta = _eraseContentWithPath(
+          content: content,
+          coordinates: coordinates,
+          radius: radius,
+        );
+        if (!delta.affected) {
+          updatedContent.add(content);
+          continue;
+        }
 
-      if (delta.affected) {
-        erasedAnything = true;
+        erasedFromLayer = true;
         operations.add(
           _LayerOperation.removed(
             page: page,
@@ -2228,14 +2235,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           eraserIndex.add(newContent);
           updatedContent.add(newContent);
         }
-      } else {
-        updatedContent.add(content);
       }
+      if (erasedFromLayer) layer.content = updatedContent;
     }
 
-    if (!erasedAnything) return;
+    if (operations.isEmpty) return;
 
-    layer.content = updatedContent;
     _undoStack.add(_UndoEntry(operations));
     _markDirty();
     _refreshPageStack(currentPage, page);
@@ -2279,15 +2284,19 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   _EraserContentIndex _eraserIndexForLayer(XppLayer layer) {
-    return _eraserIndex ??= _EraserContentIndex.fromContent(layer.content);
+    return _eraserIndexes.putIfAbsent(
+      layer,
+      () => _EraserContentIndex.fromContent(layer.content),
+    );
   }
 
   void _invalidateEraserIndex() {
-    _eraserIndex = null;
+    _eraserIndexes.clear();
   }
 
   void shareScreenshot() async {
     Uint8List imageBytes = await _currentPagePng();
+    if (!mounted) return;
     String fileName =
         await (XppPickedFile(
           imageBytes,
@@ -2299,6 +2308,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               '.png',
         ).exportToStorage()) ??
         (_file?.title ?? S.of(context).newFile);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(S.of(context).successfullyShared + ' ' + fileName),
@@ -2477,6 +2487,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   Future<bool> saveFile({bool saveAs = false}) async {
+    if (savingFile) return false;
     setState(() {
       savingFile = true;
     });
@@ -2508,6 +2519,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           ? kTransparentImage
           : await _currentPagePng();
       XppPickedFile file = _file!.toXppPickedFile(filePath: path);
+      final savedRevision = _revision;
       final savedPath = !saveAs && filePath != null
           ? await file
                 .saveToPath(path: filePath!)
@@ -2544,12 +2556,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       scaffoldMessenger.removeCurrentSnackBar();
       setState(() {
         savingFile = false;
-        _savedRevision = _revision;
+        _savedRevision = savedRevision;
       });
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text(S.of(context).successfullySaved)),
       );
-      return true;
+      return !_isDirty;
     } catch (error) {
       if (!mounted) return false;
       savingSnackBar.close();

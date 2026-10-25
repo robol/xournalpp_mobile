@@ -7,6 +7,26 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 
 void main() {
+  test('PDF replacement preserves the size of annotated pages', () {
+    final originalSize = XppPageSize(width: 200, height: 300);
+    final pdfSize = XppPageSize(width: 400, height: 600);
+    final annotated = XppPage(
+      pageSize: originalSize,
+      layers: [
+        XppLayer(
+          content: [XppText(text: 'note', offset: Offset.zero)],
+        ),
+      ],
+    );
+    final empty = XppPage(pageSize: originalSize, layers: [XppLayer.empty()]);
+
+    resizePageForPdfIfEmpty(annotated, pdfSize);
+    resizePageForPdfIfEmpty(empty, pdfSize);
+
+    expect(annotated.pageSize, same(originalSize));
+    expect(empty.pageSize, same(pdfSize));
+  });
+
   test('paste offset centers copied content in the visible page region', () {
     expect(
       pasteOffsetForVisiblePage(

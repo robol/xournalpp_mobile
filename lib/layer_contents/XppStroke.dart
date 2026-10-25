@@ -85,7 +85,6 @@ abstract class XppStroke extends XppContent {
       selectionMode: selectionMode,
       selected: selected,
       onSelect: onSelect,
-      tool: EditingTool.STYLUS,
     );
   }
 
@@ -175,18 +174,6 @@ abstract class XppStroke extends XppContent {
       delete: newStrokes.isEmpty,
       newContent: newStrokes,
     );
-  }
-
-  @override
-  bool inRegion({Offset? topLeft, Offset? bottomRight}) {
-    // TODO: implement shouldSelectAt
-    throw UnimplementedError();
-  }
-
-  @override
-  bool shouldSelectAt({Offset? coordinates, EditingTool? tool}) {
-    // TODO: implement shouldSelectAt
-    throw UnimplementedError();
   }
 
   XppStroke newStroke({Color? color, List<XppStrokePoint>? points});

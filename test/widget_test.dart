@@ -6,15 +6,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
+import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPage.dart';
+import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 
 void main() {
+  testWidgets('empty share lists do not poison the next intent', (
+    tester,
+  ) async {
+    lastIntentData = null;
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pump();
+
+    final dynamic state = tester.state(find.byType(OpenPage));
+    await state.receivedShareNotification(<Object>[]);
+
+    expect(lastIntentData, isNull);
+  });
+
   testWidgets('toolbar paste places a copy in the visible page region', (
     WidgetTester tester,
   ) async {

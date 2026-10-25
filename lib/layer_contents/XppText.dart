@@ -3,7 +3,6 @@ import 'package:xml/xml.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
-import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class XppText extends XppContent {
   static const String _defaultFontFamily = 'Sans';
@@ -113,19 +112,22 @@ class XppText extends XppContent {
       onSelected: (context) {
         if (onReplace == null) return;
         XppText.edit(
-          context: context,
-          text: text ?? '',
-          offset: offset,
-          color: color,
-          size: size,
-          fontFamily: fontFamily,
-        ).then(onReplace).catchError((_) {});
+              context: context,
+              text: text ?? '',
+              offset: offset,
+              color: color,
+              size: size,
+              fontFamily: fontFamily,
+            )
+            .then((value) {
+              if (context.mounted) onReplace(value);
+            })
+            .catchError((_) {});
       },
       onPointerDown: onPointerDown,
       selectionMode: selectionMode,
       selected: selected,
       onSelect: onSelect,
-      tool: EditingTool.TEXT,
     );
   }
 
@@ -147,17 +149,5 @@ class XppText extends XppContent {
         .replaceAll(r'&', r'&amp;')
         .replaceAll(r'<', r'&lt;')
         .replaceAll(r'>', r'&gt;');
-  }
-
-  @override
-  bool inRegion({Offset? topLeft, Offset? bottomRight}) {
-    // TODO: implement inRegion
-    throw UnimplementedError();
-  }
-
-  @override
-  bool shouldSelectAt({Offset? coordinates, EditingTool? tool}) {
-    // TODO: implement shouldSelectAt
-    throw UnimplementedError();
   }
 }

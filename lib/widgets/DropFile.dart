@@ -19,6 +19,60 @@ class _DropFileState extends State<DropFile> {
   bool _fileHover = false;
   bool _loadingDropZone = true;
 
+  Future<void> _openDroppedFile(dynamic droppedFile) async {
+    setState(() {
+      _fileHover = false;
+      _loadingDropZone = true;
+    });
+
+    String? filename;
+    try {
+      filename = await _fileDropController.getFilename(droppedFile);
+      final bytes = await _fileDropController.getFileData(droppedFile);
+      if (!mounted) return;
+      final file = await runWithLoadingFileDialog(context, () async {
+        final notebook = await XppFile.fromXppPickedFile(
+          XppPickedFile(bytes, path: filename, fileExtension: 'xopp'),
+          (percentage) {},
+          showMissingFileDialog,
+        );
+        if (mounted) await notebook.prepareForOpening(context);
+        return notebook;
+      });
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (context) => CanvasPage(file: file)));
+    } catch (error) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(S.of(context).errorOpeningFile),
+          content: SelectableText(
+            '${S.of(context).imVerySorryButICouldntReadTheFile}'
+            '${filename ?? ''}'
+            '${S.of(context).areYouSureIHaveThePermissionAndAreYou}'
+            '\n$error',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Clipboard.setData(ClipboardData(text: error.toString())),
+              child: Text(S.of(context).copyErrorMessage),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(S.of(context).okay),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingDropZone = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -31,88 +85,18 @@ class _DropFileState extends State<DropFile> {
             children: [
               Builder(
                 builder: (context) => DropzoneView(
-                  onDropFile: (file) {
-                    setState(() {
-                      _fileHover = false;
-                      _loadingDropZone = true;
-                    });
-
-                    _fileDropController.getFilename(file).then((filename) {
-                      _fileDropController.getFileData(file).then((bytes) {
-                        runWithLoadingFileDialog(context, () async {
-                              final file = await XppFile.fromXppPickedFile(
-                                XppPickedFile(
-                                  bytes,
-                                  path: filename,
-                                  fileExtension: 'xopp',
-                                ),
-                                (percentage) {},
-                                showMissingFileDialog,
-                              );
-                              if (context.mounted) {
-                                await file.prepareForOpening(context);
-                              }
-                              return file;
-                            })
-                            .then((file) {
-                              setState(() {
-                                _loadingDropZone = false;
-                              });
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => CanvasPage(file: file),
-                                ),
-                              );
-                            })
-                            .catchError((e) {
-                              setState(() {
-                                _loadingDropZone = false;
-                              });
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text(S.of(context).errorOpeningFile),
-                                  content: SelectableText(
-                                    S
-                                            .of(context)
-                                            .imVerySorryButICouldntReadTheFile +
-                                        '$filename' +
-                                        S
-                                            .of(context)
-                                            .areYouSureIHaveThePermissionAndAreYou +
-                                        '\n${e.toString()}',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Clipboard.setData(
-                                        ClipboardData(text: e.toString()),
-                                      ),
-                                      child: Text(
-                                        S.of(context).copyErrorMessage,
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: Text(S.of(context).okay),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            });
-                      });
-                    });
-                  },
+                  onDropFile: _openDroppedFile,
                   onHover: () {
-                    setState(() => _fileHover = true);
+                    if (mounted) setState(() => _fileHover = true);
                   },
                   onLeave: () {
-                    setState(() => _fileHover = false);
+                    if (mounted) setState(() => _fileHover = false);
                   },
                   onLoaded: () {
-                    setState(() => _loadingDropZone = false);
+                    if (mounted) setState(() => _loadingDropZone = false);
                   },
                   onError: (message) {
+                    if (!mounted) return;
                     final errorMessage = message ?? '';
                     setState(() {
                       _fileHover = false;

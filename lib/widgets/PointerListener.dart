@@ -581,7 +581,7 @@ class PointerListenerState extends State<PointerListener> {
       if (!mounted || _consumeContentPointerDown(data)) return;
       XppTexImage.edit(context: context, topLeft: topLeft, color: color)
           .then((value) {
-            widget.onNewContent!(value);
+            if (mounted) widget.onNewContent?.call(value);
           })
           .catchError((_) {});
     });
@@ -595,7 +595,7 @@ class PointerListenerState extends State<PointerListener> {
       if (!mounted || _consumeContentPointerDown(data)) return;
       XppText.edit(context: context, offset: offset, color: color, size: size)
           .then((value) {
-            widget.onNewContent!(value);
+            if (mounted) widget.onNewContent?.call(value);
           })
           .catchError((_) {});
     });
