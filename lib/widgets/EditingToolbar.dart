@@ -17,6 +17,7 @@ class EditingToolBar extends StatefulWidget {
   final double Function(EditingTool? tool)? getMaxWidth;
   final int? Function(EditingTool? tool)? getWidthDivisions;
   final VoidCallback? onBackgroundSettings;
+  final VoidCallback? onPasteSelection;
   final bool compact;
 
   const EditingToolBar({
@@ -31,6 +32,7 @@ class EditingToolBar extends StatefulWidget {
     this.getMaxWidth,
     this.getWidthDivisions,
     this.onBackgroundSettings,
+    this.onPasteSelection,
     this.compact = false,
   }) : super(key: key);
 
@@ -100,6 +102,21 @@ class EditingToolBarState extends State<EditingToolBar> {
             Icon(Icons.tab_unselected),
             usePrimaryColor: true,
           ),
+          if (widget.compact)
+            IconButton(
+              onPressed: widget.onPasteSelection,
+              tooltip: 'Paste copied selection',
+              constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+              icon: const Icon(Icons.content_paste),
+            )
+          else
+            FloatingActionButton(
+              heroTag: 'PasteSelection',
+              onPressed: widget.onPasteSelection,
+              tooltip: 'Paste copied selection',
+              backgroundColor: Theme.of(context).cardColor,
+              child: const Icon(Icons.content_paste),
+            ),
           if (widget.compact)
             IconButton(
               onPressed: widget.onBackgroundSettings,

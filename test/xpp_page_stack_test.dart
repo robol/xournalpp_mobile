@@ -4,10 +4,52 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
+import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
+import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xml/xml.dart';
 
 void main() {
+  testWidgets('selection actions expose duplicate and delete callbacks', (
+    WidgetTester tester,
+  ) async {
+    final content = XppText(
+      text: 'Selected',
+      offset: const Offset(20, 60),
+      size: 18,
+    );
+    final page = XppPage(
+      pageSize: XppPageSize(width: 200, height: 200),
+      layers: [
+        XppLayer(content: [content]),
+      ],
+    );
+    var duplicateCount = 0;
+    var deleteCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: XppPageStack(
+          page: page,
+          activeTool: EditingTool.SELECT,
+          selectedContents: {content},
+          onDuplicateSelection: () => duplicateCount++,
+          onDeleteSelection: () => deleteCount++,
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Duplicate selection'), findsOneWidget);
+    expect(find.byTooltip('Paste copied selection'), findsNothing);
+    expect(find.byTooltip('Delete selection'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Duplicate selection'));
+    await tester.tap(find.byTooltip('Delete selection'));
+
+    expect(duplicateCount, 1);
+    expect(deleteCount, 1);
+  });
+
   testWidgets(
     'rasterScale change does not rerender background with explicit target',
     (WidgetTester tester) async {

@@ -38,6 +38,83 @@ String annotatedPdfFileName(String title) {
   return '${baseName}_annotated.pdf';
 }
 
+@visibleForTesting
+List<({XppLayer layer, XppContent content, int index})>
+duplicateSelectedContents(
+  XppPage page,
+  Set<XppContent> selectedContents, {
+  Offset offset = const Offset(12, 12),
+}) {
+  final duplicates = <({XppLayer layer, XppContent content, int index})>[];
+
+  for (final layer in page.layers ?? <XppLayer>[]) {
+    final content = layer.content ?? <XppContent?>[];
+    final updatedContent = <XppContent?>[];
+    var duplicatedFromLayer = false;
+
+    for (final item in content) {
+      updatedContent.add(item);
+      if (item == null || !selectedContents.contains(item)) continue;
+
+      final duplicate = item.translatedBy(offset);
+      final duplicateIndex = updatedContent.length;
+      updatedContent.add(duplicate);
+      duplicates.add((layer: layer, content: duplicate, index: duplicateIndex));
+      duplicatedFromLayer = true;
+    }
+
+    if (duplicatedFromLayer) layer.content = updatedContent;
+  }
+
+  return duplicates;
+}
+
+@visibleForTesting
+List<({XppLayer layer, XppContent content, int index})> pasteCopiedContents(
+  XppPage page,
+  List<({XppLayer layer, XppContent content})> copiedContents, {
+  Offset offset = const Offset(12, 12),
+}) {
+  final pasted = <({XppLayer layer, XppContent content, int index})>[];
+
+  for (final layer in page.layers ?? <XppLayer>[]) {
+    final layerCopies = copiedContents.where(
+      (copied) => identical(copied.layer, layer),
+    );
+    if (layerCopies.isEmpty) continue;
+
+    final updatedContent = List<XppContent?>.from(
+      layer.content ?? <XppContent?>[],
+    );
+    for (final copied in layerCopies) {
+      final content = copied.content.translatedBy(offset);
+      final index = updatedContent.length;
+      updatedContent.add(content);
+      pasted.add((layer: layer, content: content, index: index));
+    }
+    layer.content = updatedContent;
+  }
+
+  return pasted;
+}
+
+@visibleForTesting
+Offset pasteOffsetForVisiblePage(
+  Rect copiedBounds,
+  Rect visiblePageBounds,
+  Rect pageBounds,
+) {
+  final left = (visiblePageBounds.center.dx - copiedBounds.width / 2).clamp(
+    pageBounds.left,
+    max(pageBounds.left, pageBounds.right - copiedBounds.width),
+  );
+  final top = (visiblePageBounds.center.dy - copiedBounds.height / 2).clamp(
+    pageBounds.top,
+    max(pageBounds.top, pageBounds.bottom - copiedBounds.height),
+  );
+  return Offset(left - copiedBounds.left, top - copiedBounds.top);
+}
+
 class CanvasPage extends StatefulWidget {
   CanvasPage({
     Key? key,
@@ -145,6 +222,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   _EraserContentIndex? _eraserIndex;
   final List<_UndoEntry> _undoStack = [];
   Set<XppContent> _selectedContents = {};
+  List<({XppLayer layer, XppContent content})>? _copiedContents;
   List<_SelectionMoveOriginal>? _selectionMoveOriginals;
 
   @override
@@ -362,6 +440,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       getMaxWidth: getMaxWidth,
       getWidthDivisions: getWidthDivisions,
       onBackgroundSettings: _showBackgroundSettings,
+      onPasteSelection: _canPasteSelection(_file!.pages![currentPage])
+          ? _pasteSelection
+          : null,
       onWidthChange: (newWidth, tool) {
         setState(() {
           if (tool == EditingTool.ERASER) {
@@ -665,6 +746,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                         onDeleteSelection: () {
                           _activatePageForEditing(pageIndex);
                           _deleteSelection();
+                        },
+                        onDuplicateSelection: () {
+                          _activatePageForEditing(pageIndex);
+                          _duplicateSelection();
                         },
                         onReplaceContent: (layer, oldContent, newContent) {
                           _activatePageForEditing(pageIndex);
@@ -1725,6 +1810,15 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       for (final operation in undoEntry.operations.reversed) {
         operation.undo();
       }
+      if (undoEntry.page == _file!.pages![currentPage]) {
+        final remainingContents =
+            undoEntry.page.layers
+                ?.expand((layer) => layer.content ?? <XppContent?>[])
+                .whereType<XppContent>()
+                .toSet() ??
+            <XppContent>{};
+        _selectedContents = _selectedContents.intersection(remainingContents);
+      }
       _invalidateEraserIndex();
       _markDirty();
     });
@@ -1845,6 +1939,124 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _markDirty();
     });
     _refreshPageStack(currentPage, page);
+  }
+
+  void _duplicateSelection() {
+    if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
+
+    final page = _file!.pages![currentPage];
+    final duplicates = duplicateSelectedContents(page, _selectedContents);
+    if (duplicates.isEmpty) return;
+
+    setState(() {
+      _addCopiesToUndoStack(page, duplicates);
+      _selectedContents = duplicates
+          .map((duplicate) => duplicate.content)
+          .toSet();
+      _copiedContents = duplicates
+          .map(
+            (duplicate) => (
+              layer: duplicate.layer,
+              content: duplicate.content.translatedBy(Offset.zero),
+            ),
+          )
+          .toList();
+      _invalidateEraserIndex();
+      _markDirty();
+    });
+    _refreshPageStack(currentPage, page);
+  }
+
+  bool _canPasteSelection(XppPage page) {
+    final copiedContents = _copiedContents;
+    if (copiedContents == null || copiedContents.isEmpty) return false;
+    final layers = page.layers ?? <XppLayer>[];
+    return copiedContents.every((copied) => layers.contains(copied.layer));
+  }
+
+  Rect? _visibleCurrentPageBounds(XppPage page) {
+    final viewport = _pagesViewportKey.currentContext?.findRenderObject();
+    final pageBox = _pageItemKeys[currentPage]?.currentContext
+        ?.findRenderObject();
+    if (viewport is! RenderBox || pageBox is! RenderBox) return null;
+
+    final viewportInPage = Rect.fromPoints(
+      pageBox.globalToLocal(viewport.localToGlobal(Offset.zero)),
+      pageBox.globalToLocal(
+        viewport.localToGlobal(viewport.size.bottomRight(Offset.zero)),
+      ),
+    );
+    final visible = viewportInPage.intersect(Offset.zero & pageBox.size);
+    if (visible.isEmpty) return null;
+
+    final pageSize = page.pageSize!.toSize();
+    return Rect.fromLTRB(
+      visible.left * pageSize.width / pageBox.size.width,
+      visible.top * pageSize.height / pageBox.size.height,
+      visible.right * pageSize.width / pageBox.size.width,
+      visible.bottom * pageSize.height / pageBox.size.height,
+    );
+  }
+
+  void _pasteSelection() {
+    final page = _file!.pages![currentPage];
+    final copiedContents = _copiedContents;
+    if (copiedContents == null || !_canPasteSelection(page)) return;
+
+    final visiblePageBounds = _visibleCurrentPageBounds(page);
+    if (visiblePageBounds == null) return;
+    Rect? copiedBounds;
+    for (final copied in copiedContents) {
+      final bounds = copied.content.selectionBounds;
+      if (bounds == null || bounds.isEmpty) continue;
+      copiedBounds = copiedBounds?.expandToInclude(bounds) ?? bounds;
+    }
+    if (copiedBounds == null) return;
+    final pageSize = page.pageSize!.toSize();
+    final offset = pasteOffsetForVisiblePage(
+      copiedBounds,
+      visiblePageBounds,
+      Offset.zero & pageSize,
+    );
+
+    final pasted = pasteCopiedContents(page, copiedContents, offset: offset);
+    if (pasted.isEmpty) return;
+
+    setState(() {
+      _addCopiesToUndoStack(page, pasted);
+      _selectedContents = pasted.map((copy) => copy.content).toSet();
+      _copiedContents = pasted
+          .map(
+            (copy) => (
+              layer: copy.layer,
+              content: copy.content.translatedBy(Offset.zero),
+            ),
+          )
+          .toList();
+      _invalidateEraserIndex();
+      _markDirty();
+    });
+    _refreshPageStack(currentPage, page);
+  }
+
+  void _addCopiesToUndoStack(
+    XppPage page,
+    List<({XppLayer layer, XppContent content, int index})> copies,
+  ) {
+    _undoStack.add(
+      _UndoEntry(
+        copies
+            .map(
+              (copy) => _LayerOperation.added(
+                page: page,
+                layer: copy.layer,
+                content: copy.content,
+                index: copy.index,
+              ),
+            )
+            .toList(),
+      ),
+    );
   }
 
   bool _shouldMoveSelection(Offset position) {

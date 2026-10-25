@@ -32,6 +32,7 @@ class XppPageStack extends StatefulWidget {
   final EditingTool? activeTool;
   final Set<XppContent> selectedContents;
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
+  final VoidCallback? onDuplicateSelection;
   final VoidCallback? onDeleteSelection;
   final bool keepAlive;
   final double? backgroundTargetPixelWidth;
@@ -47,6 +48,7 @@ class XppPageStack extends StatefulWidget {
     this.activeTool,
     this.selectedContents = const {},
     this.onSelectContent,
+    this.onDuplicateSelection,
     this.onDeleteSelection,
     this.keepAlive = true,
     this.backgroundTargetPixelWidth,
@@ -116,8 +118,8 @@ class XppPageStackState extends State<XppPageStack>
         ),
       ),
     );
-    final deleteButton = _buildDeleteSelectionButton();
-    if (deleteButton != null) children.add(deleteButton);
+    final selectionActions = _buildSelectionActions();
+    if (selectionActions != null) children.add(selectionActions);
     return RepaintBoundary(
       key: pngKey,
       child: Theme(
@@ -144,10 +146,11 @@ class XppPageStackState extends State<XppPageStack>
     );
   }
 
-  Widget? _buildDeleteSelectionButton() {
+  Widget? _buildSelectionActions() {
     if (widget.activeTool != EditingTool.SELECT ||
         widget.selectedContents.isEmpty ||
-        widget.onDeleteSelection == null) {
+        (widget.onDuplicateSelection == null &&
+            widget.onDeleteSelection == null)) {
       return null;
     }
 
@@ -161,8 +164,15 @@ class XppPageStackState extends State<XppPageStack>
 
     final pageSize = page!.pageSize!.toSize();
     const buttonSize = 32.0;
+    const buttonGap = 6.0;
+    final actionCount = [
+      widget.onDuplicateSelection,
+      widget.onDeleteSelection,
+    ].whereType<VoidCallback>().length;
+    final actionsWidth =
+        buttonSize * actionCount + buttonGap * max(0, actionCount - 1);
     final left = (selectionBounds.right + 6)
-        .clamp(0.0, max(0.0, pageSize.width - buttonSize))
+        .clamp(0.0, max(0.0, pageSize.width - actionsWidth))
         .toDouble();
     final top = (selectionBounds.top - buttonSize - 6)
         .clamp(0.0, max(0.0, pageSize.height - buttonSize))
@@ -171,23 +181,53 @@ class XppPageStackState extends State<XppPageStack>
     return Positioned(
       left: left,
       top: top,
-      width: buttonSize,
+      width: actionsWidth,
       height: buttonSize,
       child: Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: widget.onContentPointerDown,
-        child: Material(
-          color: Colors.redAccent,
-          shape: CircleBorder(),
-          elevation: 3,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            iconSize: 18,
-            color: Colors.white,
-            tooltip: 'Delete selection',
-            icon: Icon(Icons.delete),
-            onPressed: widget.onDeleteSelection,
-          ),
+        child: Row(
+          spacing: buttonGap,
+          children: [
+            if (widget.onDuplicateSelection != null)
+              _buildSelectionActionButton(
+                color: Theme.of(context).colorScheme.primary,
+                tooltip: 'Duplicate selection',
+                icon: Icons.content_copy,
+                onPressed: widget.onDuplicateSelection!,
+              ),
+            if (widget.onDeleteSelection != null)
+              _buildSelectionActionButton(
+                color: Colors.redAccent,
+                tooltip: 'Delete selection',
+                icon: Icons.delete,
+                onPressed: widget.onDeleteSelection!,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionActionButton({
+    required Color color,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox.square(
+      dimension: 32,
+      child: Material(
+        color: color,
+        shape: const CircleBorder(),
+        elevation: 3,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          iconSize: 18,
+          color: Colors.white,
+          tooltip: tooltip,
+          icon: Icon(icon),
+          onPressed: onPressed,
         ),
       ),
     );

@@ -1,16 +1,90 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
+import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
+import 'package:xournalpp/widgets/XppPageStack.dart';
 
 void main() {
+  testWidgets('toolbar paste places a copy in the visible page region', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final page = XppPage.empty()
+      ..pageSize = XppPageSize(width: 200, height: 600);
+    page.layers!.last.content!.add(
+      XppText(text: 'Copy me', offset: const Offset(20, 20), size: 12),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(
+          file: XppFile(title: 'Document', pages: [page]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is FloatingActionButton &&
+            widget.heroTag == EditingTool.SELECT,
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Copy me'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Duplicate selection'));
+    await tester.pump();
+    expect(page.layers!.last.content, hasLength(2));
+
+    await tester.sendEventToBinding(
+      const PointerScrollEvent(
+        position: Offset(400, 350),
+        scrollDelta: Offset(0, 700),
+        kind: PointerDeviceKind.mouse,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Paste copied selection'));
+    await tester.pump();
+
+    expect(page.layers!.last.content, hasLength(3));
+    final pasted = page.layers!.last.content!.last! as XppText;
+    final pageRect = tester.getRect(find.byType(XppPageStack));
+    final viewportRect = tester.getRect(find.byType(SingleChildScrollView));
+    final visibleRect = pageRect.intersect(viewportRect);
+    final visibleTop =
+        (visibleRect.top - pageRect.top) *
+        page.pageSize!.height! /
+        pageRect.height;
+    final visibleBottom =
+        (visibleRect.bottom - pageRect.top) *
+        page.pageSize!.height! /
+        pageRect.height;
+    expect(
+      pasted.selectionBounds!.center.dy,
+      inInclusiveRange(visibleTop, visibleBottom),
+    );
+  });
+
   testWidgets('toolbar embeds at 1000px and preserves state across resizing', (
     WidgetTester tester,
   ) async {
@@ -35,6 +109,16 @@ void main() {
 
     final toolbar = find.byType(EditingToolBar);
     final state = tester.state<EditingToolBarState>(toolbar);
+    final pasteButton = find.descendant(
+      of: toolbar,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is FloatingActionButton &&
+            widget.heroTag == 'PasteSelection',
+      ),
+    );
+    expect(pasteButton, findsOneWidget);
+    expect(tester.widget<FloatingActionButton>(pasteButton).onPressed, isNull);
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNotNull);
     expect(tester.getSize(find.byType(AppBar)).height, kToolbarHeight + 64);
     final pageBrowser = find.byType(XppPagesBrowser);
@@ -57,6 +141,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNull);
     expect(tester.widget<EditingToolBar>(toolbar).compact, isTrue);
+    final compactPasteButton = find.descendant(
+      of: toolbar,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is IconButton && widget.tooltip == 'Paste copied selection',
+      ),
+    );
+    expect(compactPasteButton, findsOneWidget);
+    final compactPasteWidget = tester.widget<IconButton>(compactPasteButton);
+    expect(compactPasteWidget.onPressed, isNull);
+    expect(
+      tester.getCenter(compactPasteButton).dx,
+      greaterThan(tester.getCenter(find.byIcon(Icons.tab_unselected)).dx),
+    );
     expect(tester.getSize(find.byType(AppBar)).height, kToolbarHeight);
     expect(
       tester.widget<XppPagesBrowser>(pageBrowser).direction,
