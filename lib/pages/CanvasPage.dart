@@ -142,6 +142,27 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _buildEditor(context, embedToolbar: constraints.maxWidth >= 1000),
+    );
+  }
+
+  Widget _buildEditor(BuildContext context, {required bool embedToolbar}) {
+    final editingToolbar = _buildEditingToolbar(compact: embedToolbar);
+    final documentTitle = Tooltip(
+      message:
+          '${widget.file?.title ?? S.of(context).newDocument}\n'
+          '${S.of(context).doubleTapToChange}',
+      child: GestureDetector(
+        onDoubleTap: _showTitleDialog,
+        child: Text(
+          widget.file?.title ?? S.of(context).newDocument,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
     return PopScope(
       canPop: _allowPop || !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -158,19 +179,39 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       },
       child: Scaffold(
         drawer: MainDrawer(onLeaveRequested: _confirmLeave),
-        body: Stack(
-          fit: StackFit.expand,
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Hero(
-              tag: 'ZoomArea',
-              child: _buildScrollablePages(),
-              /*ColorFiltered(
+            Expanded(
+              child: Hero(
+                tag: 'ZoomArea',
+                child: _buildScrollablePages(),
+                /*ColorFiltered(
                   colorFilter: ColorFilter.mode(
                       Theme.of(context).colorScheme.surface.withOpacity(.5),
                       BlendMode.darken),
                   child: child,
                 )*/
+              ),
             ),
+            if (embedToolbar)
+              Material(
+                color: Theme.of(context).colorScheme.surface,
+                elevation: 4,
+                child: SafeArea(
+                  left: false,
+                  top: false,
+                  child: SizedBox(
+                    width: 88,
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: _buildPageBrowser(direction: Axis.vertical),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         appBar: AppBar(
@@ -184,13 +225,16 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             color: Theme.of(context).colorScheme.onPrimary,
           ),
           elevation: 4,
-          title: Tooltip(
-            message: S.of(context).doubleTapToChange,
-            child: GestureDetector(
-              onDoubleTap: _showTitleDialog,
-              child: Text(widget.file?.title ?? S.of(context).newDocument),
-            ),
-          ),
+          centerTitle: false,
+          title: embedToolbar
+              ? Row(
+                  children: [
+                    Expanded(child: documentTitle),
+                    const SizedBox(width: 16),
+                    editingToolbar,
+                  ],
+                )
+              : documentTitle,
           actions: [
             _buildZoomControls(context),
             IconButton(
@@ -236,68 +280,79 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               },
             ),
           ],
-          bottom: PreferredSize(
-            preferredSize: Size.fromHeight(64),
-            child: EditingToolBar(
-              key: _editingToolbarKey,
-              deviceMap: _toolData,
-              getColor: getColor,
-              getWidth: getWidth,
-              getMinWidth: getMinWidth,
-              getMaxWidth: getMaxWidth,
-              getWidthDivisions: getWidthDivisions,
-              onBackgroundSettings: _showBackgroundSettings,
-              onWidthChange: (newWidth, tool) {
-                setState(() {
-                  if (tool == EditingTool.ERASER) {
-                    eraserWidth = newWidth * 2;
-                  } else if (tool == EditingTool.HIGHLIGHT) {
-                    highlighterWidth = newWidth;
-                  } else {
-                    toolWidth =
-                        newWidth *
-                        2; // average pressure is 0.5, so multiplying by 2
-                  }
-                });
-                rememberToolSettings();
-              },
-              onColorChange: (newColor, tool) {
-                setState(() {
-                  if (tool == EditingTool.HIGHLIGHT) {
-                    highlighterColor = newColor;
-                  } else {
-                    toolColor = newColor;
-                  }
-                });
-                rememberToolSettings();
-              },
-              onNewDeviceMap: (newDeviceMap) => setState(() {
-                _toolData = newDeviceMap!;
-                _setZoomableState();
-                if (_activeTool != EditingTool.SELECT) {
-                  _selectedContents = {};
-                }
-              }),
-            ),
-          ),
+          bottom: embedToolbar
+              ? null
+              : PreferredSize(
+                  preferredSize: const Size.fromHeight(64),
+                  child: editingToolbar,
+                ),
         ),
-        bottomNavigationBar: BottomAppBar(
-          shape: kIsWeb ? null : CircularNotchedRectangle(),
-          child: Container(
-            color: Theme.of(context).colorScheme.surface,
-            constraints: BoxConstraints(maxHeight: 72),
-            child: Center(
-              child: XppPagesBrowser(
-                currentPage: currentPage,
-                pageCount: _file!.pages!.length,
-                onPageChange: _switchToPage,
-                onPageAdd: _addPageAfterCurrent,
-                onPageDelete: () => _deletePage(currentPage),
+        bottomNavigationBar: embedToolbar
+            ? null
+            : BottomAppBar(
+                shape: kIsWeb ? null : CircularNotchedRectangle(),
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface,
+                  constraints: BoxConstraints(maxHeight: 72),
+                  child: Center(child: _buildPageBrowser()),
+                ),
               ),
-            ),
-          ),
-        ),
       ),
+    );
+  }
+
+  XppPagesBrowser _buildPageBrowser({Axis direction = Axis.horizontal}) {
+    return XppPagesBrowser(
+      direction: direction,
+      currentPage: currentPage,
+      pageCount: _file!.pages!.length,
+      onPageChange: _switchToPage,
+      onPageAdd: _addPageAfterCurrent,
+      onPageDelete: () => _deletePage(currentPage),
+    );
+  }
+
+  EditingToolBar _buildEditingToolbar({required bool compact}) {
+    return EditingToolBar(
+      compact: compact,
+      key: _editingToolbarKey,
+      deviceMap: _toolData,
+      getColor: getColor,
+      getWidth: getWidth,
+      getMinWidth: getMinWidth,
+      getMaxWidth: getMaxWidth,
+      getWidthDivisions: getWidthDivisions,
+      onBackgroundSettings: _showBackgroundSettings,
+      onWidthChange: (newWidth, tool) {
+        setState(() {
+          if (tool == EditingTool.ERASER) {
+            eraserWidth = newWidth * 2;
+          } else if (tool == EditingTool.HIGHLIGHT) {
+            highlighterWidth = newWidth;
+          } else {
+            toolWidth =
+                newWidth * 2; // average pressure is 0.5, so multiplying by 2
+          }
+        });
+        rememberToolSettings();
+      },
+      onColorChange: (newColor, tool) {
+        setState(() {
+          if (tool == EditingTool.HIGHLIGHT) {
+            highlighterColor = newColor;
+          } else {
+            toolColor = newColor;
+          }
+        });
+        rememberToolSettings();
+      },
+      onNewDeviceMap: (newDeviceMap) => setState(() {
+        _toolData = newDeviceMap!;
+        _setZoomableState();
+        if (_activeTool != EditingTool.SELECT) {
+          _selectedContents = {};
+        }
+      }),
     );
   }
 

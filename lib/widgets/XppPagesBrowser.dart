@@ -7,6 +7,7 @@ class XppPagesBrowser extends StatelessWidget {
   final ValueChanged<int>? onPageChange;
   final VoidCallback? onPageAdd;
   final VoidCallback? onPageDelete;
+  final Axis direction;
 
   const XppPagesBrowser({
     Key? key,
@@ -15,6 +16,7 @@ class XppPagesBrowser extends StatelessWidget {
     this.onPageChange,
     this.onPageAdd,
     this.onPageDelete,
+    this.direction = Axis.horizontal,
   }) : super(key: key);
 
   @override
@@ -22,19 +24,22 @@ class XppPagesBrowser extends StatelessWidget {
     final canGoBack = currentPage > 0;
     final canGoForward = currentPage < pageCount - 1;
     final canDelete = pageCount > 0;
+    final vertical = direction == Axis.vertical;
 
-    return Row(
+    return Flex(
+      direction: direction,
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
-          icon: const Icon(Icons.chevron_left),
+          icon: Icon(vertical ? Icons.keyboard_arrow_up : Icons.chevron_left),
           tooltip: S.of(context).movePage,
           onPressed: canGoBack
               ? () => onPageChange?.call(currentPage - 1)
               : null,
         ),
         SizedBox(
-          width: 120,
+          width: vertical ? 80 : 120,
           child: TextButton(
             onPressed: pageCount > 0
                 ? () => _showJumpToPageDialog(context)
@@ -49,13 +54,15 @@ class XppPagesBrowser extends StatelessWidget {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.chevron_right),
+          icon: Icon(
+            vertical ? Icons.keyboard_arrow_down : Icons.chevron_right,
+          ),
           tooltip: S.of(context).movePage,
           onPressed: canGoForward
               ? () => onPageChange?.call(currentPage + 1)
               : null,
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: vertical ? 0 : 12, height: vertical ? 12 : 0),
         IconButton(
           icon: const Icon(Icons.add),
           tooltip: S.of(context).addPage,
