@@ -29,6 +29,15 @@ import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 
+@visibleForTesting
+String annotatedPdfFileName(String title) {
+  final baseName = title.replaceFirst(
+    RegExp(r'\.(?:xopp|pdf)$', caseSensitive: false),
+    '',
+  );
+  return '${baseName}_annotated.pdf';
+}
+
 class CanvasPage extends StatefulWidget {
   CanvasPage({Key? key, this.file, this.filePath, this.initialPage = 0})
     : super(key: key);
@@ -110,6 +119,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double? _lastViewportPinchDistance;
   Offset? _lastViewportPinchFocalPoint;
   bool _allowPop = false;
+  bool _confirmingLeave = false;
   bool _currentPageUpdateScheduled = false;
   bool _pdfBackgroundPrefetchScheduled = false;
   bool _pdfBackgroundPrefetchPendingUntilIdle = false;
@@ -166,16 +176,23 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     return PopScope(
       canPop: _allowPop || !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (!await _confirmLeave()) return;
-        _allowPop = true;
-        if (!context.mounted) return;
-        final navigator = Navigator.of(context);
-        if (navigator.canPop()) {
-          navigator.pop(result);
-        } else {
-          await SystemNavigator.pop();
+        if (didPop || _confirmingLeave) return;
+        _confirmingLeave = true;
+        if (!await _confirmLeave()) {
+          _confirmingLeave = false;
+          return;
         }
+        if (!context.mounted) return;
+        setState(() => _allowPop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!context.mounted) return;
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) {
+            navigator.pop(result);
+          } else {
+            await SystemNavigator.pop();
+          }
+        });
       },
       child: Scaffold(
         drawer: MainDrawer(onLeaveRequested: _confirmLeave),
@@ -886,7 +903,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (!_pagesScrollController.hasClients) return;
 
     final offset = _pageScrollOffset(pageIndex);
-    print("Scrolling to page $pageIndex with offset $offset");
     final maxOffset = _pagesScrollController.position.maxScrollExtent;
     final target = offset.clamp(0.0, maxOffset).toDouble();
     if (animated) {
@@ -1081,7 +1097,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _refreshPageStack(pageIndex, page);
   }
 
-  bool get _isDirty => _revision != _savedRevision;
+  bool get _isDirty => filePath == null || _revision != _savedRevision;
 
   void _markDirty() {
     _revision++;
@@ -2008,7 +2024,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       },
     );
     final title = _file?.title ?? S.of(context).newFile;
-    final fileName = title.endsWith('.pdf') ? title : '$title.pdf';
+    final fileName = annotatedPdfFileName(title);
     return (pdfBytes: pdfBytes, fileName: fileName);
   }
 

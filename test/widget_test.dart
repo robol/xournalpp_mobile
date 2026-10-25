@@ -127,6 +127,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  Widget canvasNavigationTestApp({required CanvasPage page}) {
+    return MaterialApp(
+      localizationsDelegates: [
+        S.delegate,
+        DefaultMaterialLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: S.delegate.supportedLocales,
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => page)),
+              child: const Text('Open canvas'),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  test('PDF export adds annotated suffix to the suggested file name', () {
+    expect(annotatedPdfFileName('Document'), 'Document_annotated.pdf');
+    expect(annotatedPdfFileName('Document.xopp'), 'Document_annotated.pdf');
+    expect(annotatedPdfFileName('Document.pdf'), 'Document_annotated.pdf');
+  });
+
   testWidgets('app opens to the document launcher', (
     WidgetTester tester,
   ) async {
@@ -191,5 +222,49 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  testWidgets('leaving a new unsaved document asks to save', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      canvasNavigationTestApp(
+        page: CanvasPage(file: XppFile.empty(title: 'New document')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open canvas'));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save changes?'), findsOneWidget);
+    expect(find.text('New document'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('New document'), findsOneWidget);
+  });
+
+  testWidgets('discarding changes leaves the canvas', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      canvasNavigationTestApp(
+        page: CanvasPage(file: XppFile.empty(title: 'New document')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open canvas'));
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open canvas'), findsOneWidget);
+    expect(find.text('New document'), findsNothing);
   });
 }
