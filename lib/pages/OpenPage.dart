@@ -143,64 +143,82 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       body: ListView(
         children:
             [
-              if (kIsWeb) DropFile(),
               Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Builder(
-                  builder: (context) => GestureDetector(
-                    onTap: () => XppFile.openAndEdit(context: context),
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: Card(
-                        color: Theme.of(context).colorScheme.secondary,
-                        child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSecondary,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.folder,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSecondary,
-                                ),
-                                Text(S.of(context).open),
-                              ],
+                padding: const EdgeInsets.all(8),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final actions = <Widget>[                                                                
+                      FloatingActionButton.extended(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => CanvasPage(
+                              file: XppFile.empty(background: Colors.white),
                             ),
                           ),
                         ),
+                        label: Text(S.of(context).newNotebook),
+                        icon: Icon(Icons.note_add),
                       ),
-                    ),
-                  ),
+                      FloatingActionButton.extended(
+                        onPressed: () => XppFile.openAndEdit(context: context),
+                        label: Text(S.of(context).open),
+                        icon: Icon(Icons.folder),
+                        backgroundColor: Theme.of(context).colorScheme.secondary,
+                      ), 
+                      FloatingActionButton.extended(
+                        onPressed: () async {
+                          final _file = await runWithLoadingFileDialog(
+                            context,
+                            () async {
+                              final pdf = await XppPickedFile.importFromStorage(
+                                type: XppFilePickType.custom,
+                                fileExtension: 'pdf',
+                              );
+                              final file = await XppFile.importPdf(pdf: pdf);
+                              if (context.mounted)
+                                await file.prepareForOpening(context);
+                              return file;
+                            },
+                          ); // TODO `.pdf`
+                          if (!context.mounted) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (c) => CanvasPage(file: _file),
+                            ),
+                          );
+                        },                    
+                        label: Text(S.of(context).importPdf),
+                        icon: Icon(Icons.picture_as_pdf),
+                        backgroundColor: Theme.of(context).colorScheme.secondary,
+                      ), 
+                    ];
+                    final minimumRowWidth =
+                        600 * MediaQuery.textScalerOf(context).scale(14) / 14;
+                    if (constraints.maxWidth < minimumRowWidth) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          actions[0],
+                          const SizedBox(height: 8),
+                          actions[1],
+                          const SizedBox(height: 8),
+                          actions[2],
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: actions[0]),
+                        const SizedBox(width: 8),
+                        Expanded(child: actions[1]),
+                        const SizedBox(width: 8),
+                        Expanded(child: actions[2]),
+                      ],
+                    );
+                  },
                 ),
               ),
-              ListTile(
-                leading: Icon(Icons.picture_as_pdf),
-                onTap: () async {
-                  final _file = await runWithLoadingFileDialog(
-                    context,
-                    () async {
-                      final pdf = await XppPickedFile.importFromStorage(
-                        type: XppFilePickType.custom,
-                        fileExtension: 'pdf',
-                      );
-                      final file = await XppFile.importPdf(pdf: pdf);
-                      if (context.mounted)
-                        await file.prepareForOpening(context);
-                      return file;
-                    },
-                  ); // TODO `.pdf`
-                  if (!context.mounted) return;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (c) => CanvasPage(file: _file)),
-                  );
-                },
-                title: Text(S.of(context).importPdf),
-              ),
+              if (kIsWeb) DropFile(),
               ListTile(
                 title: Text(
                   S.of(context).recentFiles,
@@ -212,16 +230,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                   ? generateRecentFileList(recentFiles, context)
                   : [Center(child: CircularProgressIndicator())],
             ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) =>
-                CanvasPage(file: XppFile.empty(background: Colors.white)),
-          ),
-        ),
-        label: Text(S.of(context).newNotebook),
-        icon: Icon(Icons.note_add),
       ),
     );
   }

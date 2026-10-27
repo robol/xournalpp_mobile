@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
@@ -279,6 +280,7 @@ void main() {
 
     expect(find.text('Xournal++'), findsOneWidget);
   });
+
 
   testWidgets('canvas menu includes PDF export and share actions', (
     WidgetTester tester,
