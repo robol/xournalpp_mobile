@@ -14,12 +14,14 @@ import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 class _BlockingRecentStore extends InMemorySharedPreferencesStore {
   _BlockingRecentStore() : super.empty();
 
+  bool blockWrites = false;
+
   final started = Completer<void>();
   final release = Completer<void>();
 
   @override
   Future<bool> setValue(String valueType, String key, Object value) async {
-    if (key == 'flutter.recentFiles') {
+    if (blockWrites && key == 'flutter.recentFiles') {
       started.complete();
       await release.future;
     }
@@ -30,10 +32,12 @@ class _BlockingRecentStore extends InMemorySharedPreferencesStore {
 void main() {
   testWidgets('edits made during save remain unsaved', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    final store = _BlockingRecentStore();
+    final store = (await tester.runAsync(() async => _BlockingRecentStore()))!;
     SharedPreferencesStorePlatform.instance = store;
-    final directory = await Directory.systemTemp.createTemp('xpp-save-test-');
-    addTearDown(() async => directory.delete(recursive: true));
+    final directory = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('xpp-save-test-'),
+    ))!;
+    addTearDown(() => tester.runAsync(() => directory.delete(recursive: true)));
     final path = '${directory.path}/notes.xopp';
     await tester.pumpWidget(
       MaterialApp(
@@ -53,10 +57,15 @@ void main() {
     await tester.pumpAndSettle();
 
     final dynamic canvas = tester.state(find.byType(CanvasPage));
-    final Future<bool> saving = canvas.saveFile();
-    for (var i = 0; i < 20 && !store.started.isCompleted; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    store.blockWrites = true;
+    late Future<bool> saving;
+    await tester.runAsync(() async {
+      saving = canvas.saveFile();
+    });
+    await tester.pump();
+    await tester.runAsync(
+      () => store.started.future.timeout(const Duration(seconds: 10)),
+    );
     expect(store.started.isCompleted, isTrue);
 
     await tester.tap(
@@ -66,10 +75,13 @@ void main() {
       ),
     );
     await tester.pump();
-    store.release.complete();
+    final result = await tester.runAsync(() async {
+      store.release.complete();
+      return saving;
+    });
     await tester.pumpAndSettle();
 
-    expect(await saving, isFalse);
+    expect(result, isFalse);
     expect(find.text('2 / 2'), findsOneWidget);
   });
 }

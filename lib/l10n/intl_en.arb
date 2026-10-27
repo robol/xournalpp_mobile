@@ -82,7 +82,7 @@
   "forkedBy": "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
   "whiteoutEraserNotImplemented": "Whiteout eraser (not implemented)",
   "workspaceTitle": "Your Workspace",
-  "workspaceSubtitle": "Your notebooks and documents, all in one place.",
+  "workspaceSubtitle": "A Xournal++ compatible editor.",
   "workspaceRecents": "Recent Notebooks & Documents",
   "workspaceOpen": "Open Document",
   "workspaceEmptyTitle": "Your workspace is ready",

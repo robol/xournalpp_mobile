@@ -12,6 +12,7 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
@@ -33,6 +34,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    RecentFiles.changes.removeListener(_loadRecentFiles);
     _mediaSubscription?.cancel();
     _androidIntentChannel.setMethodCallHandler(null);
     _animationController.dispose();
@@ -50,6 +52,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       if (mounted) afterFirstLayout(context);
     });
 
+    RecentFiles.changes.addListener(_loadRecentFiles);
+    _loadRecentFiles();
+    super.initState();
+  }
+
+  void _loadRecentFiles() {
     SharedPreferences.getInstance()
         .then((prefs) {
           if (!mounted) return;
@@ -70,7 +78,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             _loadedRecent = true;
           });
         });
-    super.initState();
   }
 
   void afterFirstLayout(BuildContext context) {

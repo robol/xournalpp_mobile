@@ -695,10 +695,10 @@ class S {
     );
   }
 
-  /// `Your notebooks and documents, all in one place.`
+  /// `A Xournal++ compatible editor`
   String get workspaceSubtitle {
     return Intl.message(
-      'Your notebooks and documents, all in one place.',
+      'A Xournal++ compatible editor.',
       name: 'workspaceSubtitle',
       desc: '',
       args: [],

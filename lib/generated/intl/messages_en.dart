@@ -168,7 +168,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Recent Notebooks & Documents",
     ),
     "workspaceSubtitle": MessageLookupByLibrary.simpleMessage(
-      "Your notebooks and documents, all in one place.",
+      "A Xournal++ compatible editor.",
     ),
     "workspaceTitle": MessageLookupByLibrary.simpleMessage("Your Workspace"),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":

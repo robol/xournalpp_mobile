@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
+import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -245,12 +245,30 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     )..addListener(_handleZoomAnimationTick);
     _pagesScrollController.addListener(_scheduleCurrentPageFromScroll);
     loadToolSettings();
+    unawaited(_rememberOpenedFile());
     _scheduleInputModeRefresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _scrollToPage(currentPage, animated: false);
       _schedulePdfBackgroundPrefetch();
     });
+  }
+
+  Future<void> _rememberOpenedFile() async {
+    final path = filePath;
+    final file = _file;
+    if (path == null || path.isEmpty || file == null) return;
+    try {
+      await RecentFiles.remember(
+        path: path,
+        name: file.title ?? Uri.tryParse(path)?.pathSegments.lastOrNull ?? path,
+        preview: file.previewImage,
+        currentPage: currentPage,
+      );
+    } catch (error) {
+      // History storage is optional; failure must not prevent editing.
+      debugPrint('Could not remember opened document: $error');
+    }
   }
 
   @override
@@ -2527,19 +2545,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       }
       filePath = savedPath;
 
-      final prefs = await SharedPreferences.getInstance();
-      String jsonData = prefs.getString(PreferencesKeys.kRecentFiles) ?? '[]';
-      Set files = (jsonDecode(jsonData) as Iterable).toSet();
-      files.removeWhere((element) => element['path'] == savedPath);
-      files.add({
-        'preview': base64Encode(_file!.previewImage!),
-        'name': _file!.title,
-        'path': savedPath,
-        'modified': DateTime.now().toIso8601String(),
-        'currentPage': currentPage,
-      });
-      jsonData = jsonEncode(files.toList());
-      await prefs.setString(PreferencesKeys.kRecentFiles, jsonData);
+      await RecentFiles.remember(
+        path: savedPath,
+        name: _file!.title!,
+        preview: _file!.previewImage,
+        modified: DateTime.now(),
+        currentPage: currentPage,
+      );
 
       if (!mounted) return false;
       savingSnackBar.close();
