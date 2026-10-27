@@ -1,6 +1,7 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import 'intl/messages_all.dart';
 
 // **************************************************************************
@@ -464,16 +465,6 @@ class S {
     return Intl.message('Color', name: 'color', desc: '', args: []);
   }
 
-  /// `Whiteout eraser (not implemented)`
-  String get whiteoutEraserNotImplemented {
-    return Intl.message(
-      'Whiteout eraser (not implemented)',
-      name: 'whiteoutEraserNotImplemented',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Add page`
   String get addPage {
     return Intl.message('Add page', name: 'addPage', desc: '', args: []);
@@ -659,11 +650,6 @@ class S {
     );
   }
 
-  /// `Import PDF`
-  String get importPdf {
-    return Intl.message('Import PDF', name: 'importPdf', desc: '', args: []);
-  }
-
   /// `Could not find the background PDF. Select a new one`
   String get couldNotFindBackgroundPdfSelectNewOne {
     return Intl.message(
@@ -674,12 +660,108 @@ class S {
     );
   }
 
+  /// `Import PDF`
+  String get importPdf {
+    return Intl.message('Import PDF', name: 'importPdf', desc: '', args: []);
+  }
+
+  /// `This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work`
   String get forkedBy {
     return Intl.message(
-      'This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work.',
+      'This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work',
       name: 'forkedBy',
       desc: '',
       args: [],
+    );
+  }
+
+  /// `Whiteout eraser (not implemented)`
+  String get whiteoutEraserNotImplemented {
+    return Intl.message(
+      'Whiteout eraser (not implemented)',
+      name: 'whiteoutEraserNotImplemented',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your Workspace`
+  String get workspaceTitle {
+    return Intl.message(
+      'Your Workspace',
+      name: 'workspaceTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your notebooks and documents, all in one place.`
+  String get workspaceSubtitle {
+    return Intl.message(
+      'Your notebooks and documents, all in one place.',
+      name: 'workspaceSubtitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recent Notebooks & Documents`
+  String get workspaceRecents {
+    return Intl.message(
+      'Recent Notebooks & Documents',
+      name: 'workspaceRecents',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open Document`
+  String get workspaceOpen {
+    return Intl.message(
+      'Open Document',
+      name: 'workspaceOpen',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your workspace is ready`
+  String get workspaceEmptyTitle {
+    return Intl.message(
+      'Your workspace is ready',
+      name: 'workspaceEmptyTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Create your first notebook or open an existing document to get started.`
+  String get workspaceEmptyDescription {
+    return Intl.message(
+      'Create your first notebook or open an existing document to get started.',
+      name: 'workspaceEmptyDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Create Notebook`
+  String get workspaceCreate {
+    return Intl.message(
+      'Create Notebook',
+      name: 'workspaceCreate',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Last modified: {date}`
+  String workspaceModified(String date) {
+    return Intl.message(
+      'Last modified: $date',
+      name: 'workspaceModified',
+      desc: '',
+      args: [date],
     );
   }
 }

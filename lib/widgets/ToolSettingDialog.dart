@@ -57,7 +57,7 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
           margin: EdgeInsets.only(top: 45),
           decoration: BoxDecoration(
             shape: BoxShape.rectangle,
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -74,14 +74,16 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                 child: Text(
                   //todo: limit to one decimal place
                   S.of(context).strokeWidth + width.toStringAsFixed(1),
-                  style: TextStyle(color: Colors.black),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
               Container(
                 height: 64,
                 child: Slider(
-                  activeColor: Theme.of(context).colorScheme.secondary,
-                  inactiveColor: Theme.of(context).colorScheme.onPrimary,
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  inactiveColor: Theme.of(context).colorScheme.outlineVariant,
                   value: width,
                   min: widget.minWidth,
                   max: widget.maxWidth,
@@ -99,7 +101,9 @@ class _ToolSettingDialogState extends State<ToolSettingDialog> {
                 Container(
                   child: Text(
                     S.of(context).selectColor,
-                    style: TextStyle(color: Colors.black),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 ),
               if (widget.enableColor)

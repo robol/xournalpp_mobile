@@ -78,6 +78,22 @@
   "successfullyShared": "Successfully shared",
   "openNavigation": "Open navigation",
   "couldNotFindBackgroundPdfSelectNewOne": "Could not find the background PDF. Select a new one",
-  "importPdf": "Import PDF"
-  "forkedBy": "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work"
+  "importPdf": "Import PDF",
+  "forkedBy": "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
+  "whiteoutEraserNotImplemented": "Whiteout eraser (not implemented)",
+  "workspaceTitle": "Your Workspace",
+  "workspaceSubtitle": "Your notebooks and documents, all in one place.",
+  "workspaceRecents": "Recent Notebooks & Documents",
+  "workspaceOpen": "Open Document",
+  "workspaceEmptyTitle": "Your workspace is ready",
+  "workspaceEmptyDescription": "Create your first notebook or open an existing document to get started.",
+  "workspaceCreate": "Create Notebook",
+  "workspaceModified": "Last modified: {date}",
+  "@workspaceModified": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  }
 }

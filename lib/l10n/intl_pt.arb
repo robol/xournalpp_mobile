@@ -77,5 +77,20 @@
   "sharePage": "Compartilhar página...",
   "successfullyShared": "Compartilhado com sucesso",
   "couldNotFindBackgroundPdfSelectNewOne": "Não foi possível encontrar o PDF de fundo. Selecione um novo",
-  "importPdf": "Importar PDF"
+  "importPdf": "Importar PDF",
+  "workspaceTitle": "Seu espaço de trabalho",
+  "workspaceSubtitle": "Seus cadernos e documentos em um só lugar.",
+  "workspaceRecents": "Cadernos e documentos recentes",
+  "workspaceOpen": "Abrir documento",
+  "workspaceEmptyTitle": "Seu espaço de trabalho está pronto",
+  "workspaceEmptyDescription": "Crie seu primeiro caderno ou abra um documento existente para começar.",
+  "workspaceCreate": "Criar caderno",
+  "workspaceModified": "Última modificação: {date}",
+  "@workspaceModified": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  }
 }

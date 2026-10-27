@@ -20,6 +20,8 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'en';
 
+  static String m0(date) => "Last modified: ${date}";
+
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "abort": MessageLookupByLibrary.simpleMessage("Abort"),
@@ -30,9 +32,10 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Add page"),
     "apply": MessageLookupByLibrary.simpleMessage("Apply"),
-    "areYouSureIHaveThePermissionAndAreYou": MessageLookupByLibrary.simpleMessage(
-      ". Are you sure I have the permission? And are you sure it is a Xournal++ file?",
-    ),
+    "areYouSureIHaveThePermissionAndAreYou":
+        MessageLookupByLibrary.simpleMessage(
+          ". Are you sure I have the permission? And are you sure it is a Xournal++ file?",
+        ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
           "Are you sure to delete the selected file? This cannot be undone.",
@@ -66,6 +69,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Error opening file",
+    ),
+    "forkedBy": MessageLookupByLibrary.simpleMessage(
+      "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
     ),
     "graph": MessageLookupByLibrary.simpleMessage("Graph"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Highlighter"),
@@ -146,6 +152,25 @@ class MessageLookup extends MessageLookupByLibrary {
           "Unfortunately, there was an error saving this file.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("used"),
+    "whiteoutEraserNotImplemented": MessageLookupByLibrary.simpleMessage(
+      "Whiteout eraser (not implemented)",
+    ),
+    "workspaceCreate": MessageLookupByLibrary.simpleMessage("Create Notebook"),
+    "workspaceEmptyDescription": MessageLookupByLibrary.simpleMessage(
+      "Create your first notebook or open an existing document to get started.",
+    ),
+    "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
+      "Your workspace is ready",
+    ),
+    "workspaceModified": m0,
+    "workspaceOpen": MessageLookupByLibrary.simpleMessage("Open Document"),
+    "workspaceRecents": MessageLookupByLibrary.simpleMessage(
+      "Recent Notebooks & Documents",
+    ),
+    "workspaceSubtitle": MessageLookupByLibrary.simpleMessage(
+      "Your notebooks and documents, all in one place.",
+    ),
+    "workspaceTitle": MessageLookupByLibrary.simpleMessage("Your Workspace"),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":
         MessageLookupByLibrary.simpleMessage(
           "Xournal++ Mobile is a project trying to make Xournal++ files and features available on different devices.",

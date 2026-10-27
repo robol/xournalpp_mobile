@@ -199,13 +199,13 @@ class EditingToolBarState extends State<EditingToolBar> {
     }
 
     if (widget.compact) {
-      final foreground = selected ? selectedForeground : colors.onPrimary;
+      final foreground = selected ? selectedForeground : colors.onSurface;
       return Material(
         color: selected ? selectedBackground : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-            color: selected ? colors.onPrimary : Colors.transparent,
+            color: selected ? colors.primary : Colors.transparent,
             width: 2,
           ),
         ),

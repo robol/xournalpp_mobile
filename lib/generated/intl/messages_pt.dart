@@ -20,6 +20,8 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'pt';
 
+  static String m0(date) => "Última modificação: ${date}";
+
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "abort": MessageLookupByLibrary.simpleMessage("Abortar"),
@@ -30,9 +32,10 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Adicionar página"),
     "apply": MessageLookupByLibrary.simpleMessage("Aplicar"),
-    "areYouSureIHaveThePermissionAndAreYou": MessageLookupByLibrary.simpleMessage(
-      ". Tem certeza de que tenho a permissão necessária? E tem certeza de que é um arquivo Xournal++?",
-    ),
+    "areYouSureIHaveThePermissionAndAreYou":
+        MessageLookupByLibrary.simpleMessage(
+          ". Tem certeza de que tenho a permissão necessária? E tem certeza de que é um arquivo Xournal++?",
+        ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
           "Tem certeza de que deseja deletar o arquivo selecionado? É irreversvel.",
@@ -155,6 +158,24 @@ class MessageLookup extends MessageLookupByLibrary {
           "Infelizmente houve um erro ao salvar este arquivo.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("utilizado"),
+    "workspaceCreate": MessageLookupByLibrary.simpleMessage("Criar caderno"),
+    "workspaceEmptyDescription": MessageLookupByLibrary.simpleMessage(
+      "Crie seu primeiro caderno ou abra um documento existente para começar.",
+    ),
+    "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
+      "Seu espaço de trabalho está pronto",
+    ),
+    "workspaceModified": m0,
+    "workspaceOpen": MessageLookupByLibrary.simpleMessage("Abrir documento"),
+    "workspaceRecents": MessageLookupByLibrary.simpleMessage(
+      "Cadernos e documentos recentes",
+    ),
+    "workspaceSubtitle": MessageLookupByLibrary.simpleMessage(
+      "Seus cadernos e documentos em um só lugar.",
+    ),
+    "workspaceTitle": MessageLookupByLibrary.simpleMessage(
+      "Seu espaço de trabalho",
+    ),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":
         MessageLookupByLibrary.simpleMessage(
           "Xournal++ Mobile é um projeto que visa tornar as funcionalidades de Xournal++ e seus arquivos disponíveis em diferentes aparelhos.",

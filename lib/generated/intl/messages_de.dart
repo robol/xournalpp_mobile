@@ -20,6 +20,8 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'de';
 
+  static String m0(date) => "Zuletzt geändert: ${date}";
+
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "abort": MessageLookupByLibrary.simpleMessage("Abbrechen"),
@@ -30,9 +32,10 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Seite einfügen"),
     "apply": MessageLookupByLibrary.simpleMessage("Anwenden"),
-    "areYouSureIHaveThePermissionAndAreYou": MessageLookupByLibrary.simpleMessage(
-      " leider nicht lesen. Bist du dir sicher, dass ich dazu die Berechtigung habe, und, dass es eine richtige Xournal++ Datei ist?",
-    ),
+    "areYouSureIHaveThePermissionAndAreYou":
+        MessageLookupByLibrary.simpleMessage(
+          " leider nicht lesen. Bist du dir sicher, dass ich dazu die Berechtigung habe, und, dass es eine richtige Xournal++ Datei ist?",
+        ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
           "Bist du dir sicher, dass du die Datei löschen möchtest? Das kann nicht rückgängig gemacht werden..",
@@ -46,9 +49,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "copyErrorMessage": MessageLookupByLibrary.simpleMessage(
       "Fehlermeldung kopieren",
     ),
-    "couldNotFindBackgroundPdfSelectNewOne": MessageLookupByLibrary.simpleMessage(
-      "Die Hintergrund-PDF konnte nicht gefunden werden. Wähle eine neue aus",
-    ),
+    "couldNotFindBackgroundPdfSelectNewOne":
+        MessageLookupByLibrary.simpleMessage(
+          "Die Hintergrund-PDF konnte nicht gefunden werden. Wähle eine neue aus",
+        ),
     "delete": MessageLookupByLibrary.simpleMessage("Löschen"),
     "deletePage": MessageLookupByLibrary.simpleMessage("Seite löschen"),
     "dotted": MessageLookupByLibrary.simpleMessage("Gepunktet"),
@@ -155,6 +159,26 @@ class MessageLookup extends MessageLookupByLibrary {
           "Leider gab es ein Problem beim Speichern dieser Datei.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("verwendet"),
+    "workspaceCreate": MessageLookupByLibrary.simpleMessage(
+      "Notizbuch erstellen",
+    ),
+    "workspaceEmptyDescription": MessageLookupByLibrary.simpleMessage(
+      "Erstelle dein erstes Notizbuch oder öffne ein vorhandenes Dokument.",
+    ),
+    "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
+      "Dein Arbeitsbereich ist bereit",
+    ),
+    "workspaceModified": m0,
+    "workspaceOpen": MessageLookupByLibrary.simpleMessage("Dokument öffnen"),
+    "workspaceRecents": MessageLookupByLibrary.simpleMessage(
+      "Zuletzt verwendete Notizbücher & Dokumente",
+    ),
+    "workspaceSubtitle": MessageLookupByLibrary.simpleMessage(
+      "Deine Notizbücher und Dokumente an einem Ort.",
+    ),
+    "workspaceTitle": MessageLookupByLibrary.simpleMessage(
+      "Dein Arbeitsbereich",
+    ),
     "xournalMobileEditionIsAnUnofficialProjectTryingToMake":
         MessageLookupByLibrary.simpleMessage(
           "Xournal++ Mobile ist ein Projekt, das es versucht, Xournal++ Dateien und -Funktionen auf anderen Geräten bereitzustellen.",

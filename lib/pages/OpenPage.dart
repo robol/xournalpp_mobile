@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/generated/l10n.dart';
-import 'package:xournalpp/main.dart';
+import 'package:xournalpp/widgets/Workspace.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/globals.dart';
@@ -115,121 +115,139 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     } catch (e) {}
   }
 
+  void _newNotebook() => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => CanvasPage(file: XppFile.empty(background: Colors.white)),
+    ),
+  );
+
+  Future<void> _importPdf() async {
+    final _file = await runWithLoadingFileDialog(context, () async {
+      final pdf = await XppPickedFile.importFromStorage(
+        type: XppFilePickType.custom,
+        fileExtension: 'pdf',
+      );
+      final file = await XppFile.importPdf(pdf: pdf);
+      if (context.mounted) await file.prepareForOpening(context);
+      return file;
+    }); // TODO `.pdf`
+    if (!context.mounted) return;
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (c) => CanvasPage(file: _file)));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final files = recentFiles.toList();
     return Scaffold(
-      onDrawerChanged: (opened) {
-        _animationController.animateTo(opened ? 1 : 0);
-      },
+      onDrawerChanged: (opened) =>
+          _animationController.animateTo(opened ? 1 : 0),
       drawer: MainDrawer(),
       appBar: AppBar(
-        title: Text('Xournal++'),
+        title: const Text('Xournal++'),
         leading: Builder(
           builder: (context) => IconButton(
-            onPressed: () {
-              if (!Scaffold.of(context).isDrawerOpen) {
-                Scaffold.of(context).openDrawer();
-                _animationController.animateTo(1);
-              }
-            },
             tooltip: S.of(context).openNavigation,
             icon: AnimatedIcon(
               icon: AnimatedIcons.menu_arrow,
               progress: _animationController,
             ),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
       ),
-      body: ListView(
-        children:
-            [
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final actions = <Widget>[                                                                
-                      FloatingActionButton.extended(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => CanvasPage(
-                              file: XppFile.empty(background: Colors.white),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1240),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final padding = constraints.maxWidth < 600 ? 16.0 : 32.0;
+                final width = constraints.maxWidth - padding * 2;
+                final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+                final columns =
+                    (width / ((constraints.maxWidth < 600 ? 160 : 220) * scale))
+                        .floor()
+                        .clamp(1, 5);
+                return CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(padding, 20, padding, 24),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              S.of(context).workspaceTitle,
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              S.of(context).workspaceSubtitle,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 28),
+                            WorkspaceActions(
+                              onNew: _newNotebook,
+                              onOpen: () =>
+                                  XppFile.openAndEdit(context: context),
+                              onImport: _importPdf,
+                            ),
+                            if (kIsWeb) DropFile(),
+                            const SizedBox(height: 32),
+                            Text(
+                              S.of(context).workspaceRecents,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (!_loadedRecent)
+                      const SliverToBoxAdapter(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (files.isEmpty)
+                      SliverToBoxAdapter(
+                        child: EmptyDocumentsState(onNew: _newNotebook),
+                      )
+                    else
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(padding, 0, padding, 32),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                                mainAxisExtent: 184 + 112 * scale,
+                              ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _documentCard(files[index], context),
+                            childCount: files.length,
                           ),
                         ),
-                        label: Text(S.of(context).newNotebook),
-                        icon: Icon(Icons.note_add),
                       ),
-                      FloatingActionButton.extended(
-                        onPressed: () => XppFile.openAndEdit(context: context),
-                        label: Text(S.of(context).open),
-                        icon: Icon(Icons.folder),
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                      ), 
-                      FloatingActionButton.extended(
-                        onPressed: () async {
-                          final _file = await runWithLoadingFileDialog(
-                            context,
-                            () async {
-                              final pdf = await XppPickedFile.importFromStorage(
-                                type: XppFilePickType.custom,
-                                fileExtension: 'pdf',
-                              );
-                              final file = await XppFile.importPdf(pdf: pdf);
-                              if (context.mounted)
-                                await file.prepareForOpening(context);
-                              return file;
-                            },
-                          ); // TODO `.pdf`
-                          if (!context.mounted) return;
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (c) => CanvasPage(file: _file),
-                            ),
-                          );
-                        },                    
-                        label: Text(S.of(context).importPdf),
-                        icon: Icon(Icons.picture_as_pdf),
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                      ), 
-                    ];
-                    final minimumRowWidth =
-                        600 * MediaQuery.textScalerOf(context).scale(14) / 14;
-                    if (constraints.maxWidth < minimumRowWidth) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          actions[0],
-                          const SizedBox(height: 8),
-                          actions[1],
-                          const SizedBox(height: 8),
-                          actions[2],
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: actions[0]),
-                        const SizedBox(width: 8),
-                        Expanded(child: actions[1]),
-                        const SizedBox(width: 8),
-                        Expanded(child: actions[2]),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              if (kIsWeb) DropFile(),
-              ListTile(
-                title: Text(
-                  S.of(context).recentFiles,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-              ),
-            ]..addAll(
-              _loadedRecent
-                  ? generateRecentFileList(recentFiles, context)
-                  : [Center(child: CircularProgressIndicator())],
+                  ],
+                );
+              },
             ),
+          ),
+        ),
       ),
     );
   }
@@ -409,94 +427,47 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return 'xopp';
   }
 
-  Iterable<Widget> generateRecentFileList(Set files, BuildContext context) {
-    return List.generate(files.length > 0 ? files.length : 1, (index) {
-      if (files.length > 0) {
-        Map fileInfo = files.toList()[index];
-        final displayName = _decodeFileInfoForDisplay(fileInfo['name']);
-        final displayPath = _decodeFileInfoForDisplay(fileInfo['path']);
-        final displayModified = _formatModifiedForDisplay(
-          context,
-          fileInfo['modified'],
-        );
-        return ListTile(
-          isThreeLine: true,
-          title: Text(
-            displayName,
-            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: kLargeFontSize,
-            ),
-          ),
-          leading: AspectRatio(
-            aspectRatio: 1,
-            child: Container(
-              alignment: Alignment.center,
-              constraints: BoxConstraints(maxHeight: 256, minHeight: 128),
-              child: Image.memory(base64Decode(fileInfo['preview'])),
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-          subtitle: Text(
-            displayModified,
-            style: Theme.of(context).textTheme.bodySmall!,
-          ),
-          trailing: Tooltip(
-            child: Icon(Icons.info_outline),
-            message: displayPath,
-          ),
-          onLongPress: () => showDeleteDialog(fileInfo['path']),
-          onTap: () async {
-            try {
-              final initialPage = _currentPageFromRecentFile(fileInfo);
-              final file = await runWithLoadingFileDialog(context, () async {
-                final file = await XppFile.fromXppPickedFile(
-                  await XppPickedFile.fromInternalPath(path: fileInfo['path']),
-                  (percent) {},
-                  showMissingFileDialog,
-                );
-                if (context.mounted) {
-                  await file.prepareForOpening(
-                    context,
-                    currentPage: initialPage,
-                  );
-                }
-                return file;
-              });
-              if (!context.mounted) return;
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => CanvasPage(
-                    file: file,
-                    filePath: fileInfo['path'],
-                    initialPage: initialPage,
-                  ),
-                ),
-              );
-            } catch (e) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(S.of(context).errorOpeningFile + e.toString()),
-                ),
-              );
+  Widget _documentCard(Map fileInfo, BuildContext context) {
+    return DocumentCard(
+      name: _decodeFileInfoForDisplay(fileInfo['name']),
+      path: _decodeFileInfoForDisplay(fileInfo['path']),
+      modified: _formatModifiedForDisplay(context, fileInfo['modified']),
+      preview: fileInfo['preview']?.toString(),
+      onLongPress: () => showDeleteDialog(fileInfo['path']),
+      onOpen: () async {
+        try {
+          final initialPage = _currentPageFromRecentFile(fileInfo);
+          final file = await runWithLoadingFileDialog(context, () async {
+            final file = await XppFile.fromXppPickedFile(
+              await XppPickedFile.fromInternalPath(path: fileInfo['path']),
+              (percent) {},
+              showMissingFileDialog,
+            );
+            if (context.mounted) {
+              await file.prepareForOpening(context, currentPage: initialPage);
             }
-          },
-        );
-      } else {
-        return ListTile(
-          leading: Icon(Icons.info),
-          title: Text(S.of(context).noRecentFiles),
-          trailing: IconButton(
-            icon: Icon(Icons.note_add),
-            tooltip: S.of(context).newNotebook,
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (context) => CanvasPage())),
-          ),
-        );
-      }
-    });
+            return file;
+          });
+          if (!context.mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => CanvasPage(
+                file: file,
+                filePath: fileInfo['path'],
+                initialPage: initialPage,
+              ),
+            ),
+          );
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(S.of(context).errorOpeningFile + e.toString()),
+            ),
+          );
+        }
+      },
+    );
   }
 
   String _decodeFileInfoForDisplay(Object? value) {
@@ -515,7 +486,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     if (modified == null) return '';
 
     final locale = Localizations.localeOf(context).toString();
-    return 'Last modified: ${DateFormat.yMd(locale).add_Hm().format(modified)}';
+    return S
+        .of(context)
+        .workspaceModified(DateFormat.yMd(locale).add_Hm().format(modified));
   }
 
   int _currentPageFromRecentFile(Map fileInfo) {

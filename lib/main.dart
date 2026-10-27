@@ -45,7 +45,7 @@ const double kEmphasisFontSize = 25.2 / kFontSizeDivision;
 const TextStyle kHugeFont = TextStyle(
   fontFamily: 'Open Sans',
   fontWeight: FontWeight.w800,
-  color: kSecondaryColor,
+  color: kLightColor,
   height: 1.4,
   fontSize: kHugeFontSize,
 );
@@ -72,43 +72,104 @@ final kTextTheme = TextTheme(
   displayLarge: kHugeFont,
   displayMedium: kHugeFont,
   headlineMedium: kLargeFont
-      .copyWith(color: kDarkColor)
+      .copyWith(color: kLightColor)
       .copyWith(fontSize: kLargeFontSize * kFontSizeDivision),
-  headlineSmall: kLargeFont.copyWith(color: kDarkColor),
-  titleLarge: kLargeFont.copyWith(color: kDarkColor),
-  titleMedium: kLargeFont.copyWith(color: kDarkColor),
+  headlineSmall: kLargeFont.copyWith(color: kLightColor),
+  titleLarge: kLargeFont.copyWith(color: kLightColor),
+  titleMedium: kLargeFont.copyWith(color: kLightColor),
   bodyLarge: kBodyFont,
   bodyMedium: kBodyFont,
-  bodySmall: kBodyFont,
+  bodySmall: kBodyFont.copyWith(color: const Color(0xffb0bec5)),
   labelLarge: kBodyFont,
 );
 
-final kColorScheme = ColorScheme(
+// Shared workspace palette for every route and Material overlay.
+final kColorScheme = ColorScheme.dark(
   primary: kPrimaryColor,
-  secondary: kSecondaryColor,
-  surface: kDarkColor!,
-  error: Colors.deepOrange,
-  onPrimary: kLightColor,
+  onPrimary: kDarkColor!,
+  primaryContainer: const Color(0xff244e63),
+  onPrimaryContainer: kLightColor,
+  secondary: kSecondaryColorAccent,
   onSecondary: kDarkColor!,
+  secondaryContainer: const Color(0xff563543),
+  onSecondaryContainer: kLightColor,
+  surface: kDarkColor!,
+  surfaceContainerLow: const Color(0xff2b3940),
+  surfaceContainer: const Color(0xff304047),
+  surfaceContainerHigh: const Color(0xff34454d),
+  surfaceContainerHighest: const Color(0xff40535c),
   onSurface: kLightColor,
-  onError: kLightColor,
-  brightness: Brightness.dark,
+  onSurfaceVariant: const Color(0xffb0bec5),
+  outline: const Color(0xff78909c),
+  outlineVariant: const Color(0xff455a64),
+  error: const Color(0xffffb4ab),
+  onError: const Color(0xff690005),
 );
 
 final kDialogTheme = DialogThemeData(
-  backgroundColor: kDarkColor,
-  titleTextStyle: kLargeFont.copyWith(color: kLightColor),
+  backgroundColor: kColorScheme.surfaceContainerHigh,
+  surfaceTintColor: Colors.transparent,
+  titleTextStyle: kLargeFont,
   contentTextStyle: kBodyFont.copyWith(color: kLightColor),
 );
 
 final kTextButtonTheme = TextButtonThemeData(
-  style: TextButton.styleFrom(foregroundColor: kSecondaryColorAccent),
+  style: TextButton.styleFrom(foregroundColor: kColorScheme.primary),
 );
 
 final kSnackBarTheme = SnackBarThemeData(
-  backgroundColor: kDarkColor,
-  actionTextColor: kSecondaryColorAccent,
-  contentTextStyle: kBodyFont,
+  backgroundColor: kColorScheme.surfaceContainerHigh,
+  actionTextColor: kColorScheme.primary,
+  contentTextStyle: kBodyFont.copyWith(color: kLightColor),
+);
+
+final kAppTheme = ThemeData(
+  brightness: Brightness.dark,
+  fontFamily: 'Open Sans',
+  textTheme: kTextTheme.apply(
+    bodyColor: kLightColor,
+    displayColor: kLightColor,
+  ),
+  scaffoldBackgroundColor: kColorScheme.surface,
+  colorScheme: kColorScheme,
+  cardColor: kColorScheme.surfaceContainerHigh,
+  visualDensity: VisualDensity.adaptivePlatformDensity,
+  appBarTheme: AppBarTheme(
+    backgroundColor: kColorScheme.surface,
+    foregroundColor: kColorScheme.onSurface,
+    surfaceTintColor: Colors.transparent,
+    centerTitle: false,
+    elevation: 0,
+  ),
+  bottomAppBarTheme: BottomAppBarThemeData(
+    color: kColorScheme.surfaceContainer,
+    surfaceTintColor: Colors.transparent,
+  ),
+  drawerTheme: DrawerThemeData(
+    backgroundColor: kColorScheme.surfaceContainer,
+    surfaceTintColor: Colors.transparent,
+  ),
+  bottomSheetTheme: BottomSheetThemeData(
+    backgroundColor: kColorScheme.surfaceContainerHigh,
+    modalBackgroundColor: kColorScheme.surfaceContainerHigh,
+    surfaceTintColor: Colors.transparent,
+  ),
+  popupMenuTheme: PopupMenuThemeData(
+    color: kColorScheme.surfaceContainerHigh,
+    surfaceTintColor: Colors.transparent,
+  ),
+  floatingActionButtonTheme: FloatingActionButtonThemeData(
+    backgroundColor: kColorScheme.primaryContainer,
+    foregroundColor: kColorScheme.onPrimaryContainer,
+  ),
+  listTileTheme: ListTileThemeData(
+    textColor: kColorScheme.onSurface,
+    iconColor: kColorScheme.onSurfaceVariant,
+    subtitleTextStyle: kBodyFont.copyWith(color: kColorScheme.onSurfaceVariant),
+  ),
+  dialogTheme: kDialogTheme,
+  textButtonTheme: kTextButtonTheme,
+  snackBarTheme: kSnackBarTheme,
 );
 
 class XournalppMobile extends StatelessWidget {
@@ -126,28 +187,9 @@ class XournalppMobile extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: S.delegate.supportedLocales,
-      theme: ThemeData(
-        primarySwatch: kPrimaryColor as MaterialColor?,
-        fontFamily: 'Open Sans',
-        textTheme: kTextTheme,
-        scaffoldBackgroundColor: kDarkColor,
-        colorScheme: kColorScheme.copyWith(brightness: Brightness.light),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        dialogTheme: kDialogTheme,
-        textButtonTheme: kTextButtonTheme,
-        snackBarTheme: kSnackBarTheme,
-      ),
-      darkTheme: ThemeData(
-        primarySwatch: kPrimaryColor as MaterialColor?,
-        fontFamily: 'Open Sans',
-        textTheme: kTextTheme,
-        scaffoldBackgroundColor: kDarkColor,
-        colorScheme: kColorScheme,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        dialogTheme: kDialogTheme,
-        textButtonTheme: kTextButtonTheme,
-        snackBarTheme: kSnackBarTheme,
-      ),
+      themeMode: ThemeMode.dark,
+      theme: kAppTheme,
+      darkTheme: kAppTheme,
       home: OpenPage(),
     );
   }

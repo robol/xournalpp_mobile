@@ -78,5 +78,20 @@
   "successfullyShared": "Erfolgreich geteilt:",
   "openNavigation": "Navigation öffnen",
   "couldNotFindBackgroundPdfSelectNewOne": "Die Hintergrund-PDF konnte nicht gefunden werden. Wähle eine neue aus",
-  "importPdf": "PDF importieren"
+  "importPdf": "PDF importieren",
+  "workspaceTitle": "Dein Arbeitsbereich",
+  "workspaceSubtitle": "Deine Notizbücher und Dokumente an einem Ort.",
+  "workspaceRecents": "Zuletzt verwendete Notizbücher & Dokumente",
+  "workspaceOpen": "Dokument öffnen",
+  "workspaceEmptyTitle": "Dein Arbeitsbereich ist bereit",
+  "workspaceEmptyDescription": "Erstelle dein erstes Notizbuch oder öffne ein vorhandenes Dokument.",
+  "workspaceCreate": "Notizbuch erstellen",
+  "workspaceModified": "Zuletzt geändert: {date}",
+  "@workspaceModified": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  }
 }

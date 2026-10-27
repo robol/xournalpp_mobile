@@ -323,7 +323,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             ),
             if (embedToolbar)
               Material(
-                color: Theme.of(context).colorScheme.surface,
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 elevation: 4,
                 child: SafeArea(
                   left: false,
@@ -343,16 +343,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         ),
         appBar: AppBar(
           toolbarHeight: kToolbarHeight,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          iconTheme: IconThemeData(
-            color: Theme.of(context).colorScheme.onPrimary,
-          ),
-          actionsIconTheme: IconThemeData(
-            color: Theme.of(context).colorScheme.onPrimary,
-          ),
-          elevation: 4,
-          centerTitle: false,
           title: embedToolbar
               ? Row(
                   children: [
@@ -375,7 +365,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                       padding: const EdgeInsets.all(8.0),
                       child: CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation(
-                          Theme.of(context).colorScheme.onPrimary,
+                          Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -419,7 +409,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             : BottomAppBar(
                 shape: kIsWeb ? null : CircularNotchedRectangle(),
                 child: Container(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: Theme.of(context).colorScheme.surfaceContainer,
                   constraints: BoxConstraints(maxHeight: 72),
                   child: Center(child: _buildPageBrowser()),
                 ),
@@ -1385,20 +1375,20 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           children: [
             IconButton(
               icon: Icon(Icons.remove),
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               onPressed: () {
                 _setScale(pageScale - 0.1);
               },
             ),
             IconButton(
               icon: Icon(Icons.fit_screen),
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               tooltip: 'Fit width',
               onPressed: _fitPageToWidth,
             ),
             IconButton(
               icon: Icon(Icons.add),
-              color: Theme.of(context).colorScheme.onPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               onPressed: () {
                 _setScale(pageScale + 0.1);
               },
