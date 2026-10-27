@@ -66,7 +66,7 @@ Future<Uint8List> renderPdfDocumentPageBytes(
   if (rendered == null) throw StateError('Could not render PDF page.');
   try {
     final pixels = Uint8List.fromList(rendered.pixels);
-    return compute(
+    return await compute(
       _encodePdfImagePng,
       _PdfImageEncodeRequest(
         pixels: TransferableTypedData.fromList([pixels]),

@@ -759,5 +759,5 @@ class _RecordingPdfBackground extends XppBackgroundPdf {
   }
 
   @override
-  XmlElement toXmlElement() => XmlElement(XmlName('background'));
+  XmlElement toXmlElement() => XmlElement(XmlName.parts('background'));
 }

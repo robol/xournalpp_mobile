@@ -11,7 +11,7 @@ class XppLayer {
   static XppLayer empty() => XppLayer(content: []);
 
   XmlElement toXmlElement() => XmlElement(
-    XmlName('layer'),
+    XmlName.parts('layer'),
     const [],
     content!.map((e) => e!.toXmlElement()),
   );

@@ -133,13 +133,16 @@ class XppText extends XppContent {
 
   @override
   XmlElement toXmlElement() => XmlElement(
-    XmlName('text'),
+    XmlName.parts('text'),
     [
-      XmlAttribute(XmlName('font'), fontFamily ?? _defaultFontFamily),
-      XmlAttribute(XmlName('size'), size.toString()),
-      XmlAttribute(XmlName('x'), offset!.dx.toString()),
-      XmlAttribute(XmlName('y'), offset!.dy.toString()),
-      XmlAttribute(XmlName('color'), (color ?? Colors.black).toHexTriplet()),
+      XmlAttribute(XmlName.parts('font'), fontFamily ?? _defaultFontFamily),
+      XmlAttribute(XmlName.parts('size'), size.toString()),
+      XmlAttribute(XmlName.parts('x'), offset!.dx.toString()),
+      XmlAttribute(XmlName.parts('y'), offset!.dy.toString()),
+      XmlAttribute(
+        XmlName.parts('color'),
+        (color ?? Colors.black).toHexTriplet(),
+      ),
     ],
     [XmlText(encodeText(text ?? ''))],
   );

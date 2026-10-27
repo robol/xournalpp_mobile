@@ -569,18 +569,18 @@ class XppFile {
   XmlDocument toXmlDocument() {
     return XmlDocument([
       XmlElement(
-        XmlName('xournal'),
+        XmlName.parts('xournal'),
         [
-          XmlAttribute(XmlName('creator'), 'Xournal++ Mobile'),
-          XmlAttribute(XmlName('fileversion'), '4'),
+          XmlAttribute(XmlName.parts('creator'), 'Xournal++ Mobile'),
+          XmlAttribute(XmlName.parts('fileversion'), '4'),
         ],
         [
-          XmlElement(XmlName('title'), const [], [
+          XmlElement(XmlName.parts('title'), const [], [
             XmlText(
               'Xournal document - see http://math.mit.edu/~auroux/software/xournal/',
             ),
           ]),
-          XmlElement(XmlName('preview'), const [], [
+          XmlElement(XmlName.parts('preview'), const [], [
             XmlText(base64Encode(previewImage!)),
           ]),
         ]..addAll(pages!.map((e) => e.toXmlElement())),

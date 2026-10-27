@@ -11,20 +11,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  file_picker: ^11.0.2
+  file_picker: ^13.3.0
   flutter_math_fork: ^0.7.4
   intl: ^0.20.0
   archive: ^4.0.9
-  xml: ^6.5.0
+  xml: ^7.0.1
   url_launcher: ^6.3.2
 #  catcher: ^0.4.0
   receive_sharing_intent: ^1.9.0
   flutter_dropzone: ^4.2.1
   shared_preferences: ^2.5.5
-  share_plus: ^11.1.0
+  share_plus: ^13.3.1
   vector_math: ^2.2.0
   flutter_colorpicker: ^1.1.0
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.2
   path_provider: ^2.1.5
   pdf: ^3.12.0
 #  zefyr: ^0.12.0
@@ -34,7 +34,7 @@ dependencies:
     sdk: flutter
   font_awesome_flutter: ^11.0.0
   pdfrx: ^2.4.5
-  pdfium_flutter: ^0.2.2
+  pdfium_flutter: ^0.4.0
   image: ^4.8.0
 dev_dependencies:
   flutter_test:
@@ -42,8 +42,8 @@ dev_dependencies:
       flutter
   flutter_launcher_icons: ^0.14.4
 
-dependency_overrides:
-  file: ^7.0.1
+#dependency_overrides:
+#  file: ^7.0.1
 
 flutter_icons:
    android: true

@@ -119,12 +119,12 @@ abstract class XppStroke extends XppContent {
         break;
     }
     XmlElement node = XmlElement(
-      XmlName('stroke'),
+      XmlName.parts('stroke'),
       [
-        XmlAttribute(XmlName('tool'), toolString),
-        XmlAttribute(XmlName('color'), color!.toHexTriplet()),
+        XmlAttribute(XmlName.parts('tool'), toolString),
+        XmlAttribute(XmlName.parts('color'), color!.toHexTriplet()),
         XmlAttribute(
-          XmlName('width'),
+          XmlName.parts('width'),
           points!.map((e) => e.width.toString()).join(' '),
         ),
       ],

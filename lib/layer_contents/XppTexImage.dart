@@ -101,14 +101,14 @@ class XppTexImage extends XppContent {
 
   @override
   XmlElement toXmlElement() => XmlElement(
-    XmlName('teximage'),
+    XmlName.parts('teximage'),
     [
-      XmlAttribute(XmlName('text'), text!),
-      XmlAttribute(XmlName('color'), color!.toHexTriplet()),
-      XmlAttribute(XmlName('left'), topLeft!.dx.toString()),
-      XmlAttribute(XmlName('right'), bottomRight?.dx.toString() ?? '0'),
-      XmlAttribute(XmlName('top'), topLeft!.dy.toString()),
-      XmlAttribute(XmlName('bottom'), bottomRight?.dy.toString() ?? '0'),
+      XmlAttribute(XmlName.parts('text'), text!),
+      XmlAttribute(XmlName.parts('color'), color!.toHexTriplet()),
+      XmlAttribute(XmlName.parts('left'), topLeft!.dx.toString()),
+      XmlAttribute(XmlName.parts('right'), bottomRight?.dx.toString() ?? '0'),
+      XmlAttribute(XmlName.parts('top'), topLeft!.dy.toString()),
+      XmlAttribute(XmlName.parts('bottom'), bottomRight?.dy.toString() ?? '0'),
     ],
     [XmlText(XppText.encodeText(text!))],
   );

@@ -90,12 +90,12 @@ class XppImage extends XppContent {
 
   @override
   XmlElement toXmlElement() => XmlElement(
-    XmlName('image'),
+    XmlName.parts('image'),
     [
-      XmlAttribute(XmlName('left'), topLeft!.dx.toString()),
-      XmlAttribute(XmlName('right'), bottomRight!.dx.toString()),
-      XmlAttribute(XmlName('top'), topLeft!.dy.toString()),
-      XmlAttribute(XmlName('bottom'), bottomRight!.dy.toString()),
+      XmlAttribute(XmlName.parts('left'), topLeft!.dx.toString()),
+      XmlAttribute(XmlName.parts('right'), bottomRight!.dx.toString()),
+      XmlAttribute(XmlName.parts('top'), topLeft!.dy.toString()),
+      XmlAttribute(XmlName.parts('bottom'), bottomRight!.dy.toString()),
     ],
     [XmlText(base64Encode(data!))],
   );

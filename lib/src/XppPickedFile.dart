@@ -22,25 +22,23 @@ class XppPickedFile {
     required XppFilePickType type,
     String? fileExtension,
   }) async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: type == XppFilePickType.image ? FileType.image : FileType.custom,
       allowedExtensions: type == XppFilePickType.custom && fileExtension != null
           ? [fileExtension.replaceFirst('.', '')]
           : null,
-      withData: true,
     );
-    final file = result?.files.single;
     if (file == null) throw UnsupportedError('No file selected.');
-    final path = file.identifier ?? file.path;
+    final path =
+        file.path ??
+        (file.uri.scheme == 'content' ? file.uri.toString() : null);
     if (path != null) {
       await persistDocumentAccess(
         path,
         writable: type == XppFilePickType.custom,
       );
     }
-    final bytes =
-        file.bytes ?? (path == null ? null : await readFileBytes(path));
-    if (bytes == null) throw UnsupportedError('Could not read selected file.');
+    final bytes = await file.readAsBytes();
     return XppPickedFile(
       bytes,
       path: path,
@@ -82,7 +80,9 @@ class XppPickedFile {
       fileName: fileName ?? 'xournalpp-export',
       bytes: bytes,
     );
-    return savedPath;
+    return savedPath?.scheme == 'file'
+        ? savedPath!.toFilePath()
+        : savedPath?.toString();
   }
 
   Future<String> saveToPath({required String path}) async {

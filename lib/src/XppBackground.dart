@@ -68,10 +68,10 @@ class XppBackgroundImage extends XppBackground {
         domainString = 'clone';
         break;
     }
-    XmlElement node = XmlElement(XmlName('background'), [
-      XmlAttribute(XmlName('type'), 'pixmap'),
-      XmlAttribute(XmlName('domain'), domainString),
-      XmlAttribute(XmlName('filename'), filename!),
+    XmlElement node = XmlElement(XmlName.parts('background'), [
+      XmlAttribute(XmlName.parts('type'), 'pixmap'),
+      XmlAttribute(XmlName.parts('domain'), domainString),
+      XmlAttribute(XmlName.parts('filename'), filename!),
     ]);
     return (node);
   }
@@ -126,12 +126,12 @@ class XppBackgroundPdf extends XppBackground {
   @override
   XmlElement toXmlElement() {
     final attributes = [
-      XmlAttribute(XmlName('type'), 'pdf'),
-      XmlAttribute(XmlName('pageno'), page.toString()),
-      XmlAttribute(XmlName('domain'), 'absolute'),
-      if (filename != null) XmlAttribute(XmlName('filename'), filename!),
+      XmlAttribute(XmlName.parts('type'), 'pdf'),
+      XmlAttribute(XmlName.parts('pageno'), page.toString()),
+      XmlAttribute(XmlName.parts('domain'), 'absolute'),
+      if (filename != null) XmlAttribute(XmlName.parts('filename'), filename!),
     ];
-    XmlElement node = XmlElement(XmlName('background'), attributes);
+    XmlElement node = XmlElement(XmlName.parts('background'), attributes);
     return (node);
   }
 }
@@ -402,10 +402,13 @@ abstract class XppBackgroundSolid extends XppBackground {
   XppBackgroundType? type = XppBackgroundType.SOLID;
 
   XmlElement generateXmlElement(String style) {
-    XmlElement node = XmlElement(XmlName('background'), [
-      XmlAttribute(XmlName('type'), 'solid'),
-      XmlAttribute(XmlName('color'), (color ?? Colors.white).toHexTriplet()),
-      XmlAttribute(XmlName('style'), style),
+    XmlElement node = XmlElement(XmlName.parts('background'), [
+      XmlAttribute(XmlName.parts('type'), 'solid'),
+      XmlAttribute(
+        XmlName.parts('color'),
+        (color ?? Colors.white).toHexTriplet(),
+      ),
+      XmlAttribute(XmlName.parts('style'), style),
     ]);
     return (node);
   }
@@ -564,10 +567,10 @@ class _NoXppBackground extends XppBackground {
 
   @override
   XmlElement toXmlElement() {
-    XmlElement node = XmlElement(XmlName('background'), [
-      XmlAttribute(XmlName('type'), 'solid'),
-      XmlAttribute(XmlName('color'), 'white'),
-      XmlAttribute(XmlName('style'), 'plain'),
+    XmlElement node = XmlElement(XmlName.parts('background'), [
+      XmlAttribute(XmlName.parts('type'), 'solid'),
+      XmlAttribute(XmlName.parts('color'), 'white'),
+      XmlAttribute(XmlName.parts('style'), 'plain'),
     ]);
     return (node);
   }

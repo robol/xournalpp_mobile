@@ -892,6 +892,7 @@ class _FakePdfDocument extends PdfDocument {
 
   @override
   Future<void> loadPagesProgressively<T>({
+    int? startPageNumber,
     PdfPageLoadingCallback<T>? onPageLoadProgress,
     T? data,
     Duration loadUnitDuration = const Duration(milliseconds: 250),

@@ -1,5 +1,11 @@
 analyzer:
  exclude:
    - build/**
+   - android/**
+   - ios/**
+   - web/**
+   - windows/**
+   - macos/**
+   - linux/**
  optional-checks:
    chrome-os-manifest-checks
