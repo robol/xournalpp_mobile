@@ -10,6 +10,7 @@ import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 
 import 'XppPage.dart';
+import 'RasterImageCache.dart';
 
 abstract class XppBackground {
   XppBackgroundType? type;
@@ -600,9 +601,12 @@ class _RasterizedSolidBackground extends StatefulWidget {
 
 class _RasterizedSolidBackgroundState
     extends State<_RasterizedSolidBackground> {
-  static final Map<_RasterizedBackgroundKey, Future<ui.Image>> _imageCache = {};
+  static final _imageCache = RasterImageCache<_RasterizedBackgroundKey>(
+    maxBytes: 16 * 1024 * 1024,
+  );
 
-  Future<ui.Image>? _imageFuture;
+  ui.Image? _image;
+  int _generation = 0;
   _RasterizedBackgroundKey? _cacheKey;
 
   @override
@@ -612,46 +616,71 @@ class _RasterizedSolidBackgroundState
         widget.targetPixelWidth ?? widget.size.width * pixelRatio;
     final targetPixelHeight =
         widget.targetPixelHeight ?? widget.size.height * pixelRatio;
+    final target = boundedRasterSize(targetPixelWidth, targetPixelHeight);
     final key = _RasterizedBackgroundKey(
       style: widget.style,
       color: widget.color ?? Colors.white,
       size: widget.size,
-      targetPixelWidth: targetPixelWidth.ceil().clamp(1, 100000),
-      targetPixelHeight: targetPixelHeight.ceil().clamp(1, 100000),
+      targetPixelWidth: target.width.toInt(),
+      targetPixelHeight: target.height.toInt(),
     );
     if (_cacheKey != key) {
       _cacheKey = key;
-      _imageFuture = _imageCache.putIfAbsent(
+      final generation = ++_generation;
+      final cached = _imageCache.get(key);
+      if (cached != null) {
+        _image?.dispose();
+        _image = cached;
+      } else {
+        unawaited(_loadImage(key, generation));
+      }
+    }
+
+    return _image != null
+        ? RawImage(
+            image: _image,
+            width: widget.size.width,
+            height: widget.size.height,
+            fit: BoxFit.fill,
+          )
+        : SizedBox(
+            width: widget.size.width,
+            height: widget.size.height,
+            child: ColoredBox(color: widget.color ?? Colors.white),
+          );
+  }
+
+  Future<void> _loadImage(_RasterizedBackgroundKey key, int generation) async {
+    try {
+      final image = await _imageCache.load(
         key,
         () => _renderImage(
           color: key.color,
-          size: widget.size,
+          size: key.size,
           targetPixelWidth: key.targetPixelWidth,
           targetPixelHeight: key.targetPixelHeight,
           painter: widget.painter,
         ),
       );
+      if (!mounted || generation != _generation) {
+        image.dispose();
+        return;
+      }
+      setState(() {
+        _image?.dispose();
+        _image = image;
+      });
+    } catch (_) {
+      // Allow a later rebuild to retry a failed native allocation.
+      if (mounted && generation == _generation) _cacheKey = null;
     }
+  }
 
-    return FutureBuilder<ui.Image>(
-      future: _imageFuture,
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return RawImage(
-            image: snapshot.data,
-            width: widget.size.width,
-            height: widget.size.height,
-            fit: BoxFit.fill,
-          );
-        }
-
-        return SizedBox(
-          width: widget.size.width,
-          height: widget.size.height,
-          child: ColoredBox(color: widget.color ?? Colors.white),
-        );
-      },
-    );
+  @override
+  void dispose() {
+    _generation++;
+    _image?.dispose();
+    super.dispose();
   }
 
   static Future<ui.Image> _renderImage({
@@ -671,9 +700,11 @@ class _RasterizedSolidBackgroundState
     painter.paint(canvas, size);
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(targetPixelWidth, targetPixelHeight);
-    picture.dispose();
-    return image;
+    try {
+      return await picture.toImage(targetPixelWidth, targetPixelHeight);
+    } finally {
+      picture.dispose();
+    }
   }
 }
 

@@ -746,7 +746,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                       XppPageStack(
                         key: _pageStackKeyFor(pageIndex),
                         page: page,
-                        rasterScale: _strokeRasterScale,
+                        rasterScale:
+                            _pageDisplayWidthForScale(
+                              viewportWidth,
+                              _strokeRasterScale,
+                            ) /
+                            page.pageSize!.width!,
                         keepAlive: false,
                         backgroundTargetPixelWidth:
                             backgroundDisplayWidth * devicePixelRatio,
