@@ -53,6 +53,27 @@ Future<XppFile> _open(WidgetTester tester, {bool shortPages = false}) async {
   return file;
 }
 
+Future<XppFile> _openPageCount(WidgetTester tester, int pageCount) async {
+  SharedPreferences.setMockInitialValues({});
+  await tester.binding.setSurfaceSize(const Size(800, 600));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  final size = XppPageSize(width: 1000, height: 1000);
+  final file = XppFile(
+    title: 'Large viewport',
+    pages: List.generate(
+      pageCount,
+      (_) => XppPage(
+        pageSize: size,
+        background: XppBackgroundSolidLined(size: size),
+        layers: [XppLayer.empty()],
+      ),
+    ),
+  );
+  await tester.pumpWidget(_app(CanvasPage(file: file)));
+  await tester.pumpAndSettle();
+  return file;
+}
+
 ScrollPosition _vertical(WidgetTester tester) => tester
     .stateList<ScrollableState>(find.byType(Scrollable))
     .firstWhere((state) => state.position.axis == Axis.vertical)
@@ -68,6 +89,83 @@ Future<void> _wheel(WidgetTester tester, Offset position, double delta) =>
     );
 
 void main() {
+  testWidgets('geometry current-page tracking handles long documents', (
+    tester,
+  ) async {
+    await _openPageCount(tester, 500);
+    final vertical = _vertical(tester);
+    vertical.jumpTo(vertical.maxScrollExtent * .8);
+    await tester.pumpAndSettle();
+
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    expect(canvas.currentPage, greaterThan(300));
+    expect(canvas.currentPage, lessThan(450));
+    expect(find.byType(XppPageStack).evaluate().length, lessThanOrEqualTo(8));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('scroll current-page tracking handles mixed page heights', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final pages = List.generate(12, (index) {
+      final size = XppPageSize(width: 1000, height: index.isEven ? 500 : 1300);
+      return XppPage(
+        pageSize: size,
+        background: XppBackgroundSolidLined(size: size),
+        layers: [XppLayer.empty()],
+      );
+    });
+    await tester.pumpWidget(
+      _app(
+        CanvasPage(
+          file: XppFile(title: 'Mixed heights', pages: pages),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final vertical = _vertical(tester);
+    vertical.jumpTo(vertical.maxScrollExtent * .65);
+    await tester.pumpAndSettle();
+
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    expect(canvas.currentPage, greaterThan(3));
+    expect(canvas.currentPage, lessThan(10));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('pan mode updates do not rebuild page content child', (
+    tester,
+  ) async {
+    final panMode = ValueNotifier<bool>(false);
+    addTearDown(panMode.dispose);
+    var childBuilds = 0;
+
+    await tester.pumpWidget(
+      _app(
+        PointerListener(
+          canPanViewportListenable: panMode,
+          toolData: const {},
+          child: Builder(
+            builder: (_) {
+              childBuilds++;
+              return const SizedBox(key: ValueKey('stable-page-child'));
+            },
+          ),
+        ),
+      ),
+    );
+    expect(childBuilds, 1);
+    panMode.value = true;
+    await tester.pump();
+    expect(childBuilds, 1);
+    panMode.value = false;
+    await tester.pump();
+    expect(childBuilds, 1);
+  });
+
   testWidgets('idle prefetch requests a frame without an unrelated rebuild', (
     tester,
   ) async {

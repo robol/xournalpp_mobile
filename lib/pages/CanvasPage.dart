@@ -188,11 +188,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Map<PointerDeviceKind?, EditingTool> _toolData = {};
   PointerDeviceKind? _currentDevice = PointerDeviceKind.touch;
+  final ValueNotifier<bool> _canPanViewportListenable = ValueNotifier(false);
 
   /// used fro parent-child communication
   final Map<int, GlobalKey<XppPageStackState>> _pageStackKeys = {};
   final Map<int, GlobalKey<PointerListenerState>> _pointerListenerKeys = {};
-  final Map<int, GlobalKey> _pageItemKeys = {};
   final GlobalKey<EditingToolBarState> _editingToolbarKey = GlobalKey();
   final GlobalKey _pagesViewportKey = GlobalKey();
   final ScrollController _pagesScrollController = ScrollController();
@@ -203,6 +203,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   Animation<double>? _zoomAnimation;
   _TopScrollPosition? _zoomTopScrollPosition;
   final ValueNotifier<bool> _deferPdfRasterUpdates = ValueNotifier(false);
+  final ValueNotifier<double> _viewportScale = ValueNotifier(1);
 
   double pageScale = 1;
   double _backgroundRenderScale = 1;
@@ -535,57 +536,66 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Widget _buildScrollablePages() {
     final pages = _file?.pages ?? <XppPage>[];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _lastViewportWidth = constraints.maxWidth;
-        final contentWidth = max(
-          constraints.maxWidth,
-          _pageDisplayWidth(constraints.maxWidth) +
-              (_pageHorizontalPadding + _pageCardMargin) * 2,
-        );
-        return Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: _handleViewportPointerDown,
-          onPointerMove: _handleViewportPointerMove,
-          onPointerUp: _handleViewportPointerUp,
-          onPointerCancel: _handleViewportPointerUp,
-          onPointerSignal: _handleViewportPointerSignal,
-          child: SingleChildScrollView(
-            key: _pagesViewportKey,
-            controller: _pagesHorizontalScrollController,
-            physics: _viewportScrollPhysics,
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: contentWidth,
-              height: constraints.maxHeight,
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  if (notification is ScrollStartNotification ||
-                      notification is ScrollUpdateNotification ||
-                      notification is UserScrollNotification) {
-                    _noteViewportInteraction();
-                  }
-                  _scheduleCurrentPageFromScroll();
-                  return false;
-                },
-                child: ListView.builder(
-                  controller: _pagesScrollController,
-                  physics: _viewportScrollPhysics,
-                  padding: const EdgeInsets.symmetric(vertical: _pageGap),
-                  itemExtentBuilder: (index, _) =>
-                      _pageItemExtent(index, _lastViewportWidth),
-                  scrollCacheExtent: ScrollCacheExtent.pixels(
-                    _estimatedPageExtent(_lastViewportWidth) * 1.5,
+    return ValueListenableBuilder<double>(
+      valueListenable: _viewportScale,
+      builder: (context, viewportScale, _) => LayoutBuilder(
+        builder: (context, constraints) {
+          _lastViewportWidth = constraints.maxWidth;
+          final contentWidth = max(
+            constraints.maxWidth,
+            _pageDisplayWidthForScale(constraints.maxWidth, viewportScale) +
+                (_pageHorizontalPadding + _pageCardMargin) * 2,
+          );
+          return Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: _handleViewportPointerDown,
+            onPointerMove: _handleViewportPointerMove,
+            onPointerUp: _handleViewportPointerUp,
+            onPointerCancel: _handleViewportPointerUp,
+            onPointerSignal: _handleViewportPointerSignal,
+            child: SingleChildScrollView(
+              key: _pagesViewportKey,
+              controller: _pagesHorizontalScrollController,
+              physics: _viewportScrollPhysics,
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: contentWidth,
+                height: constraints.maxHeight,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollStartNotification ||
+                        notification is ScrollUpdateNotification ||
+                        notification is UserScrollNotification) {
+                      _noteViewportInteraction();
+                    }
+                    _scheduleCurrentPageFromScroll();
+                    return false;
+                  },
+                  child: ListView.builder(
+                    controller: _pagesScrollController,
+                    physics: _viewportScrollPhysics,
+                    padding: const EdgeInsets.symmetric(vertical: _pageGap),
+                    itemExtentBuilder: (index, _) => _pageItemExtentForScale(
+                      index,
+                      _lastViewportWidth,
+                      viewportScale,
+                    ),
+                    scrollCacheExtent: ScrollCacheExtent.pixels(
+                      _scrollCacheExtent(_lastViewportWidth, viewportScale),
+                    ),
+                    itemCount: pages.length,
+                    itemBuilder: (context, index) => _buildScrollablePage(
+                      context,
+                      index,
+                      _lastViewportWidth,
+                    ),
                   ),
-                  itemCount: pages.length,
-                  itemBuilder: (context, index) =>
-                      _buildScrollablePage(context, index, _lastViewportWidth),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -694,7 +704,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     double viewportWidth,
   ) {
     final page = _file!.pages![pageIndex];
-    final displayWidth = _pageDisplayWidth(viewportWidth);
+    final displayWidth = _pageDisplayWidthForScale(viewportWidth, pageScale);
     final displayHeight = displayWidth / page.pageSize!.ratio;
     final backgroundDisplayWidth = _pageDisplayWidthForScale(
       viewportWidth,
@@ -717,7 +727,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           elevation: isActivePage ? 12 : 6,
           color: Colors.white,
           child: SizedBox(
-            key: _pageItemKeyFor(pageIndex),
             width: displayWidth,
             height: displayHeight,
             child: FittedBox(
@@ -732,6 +741,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 highlighterColor: highlighterColor,
                 laserColor: _laserColor,
                 drawWithStylusOnly: drawWithStylusOnly,
+                canPanViewportListenable: _canPanViewportListenable,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
                 onPan: _panPages,
                 onDeviceChange: _handleDeviceChange,
@@ -840,10 +850,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  GlobalKey _pageItemKeyFor(int pageIndex) {
-    return _pageItemKeys.putIfAbsent(pageIndex, GlobalKey.new);
-  }
-
   Widget _buildPageTopCoordinateOverlay(int pageIndex) {
     return Positioned(
       left: 8,
@@ -927,7 +933,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _pinchAnchor = null;
     _pageStackKeys.clear();
     _pointerListenerKeys.clear();
-    _pageItemKeys.clear();
   }
 
   void _activatePageForEditing(int pageIndex) {
@@ -1077,38 +1082,47 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _updateCurrentPageFromScroll() {
     if (_navigationTarget != null) return;
-    final viewportObject = _pagesViewportKey.currentContext?.findRenderObject();
-    if (viewportObject is! RenderBox) return;
+    if (!_pagesScrollController.hasClients || _lastViewportWidth <= 0) return;
+    final position = _pagesScrollController.position;
+    final viewportCenter = position.pixels + position.viewportDimension / 2;
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return;
 
-    final viewportTop = viewportObject.localToGlobal(Offset.zero).dy;
-    final viewportCenter = viewportTop + viewportObject.size.height / 2;
-    var bestPage = currentPage;
-    var bestDistance = double.infinity;
-
-    final stalePages = <int>[];
-    for (final entry in _pageItemKeys.entries) {
-      final pageObject = entry.value.currentContext?.findRenderObject();
-      if (pageObject is! RenderBox || !pageObject.attached) {
-        stalePages.add(entry.key);
-        continue;
-      }
-
-      final pageTop = pageObject.localToGlobal(Offset.zero).dy;
-      final pageCenter = pageTop + pageObject.size.height / 2;
-      final distance = (pageCenter - viewportCenter).abs();
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestPage = entry.key;
-      }
-    }
-
-    for (final page in stalePages) {
-      _pageItemKeys.remove(page);
-      _pageStackKeys.remove(page);
-      _pointerListenerKeys.remove(page);
+    final displayWidth = _pageDisplayWidthForScale(
+      _lastViewportWidth,
+      pageScale,
+    );
+    final candidate = _geometry.pageAt(
+      viewportCenter,
+      displayWidth,
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
+    var bestPage = candidate;
+    final bestDistance = _pageCenterDistance(
+      candidate,
+      viewportCenter,
+      displayWidth,
+    );
+    if (candidate + 1 < pages.length &&
+        _pageCenterDistance(candidate + 1, viewportCenter, displayWidth) <
+            bestDistance) {
+      bestPage = candidate + 1;
     }
 
     if (bestPage != currentPage) _setCurrentPage(bestPage);
+  }
+
+  double _pageCenterDistance(int pageIndex, double y, double displayWidth) {
+    final page = _file!.pages![pageIndex];
+    final top = _geometry.offset(
+      pageIndex,
+      displayWidth,
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
+    final height = displayWidth / page.pageSize!.ratio;
+    return (top + height / 2 - y).abs();
   }
 
   void _scrollToPage(int pageIndex, {bool animated = true}) {
@@ -1201,8 +1215,19 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     );
   }
 
-  double? _pageItemExtent(int pageIndex, double viewportWidth) {
-    return _pageItemExtentForScale(pageIndex, viewportWidth, pageScale);
+  double _scrollCacheExtent(double viewportWidth, double scale) {
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return 1200;
+    final displayWidth = _pageDisplayWidthForScale(viewportWidth, scale);
+    final currentIndex = currentPage.clamp(0, pages.length - 1);
+    final averageHeight =
+        pages
+            .skip(max(0, currentIndex - 1))
+            .take(3)
+            .map((page) => displayWidth / page.pageSize!.ratio)
+            .fold<double>(0, (total, height) => total + height) /
+        min(3, pages.length);
+    return (averageHeight + _pageGap + _pageCardMargin * 2) * 1.5;
   }
 
   double? _pageItemExtentForScale(
@@ -1228,7 +1253,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final scrollOffset = _pagesScrollController.offset;
     final pageIndex = _geometry.pageAt(
       scrollOffset,
-      _pageDisplayWidth(_lastViewportWidth),
+      _pageDisplayWidthForScale(_lastViewportWidth, pageScale),
       _pageGap + _pageCardMargin * 2,
       _pageGap + _pageCardMargin,
     );
@@ -1266,12 +1291,6 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (clampedTarget != vertical.pixels) {
       _pagesScrollController.jumpTo(clampedTarget);
     }
-  }
-
-  double _estimatedPageExtent(double viewportWidth) {
-    final pages = _file?.pages;
-    if (pages == null || pages.isEmpty) return 800;
-    return _pageItemExtent(currentPage, viewportWidth) ?? 800;
   }
 
   double _pageDisplayWidth(double viewportWidth) {
@@ -1508,11 +1527,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _setZoomableState() {
-    for (final key in _pointerListenerKeys.values) {
-      key.currentState?.setState(() {
-        key.currentState!.drawingEnabled = !_canPanViewport;
-      });
-    }
+    _canPanViewportListenable.value = _canPanViewport;
   }
 
   void _scheduleInputModeRefresh() {
@@ -1557,7 +1572,21 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _pinchZoomActive = false;
     _backgroundRenderScale = newZoom;
     _strokeRasterScale = newZoom;
+    _zoomAnimationController.addStatusListener(_finishZoomAnimationIfDone);
     _zoomAnimationController.forward(from: 0);
+  }
+
+  void _finishZoomAnimationIfDone(AnimationStatus status) {
+    if (status != AnimationStatus.completed &&
+        status != AnimationStatus.dismissed) {
+      return;
+    }
+    _zoomAnimationController.removeStatusListener(_finishZoomAnimationIfDone);
+    final animation = _zoomAnimation;
+    if (animation == null) return;
+    pageScale = animation.value;
+    _viewportScale.value = pageScale;
+    setState(() {});
   }
 
   void _handlePinchZoomStart(Offset globalFocalPoint) {
@@ -1687,10 +1716,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     _noteViewportInteraction();
     _pinchFocalPoint = globalFocalPoint;
-    setState(() {
-      pageScale = nextScale;
-      _applyPinchAnchor();
-    });
+    pageScale = nextScale;
+    _viewportScale.value = nextScale;
+    _applyPinchAnchor();
     _schedulePinchCorrection();
   }
 
@@ -1725,10 +1753,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (animation == null) return;
 
     final nextScale = animation.value;
-    setState(() {
-      pageScale = nextScale;
-      _restoreTopScrollPosition(_zoomTopScrollPosition, scale: nextScale);
-    });
+    pageScale = nextScale;
+    _viewportScale.value = nextScale;
+    _restoreTopScrollPosition(_zoomTopScrollPosition, scale: nextScale);
     _noteViewportInteraction();
     final generation = _pinchGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2040,7 +2067,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   Rect? _visibleCurrentPageBounds(XppPage page) {
     final viewport = _pagesViewportKey.currentContext?.findRenderObject();
-    final pageBox = _pageItemKeys[currentPage]?.currentContext
+    final pageBox = _pointerListenerKeys[currentPage]?.currentContext
         ?.findRenderObject();
     if (viewport is! RenderBox || pageBox is! RenderBox) return null;
 
@@ -2680,6 +2707,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _backgroundRenderCommitTimer?.cancel();
     _viewportInteractionIdleTimer?.cancel();
     _deferPdfRasterUpdates.dispose();
+    _viewportScale.dispose();
+    _canPanViewportListenable.dispose();
     _selectionTranslation.dispose();
     _invalidatePrefetch();
     _navigationGeneration++;

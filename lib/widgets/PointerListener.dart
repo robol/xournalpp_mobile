@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/layer_contents/XppTexImage.dart';
@@ -22,6 +23,7 @@ class PointerListener extends StatefulWidget {
   final Color? highlighterColor;
   final Color? laserColor;
   final bool drawWithStylusOnly;
+  final ValueListenable<bool>? canPanViewportListenable;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
   final Function()? removeLastContent;
@@ -58,6 +60,7 @@ class PointerListener extends StatefulWidget {
     this.highlighterColor,
     this.laserColor,
     this.drawWithStylusOnly = false,
+    this.canPanViewportListenable,
     this.filterEraser,
     this.filterEraserPath,
     this.removeLastContent,
@@ -141,6 +144,21 @@ class PointerListenerState extends State<PointerListener> {
 
   @override
   Widget build(BuildContext context) {
+    final panListenable = widget.canPanViewportListenable;
+    if (panListenable != null) {
+      return ValueListenableBuilder<bool>(
+        valueListenable: panListenable,
+        builder: (context, canPanViewport, child) {
+          drawingEnabled = !canPanViewport;
+          return _buildPointerTree(child!);
+        },
+        child: widget.child,
+      );
+    }
+    return _buildPointerTree(widget.child!);
+  }
+
+  Widget _buildPointerTree(Widget child) {
     return MouseRegion(
       onHover: (event) {
         notifyDeviceChange(event);
@@ -282,7 +300,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         child: Stack(
           children: [
-            widget.child!,
+            child,
             ...strokePreview.buildWidgets(),
             if (_selectionRect != null)
               Positioned.fromRect(
