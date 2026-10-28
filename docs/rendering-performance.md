@@ -1,8 +1,10 @@
 # Rendering performance validation
 
-No Android device was connected during this implementation. Widget tests verify
+The initial implementation had no connected Android device. Widget tests verify
 correctness and structural limits, not Android frame times. Do not interpret
-those tests as evidence of a measured speedup on a device.
+those tests as evidence of a measured speedup on a device. The follow-up audit
+also checks device availability; any device results must be recorded separately
+from the automated correctness checks.
 
 ## Reproducible profile
 
@@ -10,10 +12,14 @@ Run on the same physical Android device, refresh rate, orientation, and Flutter
 version for each revision:
 
 ```sh
-flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart
-flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart --dart-define=PROFILE_MIXED=true
-flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart --dart-define=PROFILE_PAGES=500 --dart-define=PROFILE_STROKES=20
+ORG_GRADLE_PROJECT_renderingBenchmark=true flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart
+ORG_GRADLE_PROJECT_renderingBenchmark=true flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart --dart-define=PROFILE_MIXED=true
+ORG_GRADLE_PROJECT_renderingBenchmark=true flutter run --profile -d DEVICE_ID -t tool/rendering_benchmark.dart --dart-define=PROFILE_PAGES=500 --dart-define=PROFILE_STROKES=20
 ```
+
+On Android, the Gradle property above installs the profile build under a
+separate `.benchmark` application ID, preserving the installed app and its
+data. It does not change release builds.
 
 The harness creates an unsaved deterministic notebook and reports build/raster
 p95/p99 and over-budget frames in batches of 120 frames. It uses the display's
@@ -60,3 +66,24 @@ picture/tile design, and whether PDF encode/decode should be replaced by a direc
 native-image display path. Neither change should be made on assumptions about
 engine/backend costs. Preserve original image bytes and notebook geometry in
 any later display-only optimization.
+
+## Follow-up audit of the eight-point plan
+
+| Item | Implementation and remaining validation |
+| --- | --- |
+| 1. Embedded-image animation | Loaded/error states have no persistent loading animation; idle-frame regression covered. |
+| 2. First paint and scheduling | Shared serial queue, visibility priority, obsolete-job cancellation, bounded recording batches, and a 2 ms cooperative recording slice. Lazy page creation limits nearby preparation. Cold vector painting rejects clipped strokes; retained pictures/tiles still need comparative profiling. A single highlighter batch can exceed the slice. |
+| 3. Smaller invalidation units | Ordered groups of at most 64 strokes, cropped padded regions, unchanged-prefix reuse, retained/active image budgets. Raster timeline events expose estimated in-flight output bytes and cache lookup hits/misses. Native intermediates still require platform memory measurements. |
+| 4. Selection and rebuilds | Transient transforms, one release mutation, coalesced region queries, spatial hit testing, targeted page refreshes. Mutation-tracked layer revisions now reuse unchanged compositions, including grouped stroke lists and selection indexes. Edited content must still be replaced, not mutated in place. |
+| 5. Live strokes | Separate settled/tail painting, bounded widget count, picture consolidation, frame-synchronized fade, incremental smoothing with exact-output regression. |
+| 6. Erasing | Incremental preview path, nearby candidate samples, single-pass splitting. Large operations now yield during path indexing and stroke processing, stage all layers, and commit once. Further edits are temporarily blocked with progress feedback; save, export, and navigation wait for completion. Small operations retain immediate commit behavior. |
+| 7. Page geometry | Cached cumulative extents and binary search; mixed-size/zoom and existing viewport regressions. |
+| 8. Images/PDF/lifetime | Image disposal, decode-size hints, removal of redundant pixel copy, byte-bounded PDF cache. Direct native PDF display remains conditional on measured encode/decode costs. |
+
+The slice and eraser batch limits are cooperative scheduling limits, not a
+hard real-time frame guarantee. Candidate-index queries, one highlighter path,
+and the final atomic list publication can still exceed a frame budget on
+pathological inputs. Cache counters are lifetime lookup counts, not a count of
+unique jobs; deduplicated waiters can each count as misses. Active and cached
+image handles may share backing pixels, so their byte estimates must not be
+summed as measured physical memory.

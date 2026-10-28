@@ -180,19 +180,41 @@ abstract class XppStroke extends XppContent {
   /// Apply the same point-removal predicate as repeated eraseWhere calls,
   /// visiting the stroke once. Path samples are indexed in page coordinates.
   XppContentEraseData eraseAlongPath(List<Offset> coordinates, double radius) {
+    return _erasePathSteps(coordinates, radius).last!;
+  }
+
+  /// Yield between bounded chunks while retaining the exact synchronous split
+  /// algorithm. No persistent content is mutated while this is running.
+  Future<XppContentEraseData> eraseAlongPathBatched(
+    List<Offset> coordinates,
+    double radius,
+  ) async {
+    for (final result in _erasePathSteps(coordinates, radius)) {
+      if (result != null) return result;
+      await Future<void>.delayed(Duration.zero);
+    }
+    return XppContentEraseData();
+  }
+
+  Iterable<XppContentEraseData?> _erasePathSteps(
+    List<Offset> coordinates,
+    double radius,
+  ) sync* {
     final source = points;
-    if (source == null || source.isEmpty || coordinates.isEmpty)
-      return XppContentEraseData();
-    final cellSize = math.max(
-      1.0,
-      radius +
-          source.fold<double>(
-            0,
-            (width, point) => math.max(width, point.width ?? 0),
-          ),
-    );
+    if (source == null || source.isEmpty || coordinates.isEmpty) {
+      yield XppContentEraseData();
+      return;
+    }
+    var work = 0;
+    var maxWidth = 0.0;
+    for (final point in source) {
+      maxWidth = math.max(maxWidth, point.width ?? 0);
+      if (++work % 512 == 0) yield null;
+    }
+    final cellSize = math.max(1.0, radius + maxWidth);
     final cells = <(int, int), List<Offset>>{};
     for (final coordinate in coordinates) {
+      if (++work % 512 == 0) yield null;
       (cells[(
                 (coordinate.dx / cellSize).floor(),
                 (coordinate.dy / cellSize).floor(),
@@ -224,6 +246,7 @@ abstract class XppStroke extends XppContent {
     var segment = <XppStrokePoint>[];
     var affected = false;
     for (final point in source) {
+      if (++work % 512 == 0) yield null;
       if (removes(point)) {
         affected = true;
         if (segment.isNotEmpty) {
@@ -234,10 +257,13 @@ abstract class XppStroke extends XppContent {
         segment.add(point);
       }
     }
-    if (!affected) return XppContentEraseData();
+    if (!affected) {
+      yield XppContentEraseData();
+      return;
+    }
     if (segment.isNotEmpty)
       strokes.add(newStroke(color: color, points: segment));
-    return XppContentEraseData(
+    yield XppContentEraseData(
       affected: true,
       delete: strokes.isEmpty,
       newContent: strokes,

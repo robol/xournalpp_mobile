@@ -17,6 +17,84 @@ import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 void main() {
+  test('layer revisions track list edits and own their input list', () {
+    final input = <XppContent?>[];
+    final layer = XppLayer(content: input);
+    final initial = layer.revision;
+    input.add(null);
+    expect(layer.content, isEmpty);
+    layer.content!.add(null);
+    expect(layer.revision, greaterThan(initial));
+    final added = layer.revision;
+    layer.content![0] = XppStrokePen(color: Colors.black, points: []);
+    expect(layer.revision, greaterThan(added));
+    final replaced = layer.revision;
+    layer.content!.clear();
+    expect(layer.revision, greaterThan(replaced));
+    final cleared = layer.revision;
+    layer.content = [];
+    expect(layer.revision, greaterThan(cleared));
+  });
+
+  test('batched erasing yields and preserves exact pressure splits', () async {
+    final stroke = XppStrokePen(
+      color: Colors.black,
+      points: List.generate(
+        12000,
+        (i) => XppStrokePoint(x: i / 10, y: 10, width: 1 + i % 7.0),
+      ),
+    );
+    final path = [const Offset(30, 10), const Offset(700, 10)];
+    var finished = false;
+    final pending = stroke.eraseAlongPathBatched(path, 10).then((value) {
+      finished = true;
+      return value;
+    });
+    await Future<void>.delayed(Duration.zero);
+    expect(finished, isFalse);
+    final result = await pending;
+    final expected = stroke.eraseAlongPath(path, 10);
+    expect(result.affected, expected.affected);
+    expect(
+      result.newContent.map((e) => e.toXmlElement().toXmlString()),
+      expected.newContent.map((e) => e.toXmlElement().toXmlString()),
+    );
+    expect(stroke.points, hasLength(12000));
+  });
+
+  testWidgets('unchanged layer reuses composition, mutations invalidate it', (
+    tester,
+  ) async {
+    final layer = XppLayer(
+      content: [
+        XppStrokePen(
+          color: Colors.black,
+          points: [XppStrokePoint(x: 20, y: 20, width: 2)],
+        ),
+      ],
+    );
+    Widget build() => MaterialApp(
+      home: XppLayerStack(
+        layer: layer,
+        pageSize: const Size(200, 300),
+        rasterScale: 1,
+      ),
+    );
+    await tester.pumpWidget(build());
+    final stacks = find.descendant(
+      of: find.byType(XppLayerStack),
+      matching: find.byType(Stack),
+    );
+    final first = tester.widget(stacks.first);
+    await tester.pumpWidget(build());
+    expect(tester.widget(stacks.first), same(first));
+    layer.content!.clear();
+    await tester.pumpWidget(build());
+    expect(tester.widget(stacks.first), isNot(same(first)));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
   test(
     'page prefix lookup matches mixed-size linear layout at every scale',
     () {

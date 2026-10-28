@@ -34,6 +34,10 @@ void main() {
     ready.complete(source);
     final clients = await Future.wait([first, second]);
     expect(calls, 1);
+    expect(cache.misses, 2);
+    final cached = cache.get(1)!;
+    expect(cache.hits, 1);
+    cached.dispose();
     expect(source.debugDisposed, isTrue);
     cache.clear();
     clients.first.dispose();

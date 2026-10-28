@@ -11,14 +11,24 @@ class RasterImageCache<K> {
   final int maxEntries;
   final _images = LinkedHashMap<K, ui.Image>();
   int _bytes = 0;
+  int _hits = 0;
+  int _misses = 0;
   final _pending = <K, _PendingRaster>{};
 
   int get bytes => _bytes;
+
+  /// Lifetime lookup counters; misses include callers sharing a pending load.
+  int get hits => _hits;
+  int get misses => _misses;
   int get length => _images.length;
 
   ui.Image? get(K key) {
     final image = _images.remove(key);
-    if (image == null) return null;
+    if (image == null) {
+      _misses++;
+      return null;
+    }
+    _hits++;
     _images[key] = image;
     return image.clone();
   }

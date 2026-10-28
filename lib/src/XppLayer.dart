@@ -1,12 +1,23 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 
 import 'XppPageContentWidget.dart';
 
 class XppLayer {
-  XppLayer({this.content});
+  XppLayer({List<XppContent?>? content}) {
+    this.content = content;
+  }
 
-  List<XppContent?>? content;
+  int _revision = 0;
+  int get revision => _revision;
+  List<XppContent?>? _content;
+  List<XppContent?>? get content => _content;
+  set content(List<XppContent?>? value) {
+    _content = value == null ? null : _LayerContents(value, () => _revision++);
+    _revision++;
+  }
 
   static XppLayer empty() => XppLayer(content: []);
 
@@ -51,4 +62,30 @@ class XppContentEraseData {
     this.delete = false,
     this.newContent = const [],
   });
+}
+
+// Own the list so mutations through an external alias cannot bypass revision
+// tracking. Content geometry is immutable by convention: replace edited items.
+class _LayerContents extends ListBase<XppContent?> {
+  _LayerContents(List<XppContent?> values, this.changed)
+    : _values = List<XppContent?>.of(values);
+  final List<XppContent?> _values;
+  final VoidCallback changed;
+  @override
+  int get length => _values.length;
+  @override
+  set length(int value) {
+    if (value == length) return;
+    _values.length = value;
+    changed();
+  }
+
+  @override
+  XppContent? operator [](int index) => _values[index];
+  @override
+  void operator []=(int index, XppContent? value) {
+    if (identical(_values[index], value)) return;
+    _values[index] = value;
+    changed();
+  }
 }

@@ -232,6 +232,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   bool _pinchCorrectionScheduled = false;
   int _revision = 0;
   int _savedRevision = 0;
+  Future<void>? _pendingErase;
+  bool _erasing = false;
 
   final Map<XppLayer, _EraserContentIndex> _eraserIndexes = {};
   final List<_UndoEntry> _undoStack = [];
@@ -281,11 +283,27 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return PdfSourceScope(
-      resolve: _resolvePdfSource,
-      child: LayoutBuilder(
-        builder: (context, constraints) =>
-            _buildEditor(context, embedToolbar: constraints.maxWidth >= 1000),
+    return AbsorbPointer(
+      absorbing: _erasing,
+      child: Stack(
+        children: [
+          PdfSourceScope(
+            resolve: _resolvePdfSource,
+            child: LayoutBuilder(
+              builder: (context, constraints) => _buildEditor(
+                context,
+                embedToolbar: constraints.maxWidth >= 1000,
+              ),
+            ),
+          ),
+          if (_erasing)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(),
+            ),
+        ],
       ),
     );
   }
@@ -310,7 +328,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       ),
     );
     return PopScope(
-      canPop: _allowPop || !_isDirty,
+      canPop: !_erasing && (_allowPop || !_isDirty),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop || _confirmingLeave) return;
         _confirmingLeave = true;
@@ -1329,6 +1347,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   Future<bool> _confirmLeave() async {
+    await _pendingErase;
+    if (!mounted) return false;
     if (!_isDirty) return true;
 
     final action = await showDialog<_UnsavedChangesAction>(
@@ -2208,14 +2228,44 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _eraseContentAlongPath({List<Offset>? coordinates, double? radius}) {
-    if (coordinates == null || coordinates.isEmpty || radius == null) return;
-
+    if (_erasing ||
+        coordinates == null ||
+        coordinates.isEmpty ||
+        radius == null)
+      return;
     final page = _file!.pages![currentPage];
+    var points = 0;
+    for (final layer in page.layers ?? <XppLayer>[]) {
+      for (final content in layer.content ?? <XppContent?>[]) {
+        points += content is XppStroke ? content.points?.length ?? 0 : 1;
+      }
+    }
+    final batched = points > 8192 || coordinates.length > 128;
+    if (batched) setState(() => _erasing = true);
+    _pendingErase = _applyEraserPath(page, coordinates, radius, batched)
+        .whenComplete(() {
+          _pendingErase = null;
+          if (mounted && batched) setState(() => _erasing = false);
+        });
+  }
+
+  Future<void> _applyEraserPath(
+    XppPage page,
+    List<Offset> coordinates,
+    double radius,
+    bool batched,
+  ) async {
+    final updatedLayers = <XppLayer, List<XppContent?>>{};
+    var work = 0;
     final operations = <_LayerOperation>[];
     for (final layer in page.layers ?? <XppLayer>[]) {
       final eraserIndex = _eraserIndexForLayer(layer);
       final eraseCandidates = <XppContent, List<Offset>>{};
       for (final coordinate in coordinates) {
+        if (batched && ++work % 128 == 0) {
+          await Future<void>.delayed(Duration.zero);
+          if (!mounted) return;
+        }
         for (final candidate in eraserIndex.query(
           Rect.fromCircle(center: coordinate, radius: radius / 2),
         )) {
@@ -2233,11 +2283,20 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
           continue;
         }
 
-        final delta = _eraseContentWithPath(
-          content: content,
-          coordinates: eraseCandidates[content]!,
-          radius: radius,
-        );
+        if (batched && ++work % 32 == 0) {
+          await Future<void>.delayed(Duration.zero);
+          if (!mounted) return;
+        }
+        final delta = batched && content is XppStroke
+            ? await content.eraseAlongPathBatched(
+                eraseCandidates[content]!,
+                radius,
+              )
+            : _eraseContentWithPath(
+                content: content,
+                coordinates: eraseCandidates[content]!,
+                radius: radius,
+              );
         if (!delta.affected) {
           updatedContent.add(content);
           continue;
@@ -2252,7 +2311,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             index: index,
           ),
         );
-        eraserIndex.remove(content);
+
         for (final newContent in delta.newContent) {
           operations.add(
             _LayerOperation.added(
@@ -2262,18 +2321,23 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
               index: updatedContent.length,
             ),
           );
-          eraserIndex.add(newContent);
+
           updatedContent.add(newContent);
         }
       }
-      if (erasedFromLayer) layer.content = updatedContent;
+      if (erasedFromLayer) updatedLayers[layer] = updatedContent;
     }
 
-    if (operations.isEmpty) return;
+    if (!mounted || operations.isEmpty) return;
+    // Publish all layers together, with one undo entry and dirty revision.
+    for (final entry in updatedLayers.entries) {
+      entry.key.content = entry.value;
+      _eraserIndexes.remove(entry.key);
+    }
 
     _undoStack.add(_UndoEntry(operations));
     _markDirty();
-    _refreshPageStack(currentPage, page);
+    _refreshPageStack(_file!.pages!.indexOf(page), page);
     setState(() {});
   }
 
@@ -2328,6 +2392,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void shareScreenshot() async {
+    await _pendingErase;
+    if (!mounted) return;
     Uint8List imageBytes = await _currentPagePng();
     if (!mounted) return;
     String fileName =
@@ -2468,6 +2534,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   Future<({Uint8List pdfBytes, String fileName})> _buildPdfExport() async {
+    await _pendingErase;
+    if (!mounted) throw StateError("Editor disposed");
     final pdfBytes = await exportPdfDocument(
       _file!,
       pdfResolver: (background) async {
@@ -2520,6 +2588,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   Future<bool> saveFile({bool saveAs = false}) async {
+    await _pendingErase;
+    if (!mounted) return false;
     if (savingFile) return false;
     setState(() {
       savingFile = true;

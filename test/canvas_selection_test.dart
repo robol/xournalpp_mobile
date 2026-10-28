@@ -17,6 +17,64 @@ import 'package:xournalpp/src/XppPage.dart';
 
 void main() {
   testWidgets(
+    'large eraser publishes atomically and undo restores all layers',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final strokes = List.generate(
+        2,
+        (_) => XppStrokePen(
+          color: Colors.black,
+          points: List.generate(
+            5000,
+            (i) => XppStrokePoint(x: i / 25, y: 50, width: 2),
+          ),
+        ),
+      );
+      final layers = strokes.map((s) => XppLayer(content: [s])).toList();
+      final page = XppPage(
+        pageSize: XppPageSize(width: 200, height: 300),
+        layers: layers,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            S.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: S.delegate.supportedLocales,
+          home: CanvasPage(
+            file: XppFile(title: 'Eraser', pages: [page]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<PointerListener>(find.byType(PointerListener))
+          .filterEraserPath!(
+        coordinates: [const Offset(100, 50)],
+        radius: 20.0,
+      );
+      expect(layers[0].content!.single, same(strokes[0]));
+      expect(layers[1].content!.single, same(strokes[1]));
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(layers[0].content, hasLength(2));
+      expect(layers[1].content, hasLength(2));
+      await tester.tap(find.byTooltip('Undo last operation'));
+      await tester.pump();
+      expect(layers[0].content!.single, same(strokes[0]));
+      expect(layers[1].content!.single, same(strokes[1]));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'selection drag is transient, cancellable and one undo operation',
     (tester) async {
       SharedPreferences.setMockInitialValues({});

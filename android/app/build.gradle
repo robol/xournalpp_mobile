@@ -78,6 +78,12 @@ android {
         }
     }
     buildTypes {
+        profile {
+            // Keep synthetic profiling separate from installed user notebooks.
+            if (providers.gradleProperty('renderingBenchmark').orNull == 'true') {
+                applicationIdSuffix '.benchmark'
+            }
+        }
         release {
             if (hasReleaseSigningConfig) {
                 signingConfig signingConfigs.release

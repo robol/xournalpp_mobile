@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart'
-    show ValueListenable, visibleForTesting, listEquals;
+    show ValueListenable, visibleForTesting, listEquals, setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:xournalpp/src/RasterWorkQueue.dart';
@@ -362,10 +362,20 @@ class XppLayerStack extends StatefulWidget {
 
 class _XppLayerStackState extends State<XppLayerStack> {
   Map<XppContent, Widget> renderedContent = {};
+  Widget? _composition;
+  int? _compositionRevision;
 
   @override
   void didUpdateWidget(covariant XppLayerStack oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.layer != oldWidget.layer ||
+        widget.pageSize != oldWidget.pageSize ||
+        widget.rasterScale != oldWidget.rasterScale ||
+        widget.activeTool != oldWidget.activeTool ||
+        !setEquals(widget.selectedContents, oldWidget.selectedContents) ||
+        widget.selectionTranslation != oldWidget.selectionTranslation) {
+      _composition = null;
+    }
     if (widget.activeTool != oldWidget.activeTool ||
         widget.selectedContents != oldWidget.selectedContents) {
       renderedContent.clear();
@@ -374,6 +384,9 @@ class _XppLayerStackState extends State<XppLayerStack> {
 
   @override
   Widget build(BuildContext context) {
+    if (_composition != null && _compositionRevision == widget.layer!.revision)
+      return _composition!;
+    _compositionRevision = widget.layer!.revision;
     final contents = widget.layer!.content!;
     final liveContents = contents.toSet();
     renderedContent.removeWhere(
@@ -393,6 +406,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
             _RasterizedStrokeRun(
               strokes: List<XppStroke>.unmodifiable(pendingStrokes),
               bounds: _strokeRasterBounds(pendingStrokes, widget.pageSize),
+              onRetryNeeded: () => _composition = null,
               pageSize: widget.pageSize,
               rasterScale: widget.rasterScale,
             ),
@@ -423,7 +437,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
         renderedContent[element] = element.render(
           onReplace: (newContent) =>
               widget.onReplaceContent?.call(widget.layer!, element, newContent),
-          onPointerDown: widget.onContentPointerDown,
+          onPointerDown: (event) => widget.onContentPointerDown?.call(event),
           selectionMode: selectionMode,
           selected: widget.selectedContents.contains(element),
           onSelect: () => widget.onSelectContent?.call(widget.layer!, element),
@@ -489,7 +503,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
         ),
       );
     }
-    return Stack(children: children);
+    return _composition = Stack(children: children);
   }
 
   Widget _translateSelected(bool selected, Widget child) {
@@ -526,12 +540,14 @@ class _StrokeSelectionPainter extends CustomPainter {
 }
 
 class _RasterizedStrokeRun extends StatefulWidget {
+  final VoidCallback onRetryNeeded;
   final List<XppStroke> strokes;
   final Size pageSize;
   final Rect bounds;
   final double rasterScale;
 
   const _RasterizedStrokeRun({
+    required this.onRetryNeeded,
     required this.strokes,
     required this.bounds,
     required this.pageSize,
@@ -741,6 +757,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
         4;
     if (!_reserveImage(outputBytes, evictOffscreen: true)) {
       _requestedSignature = null;
+      widget.onRetryNeeded();
       return;
     }
     _rasterizationInProgress = true;
@@ -755,6 +772,9 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
               4,
           'retainedCacheBytes': _cache.bytes,
           'activeImageBytes': _activeBytes,
+          'inFlightOutputBytes': outputBytes,
+          'cacheHits': _cache.hits,
+          'cacheMisses': _cache.misses,
         },
       );
     final baseHandle = baseImage?.clone();
@@ -793,7 +813,12 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     } catch (_) {
       // Vector painting remains available. Permit a later update to retry,
       // without spinning indefinitely on an allocation/native-render failure.
-      if (generation == _generation) _requestedSignature = null;
+      if (mounted && generation == _generation) {
+        _requestedSignature = null;
+        // Permit a later parent update to retry even if geometry is unchanged.
+        // Do not schedule a rebuild here: allocation failures must not spin.
+        widget.onRetryNeeded();
+      }
     } finally {
       baseHandle?.dispose();
       trace.finish();
@@ -819,7 +844,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     required Rect bounds,
   }) async {
     final tailStart = baseImage == null ? 0 : cachedPrefixLength ?? 0;
-    if (tailStart >= strokes.length) return baseImage!;
+    if (tailStart >= strokes.length) return baseImage!.clone();
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -832,6 +857,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     // Yield between small batches, and stop obsolete work before native raster.
     try {
       var pointsRecorded = 0;
+      final recordingSlice = Stopwatch()..start();
       for (final stroke in strokes.skip(tailStart)) {
         final points = stroke.points;
         if (points == null || points.isEmpty) continue;
@@ -847,12 +873,14 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
             smoothPressure: stroke.tool == XppStrokeTool.PEN,
           ).paint(canvas, Size.zero);
           pointsRecorded += batch.length;
-          if (pointsRecorded >= 512) {
+          if (pointsRecorded >= 512 ||
+              recordingSlice.elapsedMicroseconds >= 2000) {
             await Future<void>.delayed(Duration.zero);
             if (!mounted || generation != _generation) {
               throw StateError('Obsolete stroke raster');
             }
             pointsRecorded = 0;
+            recordingSlice.reset();
           }
         }
       }
