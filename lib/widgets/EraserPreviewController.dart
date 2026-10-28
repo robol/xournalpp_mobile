@@ -11,6 +11,7 @@ typedef ErasePathCallback =
 class EraserPreviewController {
   final ValueNotifier<int> repaint = ValueNotifier<int>(0);
   final List<Offset> points = [];
+  final Path previewPath = Path();
 
   Offset? _lastPosition;
 
@@ -28,6 +29,11 @@ class EraserPreviewController {
     }
 
     _lastPosition = position;
+    if (points.isEmpty) {
+      previewPath.moveTo(position.dx, position.dy);
+    } else {
+      previewPath.lineTo(position.dx, position.dy);
+    }
     points.add(position);
     repaint.value++;
   }
@@ -54,6 +60,7 @@ class EraserPreviewController {
     _lastPosition = null;
     if (points.isEmpty) return;
     points.clear();
+    previewPath.reset();
     repaint.value++;
   }
 
@@ -65,10 +72,12 @@ class EraserPreviewController {
 class EraserPreviewPainter extends CustomPainter {
   final List<Offset> Function() pointsProvider;
   final double Function() radiusProvider;
+  final Path? previewPath;
 
   EraserPreviewPainter({
     required this.pointsProvider,
     required this.radiusProvider,
+    this.previewPath,
     Listenable? repaint,
   }) : super(repaint: repaint);
 
@@ -89,9 +98,12 @@ class EraserPreviewPainter extends CustomPainter {
       return;
     }
 
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (var i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
+    final path =
+        previewPath ?? (Path()..moveTo(points.first.dx, points.first.dy));
+    if (previewPath == null) {
+      for (var i = 1; i < points.length; i++) {
+        path.lineTo(points[i].dx, points[i].dy);
+      }
     }
     canvas.drawPath(path, paint);
   }

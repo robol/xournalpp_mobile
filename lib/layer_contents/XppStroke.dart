@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/HexColor.dart';
@@ -173,6 +174,73 @@ abstract class XppStroke extends XppContent {
       affected: true,
       delete: newStrokes.isEmpty,
       newContent: newStrokes,
+    );
+  }
+
+  /// Apply the same point-removal predicate as repeated eraseWhere calls,
+  /// visiting the stroke once. Path samples are indexed in page coordinates.
+  XppContentEraseData eraseAlongPath(List<Offset> coordinates, double radius) {
+    final source = points;
+    if (source == null || source.isEmpty || coordinates.isEmpty)
+      return XppContentEraseData();
+    final cellSize = math.max(
+      1.0,
+      radius +
+          source.fold<double>(
+            0,
+            (width, point) => math.max(width, point.width ?? 0),
+          ),
+    );
+    final cells = <(int, int), List<Offset>>{};
+    for (final coordinate in coordinates) {
+      (cells[(
+                (coordinate.dx / cellSize).floor(),
+                (coordinate.dy / cellSize).floor(),
+              )] ??=
+              [])
+          .add(coordinate);
+    }
+    bool removes(XppStrokePoint point) {
+      final extent = (point.width! + radius) / 2;
+      for (
+        var x = ((point.x! - extent) / cellSize).floor();
+        x <= ((point.x! + extent) / cellSize).floor();
+        x++
+      ) {
+        for (
+          var y = ((point.y! - extent) / cellSize).floor();
+          y <= ((point.y! + extent) / cellSize).floor();
+          y++
+        ) {
+          for (final coordinate in cells[(x, y)] ?? const <Offset>[]) {
+            if (_shouldRemovePoint(point, coordinate, radius)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    final strokes = <XppStroke>[];
+    var segment = <XppStrokePoint>[];
+    var affected = false;
+    for (final point in source) {
+      if (removes(point)) {
+        affected = true;
+        if (segment.isNotEmpty) {
+          strokes.add(newStroke(color: color, points: segment));
+          segment = [];
+        }
+      } else {
+        segment.add(point);
+      }
+    }
+    if (!affected) return XppContentEraseData();
+    if (segment.isNotEmpty)
+      strokes.add(newStroke(color: color, points: segment));
+    return XppContentEraseData(
+      affected: true,
+      delete: strokes.isEmpty,
+      newContent: strokes,
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -7,7 +8,9 @@ import 'package:flutter/foundation.dart'
     show ValueListenable, visibleForTesting, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:xournalpp/src/RasterWorkQueue.dart';
+import 'package:xournalpp/src/ContentSpatialIndex.dart';
+import 'package:xournalpp/layer_contents/XppImage.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
@@ -21,6 +24,9 @@ class XppPageStack extends StatefulWidget {
   @visibleForTesting
   static Future<ui.Image> Function(ui.Picture, int, int)? debugRasterizePicture;
 
+  @visibleForTesting
+  static int? debugMaxActiveRasterBytes;
+
   final XppPage? page;
   final double rasterScale;
   final void Function(
@@ -32,6 +38,7 @@ class XppPageStack extends StatefulWidget {
   final void Function(PointerDownEvent event)? onContentPointerDown;
   final EditingTool? activeTool;
   final Set<XppContent> selectedContents;
+  final ValueListenable<Offset>? selectionTranslation;
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
   final VoidCallback? onDuplicateSelection;
   final VoidCallback? onDeleteSelection;
@@ -48,6 +55,7 @@ class XppPageStack extends StatefulWidget {
     this.onContentPointerDown,
     this.activeTool,
     this.selectedContents = const {},
+    this.selectionTranslation,
     this.onSelectContent,
     this.onDuplicateSelection,
     this.onDeleteSelection,
@@ -115,32 +123,47 @@ class XppPageStackState extends State<XppPageStack>
           onContentPointerDown: widget.onContentPointerDown,
           activeTool: widget.activeTool,
           selectedContents: widget.selectedContents,
+          selectionTranslation: widget.selectionTranslation,
           onSelectContent: widget.onSelectContent,
         ),
       ),
     );
     final selectionActions = _buildSelectionActions();
-    if (selectionActions != null) children.add(selectionActions);
+    if (selectionActions != null) {
+      final translation = widget.selectionTranslation;
+      children.add(
+        translation == null
+            ? selectionActions
+            : ValueListenableBuilder<Offset>(
+                valueListenable: translation,
+                builder: (_, __, ___) =>
+                    _buildSelectionActions() ?? const SizedBox.shrink(),
+              ),
+      );
+    }
     return RepaintBoundary(
       key: pngKey,
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          iconTheme: const IconThemeData(color: Colors.black),
-          textTheme: Theme.of(context).textTheme.apply(
-            bodyColor: Colors.black,
-            displayColor: Colors.black,
+      child: ImageRasterScale(
+        scale: widget.rasterScale * MediaQuery.devicePixelRatioOf(context),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            iconTheme: const IconThemeData(color: Colors.black),
+            textTheme: Theme.of(context).textTheme.apply(
+              bodyColor: Colors.black,
+              displayColor: Colors.black,
+            ),
+            inputDecorationTheme: const InputDecorationTheme(
+              labelStyle: TextStyle(color: Colors.black),
+              helperStyle: TextStyle(color: Colors.black87),
+            ),
           ),
-          inputDecorationTheme: const InputDecorationTheme(
-            labelStyle: TextStyle(color: Colors.black),
-            helperStyle: TextStyle(color: Colors.black87),
-          ),
-        ),
-        child: DefaultTextStyle(
-          style: const TextStyle(color: Colors.black),
-          child: SizedBox(
-            width: page!.pageSize!.width,
-            height: page!.pageSize!.height,
-            child: Stack(fit: StackFit.expand, children: children),
+          child: DefaultTextStyle(
+            style: const TextStyle(color: Colors.black),
+            child: SizedBox(
+              width: page!.pageSize!.width,
+              height: page!.pageSize!.height,
+              child: Stack(fit: StackFit.expand, children: children),
+            ),
           ),
         ),
       ),
@@ -162,6 +185,9 @@ class XppPageStackState extends State<XppPageStack>
       selectionBounds = selectionBounds?.expandToInclude(bounds) ?? bounds;
     }
     if (selectionBounds == null) return null;
+    selectionBounds = selectionBounds.shift(
+      widget.selectionTranslation?.value ?? Offset.zero,
+    );
 
     final pageSize = page!.pageSize!.toSize();
     const buttonSize = 32.0;
@@ -242,12 +268,14 @@ class XppPageStackState extends State<XppPageStack>
     RenderRepaintBoundary boundary =
         pngKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
     ui.Image image = await boundary.toImage();
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) {
-      throw StateError('Could not encode page preview as PNG.');
+    try {
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null)
+        throw StateError('Could not encode page preview as PNG.');
+      return byteData.buffer.asUint8List();
+    } finally {
+      image.dispose();
     }
-    Uint8List pngBytes = byteData.buffer.asUint8List();
-    return pngBytes;
   }
 
   @override
@@ -313,6 +341,7 @@ class XppLayerStack extends StatefulWidget {
   final void Function(PointerDownEvent event)? onContentPointerDown;
   final EditingTool? activeTool;
   final Set<XppContent> selectedContents;
+  final ValueListenable<Offset>? selectionTranslation;
   final void Function(XppLayer layer, XppContent content)? onSelectContent;
 
   const XppLayerStack({
@@ -324,6 +353,7 @@ class XppLayerStack extends StatefulWidget {
     this.onContentPointerDown,
     this.activeTool,
     this.selectedContents = const {},
+    this.selectionTranslation,
     this.onSelectContent,
   }) : super(key: key);
   @override
@@ -344,8 +374,13 @@ class _XppLayerStackState extends State<XppLayerStack> {
 
   @override
   Widget build(BuildContext context) {
+    final contents = widget.layer!.content!;
+    final liveContents = contents.toSet();
+    renderedContent.removeWhere(
+      (content, _) => !liveContents.contains(content),
+    );
     List<Widget> children = [];
-    List<Widget> selectionChildren = [];
+    final selectableStrokes = <XppStroke>[];
     List<XppStroke> pendingStrokes = [];
     final selectionMode = widget.activeTool == EditingTool.SELECT;
 
@@ -353,10 +388,14 @@ class _XppLayerStackState extends State<XppLayerStack> {
       if (pendingStrokes.isEmpty) return;
       children.add(
         Positioned.fill(
-          child: _RasterizedStrokeRun(
-            strokes: List<XppStroke>.unmodifiable(pendingStrokes),
-            pageSize: widget.pageSize,
-            rasterScale: widget.rasterScale,
+          child: _translateSelected(
+            widget.selectedContents.contains(pendingStrokes.first),
+            _RasterizedStrokeRun(
+              strokes: List<XppStroke>.unmodifiable(pendingStrokes),
+              bounds: _strokeRasterBounds(pendingStrokes, widget.pageSize),
+              pageSize: widget.pageSize,
+              rasterScale: widget.rasterScale,
+            ),
           ),
         ),
       );
@@ -367,84 +406,134 @@ class _XppLayerStackState extends State<XppLayerStack> {
       if (element == null) return;
 
       if (element is XppStroke) {
+        if (pendingStrokes.isNotEmpty &&
+            widget.selectedContents.contains(pendingStrokes.first) !=
+                widget.selectedContents.contains(element))
+          flushPendingStrokes();
         pendingStrokes.add(element);
+        if (pendingStrokes.length >= 64) flushPendingStrokes();
         if (selectionMode) {
-          selectionChildren.add(_buildStrokeSelectionRegion(element));
+          selectableStrokes.add(element);
         }
         return;
       }
 
       flushPendingStrokes();
-      if (!renderedContent.keys.contains(element)) {
-        renderedContent[element] = Positioned(
-          child: element.render(
-            onReplace: (newContent) => widget.onReplaceContent?.call(
-              widget.layer!,
-              element,
-              newContent,
-            ),
-            onPointerDown: widget.onContentPointerDown,
-            selectionMode: selectionMode,
-            selected: widget.selectedContents.contains(element),
-            onSelect: () =>
-                widget.onSelectContent?.call(widget.layer!, element),
-          ),
-          top: element.getOffset()?.dy ?? 0,
-          left: element.getOffset()?.dx ?? 0,
+      if (!renderedContent.containsKey(element)) {
+        renderedContent[element] = element.render(
+          onReplace: (newContent) =>
+              widget.onReplaceContent?.call(widget.layer!, element, newContent),
+          onPointerDown: widget.onContentPointerDown,
+          selectionMode: selectionMode,
+          selected: widget.selectedContents.contains(element),
+          onSelect: () => widget.onSelectContent?.call(widget.layer!, element),
         );
       }
       final child = renderedContent[element];
-      if (child != null) children.add(child);
+      if (child != null)
+        children.add(
+          Positioned(
+            top: element.getOffset()?.dy ?? 0,
+            left: element.getOffset()?.dx ?? 0,
+            child: _translateSelected(
+              widget.selectedContents.contains(element),
+              child,
+            ),
+          ),
+        );
     });
     flushPendingStrokes();
-    children.addAll(selectionChildren);
+    if (selectionMode && selectableStrokes.isNotEmpty) {
+      final index = ContentSpatialIndex(selectableStrokes);
+      children.add(
+        Positioned.fill(
+          child: _StrokeHitRegion(
+            contains: (position) => index
+                .query(Rect.fromCircle(center: position, radius: 6))
+                .isNotEmpty,
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (event) {
+                final candidates = index.query(
+                  Rect.fromCircle(center: event.localPosition, radius: 6),
+                );
+                if (candidates.isNotEmpty)
+                  widget.onContentPointerDown?.call(event);
+              },
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapUp: (event) {
+                  final candidates = index.query(
+                    Rect.fromCircle(center: event.localPosition, radius: 6),
+                  );
+                  for (final stroke in selectableStrokes.reversed) {
+                    if (candidates.contains(stroke)) {
+                      widget.onSelectContent?.call(widget.layer!, stroke);
+                      break;
+                    }
+                  }
+                },
+                child: _translateSelected(
+                  true,
+                  CustomPaint(
+                    painter: _StrokeSelectionPainter(
+                      selectableStrokes
+                          .where(widget.selectedContents.contains)
+                          .toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Stack(children: children);
   }
 
-  Widget _buildStrokeSelectionRegion(XppStroke stroke) {
-    final bounds = stroke.eraseBounds;
-    if (bounds == null || bounds.isEmpty) return SizedBox.shrink();
-
-    final selectionBounds = bounds.inflate(6);
-    return Positioned.fromRect(
-      rect: selectionBounds,
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: widget.onContentPointerDown,
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => widget.onSelectContent?.call(widget.layer!, stroke),
-          child: widget.selectedContents.contains(stroke)
-              ? CustomPaint(foregroundPainter: _SelectionFramePainter())
-              : SizedBox.expand(),
-        ),
-      ),
+  Widget _translateSelected(bool selected, Widget child) {
+    final translation = widget.selectionTranslation;
+    if (!selected || translation == null) return child;
+    return ValueListenableBuilder<Offset>(
+      valueListenable: translation,
+      child: child,
+      builder: (_, offset, child) =>
+          Transform.translate(offset: offset, child: child),
     );
   }
 }
 
-class _SelectionFramePainter extends CustomPainter {
+class _StrokeSelectionPainter extends CustomPainter {
+  _StrokeSelectionPainter(this.strokes);
+  final List<XppStroke> strokes;
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
     final paint = Paint()
       ..color = XppPageContentWidget.selectionColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-    canvas.drawRect(rect.deflate(.75), paint);
+    for (final stroke in strokes) {
+      final bounds = stroke.eraseBounds;
+      if (bounds != null)
+        canvas.drawRect(bounds.inflate(6).deflate(.75), paint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _SelectionFramePainter oldDelegate) => false;
+  bool shouldRepaint(_StrokeSelectionPainter oldDelegate) =>
+      !listEquals(strokes, oldDelegate.strokes);
 }
 
 class _RasterizedStrokeRun extends StatefulWidget {
   final List<XppStroke> strokes;
   final Size pageSize;
+  final Rect bounds;
   final double rasterScale;
 
   const _RasterizedStrokeRun({
     required this.strokes,
+    required this.bounds,
     required this.pageSize,
     required this.rasterScale,
   });
@@ -454,15 +543,58 @@ class _RasterizedStrokeRun extends StatefulWidget {
 }
 
 class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
+  static final _workQueue = RasterWorkQueue();
   static final _cache = RasterImageCache<_StrokeRunKey>(
     maxBytes: 48 * 1024 * 1024,
   );
+
+  // Count mounted handles conservatively, including handles also in the LRU.
+  // Bound dense, interleaved pages even when many regions cover the same area.
+  static int get _maxActiveBytes =>
+      XppPageStack.debugMaxActiveRasterBytes ?? 64 * 1024 * 1024;
+  static int _activeBytes = 0;
+  static final _imageOwners = <_RasterizedStrokeRunState>{};
+
+  int get _imageBytes =>
+      _image == null ? 0 : _image!.width * _image!.height * 4;
+
+  void _replaceImage(ui.Image? image) {
+    _activeBytes -= _imageBytes;
+    _image?.dispose();
+    _image = image;
+    _activeBytes += _imageBytes;
+    _imageOwners.remove(this);
+    if (image != null) _imageOwners.add(this);
+  }
+
+  bool _reserveImage(int bytes, {bool evictOffscreen = false}) {
+    if (_activeBytes - _imageBytes + bytes <= _maxActiveBytes) return true;
+    if (!evictOffscreen) return false;
+    for (final owner in _imageOwners.toList()) {
+      if (identical(owner, this) || !owner.mounted || owner._isVisible())
+        continue;
+      owner.setState(() {
+        // Pending append jobs may hold this image as their base. Invalidate
+        // their generation before releasing that handle.
+        owner._generation++;
+        owner._rasterizeTimer?.cancel();
+        owner._rasterizeAfterCurrent = false;
+        owner._replaceImage(null);
+        owner._requestedSignature = null;
+        owner._cachedSignature = null;
+      });
+      if (_activeBytes - _imageBytes + bytes <= _maxActiveBytes) return true;
+    }
+    // Keep exact vector rendering when the visible working set exceeds budget.
+    return false;
+  }
 
   ui.Image? _image;
   _StrokeRunKey? _requestedSignature;
   _StrokeRunKey? _cachedSignature;
   double _imagePixelRatio = 1;
   Size? _imagePageSize;
+  Rect? _imageBounds;
   List<XppStroke> _cachedStrokeIdentities = const [];
   int _generation = 0;
   Timer? _rasterizeTimer;
@@ -494,13 +626,16 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     }
 
     final children = <Widget>[
-      RawImage(
-        image: image,
-        width: widget.pageSize.width,
-        height: widget.pageSize.height,
-        fit: BoxFit.fill,
-        scale: _imagePixelRatio,
-        filterQuality: FilterQuality.high,
+      Positioned.fromRect(
+        rect: _imageBounds!,
+        child: RawImage(
+          image: image,
+          width: _imageBounds!.width,
+          height: _imageBounds!.height,
+          fit: BoxFit.fill,
+          scale: _imagePixelRatio,
+          filterQuality: FilterQuality.medium,
+        ),
       ),
     ];
 
@@ -518,6 +653,17 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     return Stack(fit: StackFit.expand, children: children);
   }
 
+  bool _isVisible() {
+    if (!mounted) return false;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return false;
+    final rect = Rect.fromPoints(
+      box.localToGlobal(widget.bounds.topLeft),
+      box.localToGlobal(widget.bounds.bottomRight),
+    );
+    return rect.overlaps(Offset.zero & MediaQuery.sizeOf(context));
+  }
+
   void _rasterizeIfNeeded() {
     if (!mounted) return;
     final pixelRatio = _rasterPixelRatio();
@@ -533,10 +679,15 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     final cached = _cache.get(signature);
     if (cached != null) {
       _rasterizeTimer?.cancel();
-      _image?.dispose();
-      _image = cached;
+      if (!_reserveImage(cached.width * cached.height * 4)) {
+        cached.dispose();
+        _requestedSignature = null;
+        return;
+      }
+      _replaceImage(cached);
       _imagePixelRatio = pixelRatio;
       _imagePageSize = widget.pageSize;
+      _imageBounds = widget.bounds;
       _cachedSignature = signature;
       _cachedStrokeIdentities = widget.strokes;
       return;
@@ -559,9 +710,10 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
 
     _rasterizeTimer?.cancel();
     _rasterizeTimer = Timer(const Duration(milliseconds: 120), () {
-      SchedulerBinding.instance.scheduleTask<void>(() {
-        if (!mounted || generation != _generation) return;
-        _startRasterization(
+      _workQueue.schedule(
+        isCurrent: () => mounted && generation == _generation,
+        isVisible: _isVisible,
+        run: () => _startRasterization(
           strokes,
           widget.pageSize,
           pixelRatio,
@@ -569,8 +721,8 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
           generation,
           baseImage,
           cachedPrefixLength,
-        );
-      }, Priority.idle);
+        ),
+      );
     });
   }
 
@@ -583,7 +735,28 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     ui.Image? baseImage,
     int? cachedPrefixLength,
   ) async {
+    final outputBytes =
+        (signature.bounds.width * pixelRatio).ceil() *
+        (signature.bounds.height * pixelRatio).ceil() *
+        4;
+    if (!_reserveImage(outputBytes, evictOffscreen: true)) {
+      _requestedSignature = null;
+      return;
+    }
     _rasterizationInProgress = true;
+    final trace = developer.TimelineTask()
+      ..start(
+        'stroke raster',
+        arguments: {
+          'strokes': strokes.length,
+          'outputBytes':
+              (signature.bounds.width * pixelRatio).ceil() *
+              (signature.bounds.height * pixelRatio).ceil() *
+              4,
+          'retainedCacheBytes': _cache.bytes,
+          'activeImageBytes': _activeBytes,
+        },
+      );
     final baseHandle = baseImage?.clone();
     try {
       final image = await _rasterize(
@@ -593,17 +766,26 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
         baseImage: baseHandle,
         cachedPrefixLength: cachedPrefixLength,
         generation: generation,
+        bounds: signature.bounds,
       );
       if (!mounted || generation != _generation) {
         image.dispose();
         return;
       }
 
+      if (!_reserveImage(
+        image.width * image.height * 4,
+        evictOffscreen: true,
+      )) {
+        image.dispose();
+        _requestedSignature = null;
+        return;
+      }
       setState(() {
-        if (_image != image) _image?.dispose();
-        _image = image;
+        _replaceImage(image);
         _imagePixelRatio = pixelRatio;
         _imagePageSize = pageSize;
+        _imageBounds = signature.bounds;
         _cachedSignature = signature;
         _cachedStrokeIdentities = strokes;
         _cache.put(signature, image);
@@ -614,6 +796,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       if (generation == _generation) _requestedSignature = null;
     } finally {
       baseHandle?.dispose();
+      trace.finish();
       _rasterizationInProgress = false;
       _rerasterizeIfRequested();
     }
@@ -633,6 +816,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     ui.Image? baseImage,
     int? cachedPrefixLength,
     required int generation,
+    required Rect bounds,
   }) async {
     final tailStart = baseImage == null ? 0 : cachedPrefixLength ?? 0;
     if (tailStart >= strokes.length) return baseImage!;
@@ -643,6 +827,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       canvas.drawImage(baseImage, Offset.zero, Paint());
     }
     canvas.scale(pixelRatio);
+    canvas.translate(-bounds.left, -bounds.top);
     // Recording is synchronous UI-isolate work even though toImage is async.
     // Yield between small batches, and stop obsolete work before native raster.
     try {
@@ -676,8 +861,8 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       rethrow;
     }
     final picture = recorder.endRecording();
-    final width = (pageSize.width * pixelRatio).ceil().clamp(1, 100000);
-    final height = (pageSize.height * pixelRatio).ceil().clamp(1, 100000);
+    final width = (bounds.width * pixelRatio).ceil().clamp(1, 100000);
+    final height = (bounds.height * pixelRatio).ceil().clamp(1, 100000);
     try {
       return await (XppPageStack.debugRasterizePicture?.call(
             picture,
@@ -694,12 +879,14 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     List<XppStroke> strokes,
     Size pageSize,
     double pixelRatio,
-  ) => _StrokeRunKey(strokes, pageSize, pixelRatio);
+  ) => _StrokeRunKey(strokes, pageSize, pixelRatio, widget.bounds);
 
   int? _cachedPrefixLength({Size? pageSize, double? pixelRatio}) {
     if (_cachedSignature == null) return null;
     if (pageSize != null && _imagePageSize != pageSize) return null;
-    if (pixelRatio != null && _imagePixelRatio != pixelRatio) return null;
+    if (pixelRatio != null &&
+        (_imagePixelRatio != pixelRatio || _imageBounds != widget.bounds))
+      return null;
     if (_cachedStrokeIdentities.length > widget.strokes.length) return null;
 
     for (var i = 0; i < _cachedStrokeIdentities.length; i++) {
@@ -730,7 +917,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     _generation++;
     _rasterizeAfterCurrent = false;
     _rasterizeTimer?.cancel();
-    _image?.dispose();
+    _replaceImage(null);
     super.dispose();
   }
 }
@@ -752,7 +939,10 @@ class _StrokeRunVectorPainter extends CustomPainter {
 }
 
 void _paintStrokes(Canvas canvas, Iterable<XppStroke> strokes) {
+  final clip = canvas.getLocalClipBounds();
   for (final stroke in strokes) {
+    final bounds = stroke.eraseBounds;
+    if (bounds != null && !clip.overlaps(bounds)) continue;
     final points = stroke.points;
     if (points == null || points.isEmpty) continue;
 
@@ -774,15 +964,22 @@ Color _strokeColor(XppStroke stroke) {
 }
 
 class _StrokeRunKey {
-  _StrokeRunKey(List<XppStroke> strokes, this.pageSize, this.pixelRatio)
-    : strokes = List.unmodifiable(strokes);
+  _StrokeRunKey(
+    List<XppStroke> strokes,
+    this.pageSize,
+    this.pixelRatio,
+    this.bounds,
+  ) : strokes = List.unmodifiable(strokes);
   final List<XppStroke> strokes;
   final Size pageSize;
   final double pixelRatio;
+  final Rect bounds;
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => _hash;
+  late final int _hash = Object.hash(
     pageSize,
     pixelRatio,
+    bounds,
     Object.hashAll(strokes.map(identityHashCode)),
   );
   @override
@@ -790,6 +987,7 @@ class _StrokeRunKey {
       other is _StrokeRunKey &&
       pageSize == other.pageSize &&
       pixelRatio == other.pixelRatio &&
+      bounds == other.bounds &&
       listEquals(strokes, other.strokes);
 }
 
@@ -804,4 +1002,43 @@ Iterable<List<XppStrokePoint>> _strokeBatches(
   for (var start = 0; start < points.length - 1; start += 512) {
     yield points.sublist(start, min(start + 513, points.length));
   }
+}
+
+Rect _strokeRasterBounds(List<XppStroke> strokes, Size pageSize) {
+  Rect? bounds;
+  for (final stroke in strokes) {
+    final rect = stroke.eraseBounds;
+    if (rect != null) bounds = bounds?.expandToInclude(rect) ?? rect;
+  }
+  if (bounds == null) return const Rect.fromLTWH(0, 0, 1, 1);
+  bounds = Rect.fromLTRB(
+    bounds.left.floorToDouble(),
+    bounds.top.floorToDouble(),
+    bounds.right.ceilToDouble(),
+    bounds.bottom.ceilToDouble(),
+  ).intersect(Offset.zero & pageSize);
+  return bounds.isEmpty ? const Rect.fromLTWH(0, 0, 1, 1) : bounds;
+}
+
+class _StrokeHitRegion extends SingleChildRenderObjectWidget {
+  const _StrokeHitRegion({required this.contains, required super.child});
+  final bool Function(Offset) contains;
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderStrokeHitRegion(contains);
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderStrokeHitRegion renderObject,
+  ) {
+    renderObject.contains = contains;
+  }
+}
+
+class _RenderStrokeHitRegion extends RenderProxyBox {
+  _RenderStrokeHitRegion(this.contains);
+  bool Function(Offset) contains;
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) =>
+      contains(position) && super.hitTest(result, position: position);
 }

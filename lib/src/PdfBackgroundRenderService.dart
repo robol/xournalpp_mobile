@@ -88,6 +88,7 @@ class PdfBackgroundRenderService {
     PdfBackgroundSourceRevision? sourceRevision,
     PdfBackgroundSourceReader? sourceReader,
     int maxMemoryEntries = 40,
+    int maxMemoryBytes = 32 * 1024 * 1024,
     int maxOpenDocuments = 3,
   }) : _renderer = renderer ?? renderPdfDocumentPageBytes,
        _documentOpener = documentOpener ?? _openDefaultDocument,
@@ -96,6 +97,7 @@ class PdfBackgroundRenderService {
        _sourceRevision = sourceRevision ?? localFileRevision,
        _sourceReader = sourceReader ?? readFileBytes,
        _maxMemoryEntries = maxMemoryEntries,
+       _maxMemoryBytes = maxMemoryBytes,
        _maxOpenDocuments = maxOpenDocuments;
 
   final PdfBackgroundPageRenderer _renderer;
@@ -105,6 +107,9 @@ class PdfBackgroundRenderService {
   final PdfBackgroundSourceRevision _sourceRevision;
   final PdfBackgroundSourceReader _sourceReader;
   final int _maxMemoryEntries;
+  final int _maxMemoryBytes;
+  int _memoryBytes = 0;
+  int get memoryBytes => _memoryBytes;
   final int _maxOpenDocuments;
 
   final _memoryCache = LinkedHashMap<String, Uint8List>();
@@ -321,6 +326,7 @@ class PdfBackgroundRenderService {
 
   void clearMemoryCache() {
     _memoryCache.clear();
+    _memoryBytes = 0;
   }
 
   Future<void> dispose() => _disposeFuture ??= _dispose();
@@ -340,6 +346,7 @@ class PdfBackgroundRenderService {
     _controllers.clear();
     _sessions.clear();
     _memoryCache.clear();
+    _memoryBytes = 0;
     _inFlight.clear();
     for (final session in sessions) {
       await session.dispose();
@@ -446,10 +453,15 @@ class PdfBackgroundRenderService {
   }
 
   void _remember(String key, Uint8List bytes) {
-    _memoryCache.remove(key);
+    _memoryBytes -= _memoryCache.remove(key)?.lengthInBytes ?? 0;
+    if (bytes.lengthInBytes > _maxMemoryBytes) return;
     _memoryCache[key] = bytes;
-    while (_memoryCache.length > _maxMemoryEntries) {
-      _memoryCache.remove(_memoryCache.keys.first);
+    _memoryBytes += bytes.lengthInBytes;
+    while (_memoryCache.length > _maxMemoryEntries ||
+        _memoryBytes > _maxMemoryBytes) {
+      _memoryBytes -= _memoryCache
+          .remove(_memoryCache.keys.first)!
+          .lengthInBytes;
     }
   }
 

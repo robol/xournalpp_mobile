@@ -48,7 +48,10 @@ Future<ui.Image> _image(WidgetTester tester) async {
 }
 
 void main() {
-  tearDown(() => XppPageStack.debugRasterizePicture = null);
+  tearDown(() {
+    XppPageStack.debugRasterizePicture = null;
+    XppPageStack.debugMaxActiveRasterBytes = null;
+  });
 
   testWidgets('stroke raster survives remount but not content replacement', (
     tester,
@@ -61,8 +64,8 @@ void main() {
       images.add(await _image(tester));
     }
     XppPageStack.debugRasterizePicture = (_, width, height) async {
-      expect(width, 40);
-      expect(height, 40);
+      expect(width, lessThan(40));
+      expect(height, lessThan(40));
       return images[calls++];
     };
     final page = _page();
@@ -143,7 +146,7 @@ void main() {
       ).paint(canvas, Size.zero);
       final picture = recorder.endRecording();
       await tester.runAsync(() async {
-        final expected = await picture.toImage(40, 40);
+        final expected = await picture.toImage(actual!.width, actual!.height);
         final expectedBytes = await expected.toByteData();
         final actualBytes = await actual!.toByteData();
         expect(
@@ -156,6 +159,109 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets('appending ink rerasterizes only the final bounded group', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final image = await _image(tester);
+    var calls = 0;
+    final sizes = <Size>[];
+    XppPageStack.debugRasterizePicture = (_, width, height) async {
+      calls++;
+      sizes.add(Size(width.toDouble(), height.toDouble()));
+      return image.clone();
+    };
+    XppStroke stroke(int i) => XppStrokePen(
+      color: Colors.black,
+      points: [
+        XppStrokePoint(
+          x: 30 + (i % 10).toDouble(),
+          y: 40 + (i % 20).toDouble(),
+          width: 2,
+        ),
+      ],
+    );
+    final layer = XppLayer(content: List.generate(129, stroke));
+    final page = XppPage(
+      pageSize: XppPageSize(width: 600, height: 800),
+      layers: [layer],
+    );
+    await tester.pumpWidget(_app(page, 1));
+    await _startRaster(tester);
+    for (var i = 0; i < 10 && calls < 3; i++) {
+      await tester.pump();
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    }
+    expect(calls, 3);
+    expect(sizes.every((s) => s.width < 100 && s.height < 100), isTrue);
+    layer.content!.add(stroke(129));
+    await tester.pumpWidget(_app(page, 1));
+    await _startRaster(tester);
+    await tester.pump();
+    expect(calls, 4);
+    await tester.pumpWidget(const SizedBox());
+    image.dispose();
+  });
+
+  testWidgets('evicting an offscreen base cancels its queued append job', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    XppPageStack.debugMaxActiveRasterBytes = 700;
+    final first = _page()..background = null;
+    final second = _page()..background = null;
+    final key = GlobalKey();
+    final images = <ui.Image>[];
+    XppPageStack.debugRasterizePicture = (picture, width, height) async {
+      final image = await picture.toImage(width, height);
+      images.add(image);
+      return image;
+    };
+    Widget app(bool offscreen) => MaterialApp(
+      home: Stack(
+        children: [
+          Positioned(
+            top: offscreen ? 1000 : 0,
+            left: 0,
+            width: 40,
+            height: 40,
+            child: XppPageStack(key: key, page: first),
+          ),
+          if (offscreen)
+            Positioned(
+              top: 0,
+              left: 0,
+              width: 40,
+              height: 40,
+              child: XppPageStack(page: second),
+            ),
+        ],
+      ),
+    );
+    Future<void> finishRasters() async {
+      await _startRaster(tester);
+      for (var i = 0; i < 10; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump();
+      }
+    }
+
+    await tester.pumpWidget(app(false));
+    await finishRasters();
+    expect(images, hasLength(1));
+    first.layers!.first.content!.add((_page().layers!.first.content!.single));
+    await tester.pumpWidget(app(true));
+    await finishRasters();
+    expect(images, hasLength(2));
+    expect(images.first.debugDisposed, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('large stroke rasters respect pixel budget', (tester) async {
     tester.view.devicePixelRatio = 3;

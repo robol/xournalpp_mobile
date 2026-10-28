@@ -1,3 +1,12 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xournalpp/generated/l10n.dart';
+import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/PointerListener.dart';
+import 'package:xournalpp/widgets/XppPageStack.dart';
+import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
@@ -7,6 +16,88 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 
 void main() {
+  testWidgets(
+    'selection drag is transient, cancellable and one undo operation',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final stroke = XppStrokePen(
+        color: Colors.black,
+        points: [XppStrokePoint(x: 50, y: 50, width: 2)],
+      );
+      final layer = XppLayer(content: [stroke]);
+      final page = XppPage(
+        pageSize: XppPageSize(width: 200, height: 300),
+        layers: [layer],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            S.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: S.delegate.supportedLocales,
+          home: CanvasPage(
+            file: XppFile(title: 'Selection', pages: [page]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      tester
+          .widget<EditingToolBar>(find.byType(EditingToolBar))
+          .onNewDeviceMap!({
+        PointerDeviceKind.touch: EditingTool.SELECT,
+        PointerDeviceKind.mouse: EditingTool.SELECT,
+        PointerDeviceKind.stylus: EditingTool.SELECT,
+      });
+      await tester.pump();
+      tester.widget<XppPageStack>(find.byType(XppPageStack)).onSelectContent!(
+        layer,
+        stroke,
+      );
+      await tester.pump();
+      var pointer = tester.widget<PointerListener>(
+        find.byType(PointerListener),
+      );
+      pointer.onSelectionMove!(const Offset(10, 20), done: false);
+      await tester.pump();
+      expect(layer.content!.single, same(stroke));
+      expect(
+        tester
+            .widget<XppPageStack>(find.byType(XppPageStack))
+            .selectionTranslation!
+            .value,
+        const Offset(10, 20),
+      );
+      pointer.onSelectionMoveCancel!();
+      await tester.pump();
+      expect(layer.content!.single, same(stroke));
+      expect(
+        tester
+            .widget<XppPageStack>(find.byType(XppPageStack))
+            .selectionTranslation!
+            .value,
+        Offset.zero,
+      );
+      pointer = tester.widget<PointerListener>(find.byType(PointerListener));
+      pointer.onSelectionMove!(const Offset(3, 4), done: false);
+      pointer.onSelectionMove!(const Offset(7, 6), done: false);
+      expect(layer.content!.single, same(stroke));
+      pointer.onSelectionMove!(Offset.zero, done: true);
+      await tester.pump();
+      expect(
+        (layer.content!.single as XppStroke).points!.single.offset,
+        const Offset(60, 60),
+      );
+      await tester.tap(find.byTooltip('Undo last operation'));
+      await tester.pump();
+      expect(layer.content!.single, same(stroke));
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('PDF replacement preserves the size of annotated pages', () {
     final originalSize = XppPageSize(width: 200, height: 300);
     final pdfSize = XppPageSize(width: 400, height: 600);

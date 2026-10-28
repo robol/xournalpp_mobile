@@ -619,6 +619,45 @@ void main() {
     await service.dispose();
   });
 
+  test(
+    'PDF memory cache evicts by bytes and skips oversized entries',
+    () async {
+      final service = _testService(
+        maxMemoryBytes: 6,
+        renderer: (_, page, ___) async => Uint8List(page == 4 ? 7 : 3),
+      );
+      final source = service.sourceForPickedFile(
+        XppPickedFile(Uint8List.fromList([1])),
+      );
+      for (var page = 1; page <= 4; page++) {
+        await service.request(source, page, PdfBackgroundRenderVariant.full);
+        await Future<void>.delayed(Duration.zero);
+        expect(service.memoryBytes, lessThanOrEqualTo(6));
+      }
+      expect(
+        service.peek(
+          service.keyFor(source, 1, PdfBackgroundRenderVariant.full),
+        ),
+        isNull,
+      );
+      expect(
+        service.peek(
+          service.keyFor(source, 3, PdfBackgroundRenderVariant.full),
+        ),
+        hasLength(3),
+      );
+      expect(
+        service.peek(
+          service.keyFor(source, 4, PdfBackgroundRenderVariant.full),
+        ),
+        isNull,
+      );
+      service.clearMemoryCache();
+      expect(service.memoryBytes, 0);
+      await service.dispose();
+    },
+  );
+
   test('evicts least recently used memory entries', () async {
     final service = _testService(
       maxMemoryEntries: 1,
@@ -818,6 +857,7 @@ PdfBackgroundRenderService _testService({
   PdfBackgroundSourceRevision? sourceRevision,
   PdfBackgroundSourceReader? sourceReader,
   int maxMemoryEntries = 32,
+  int maxMemoryBytes = 32 * 1024 * 1024,
   int maxOpenDocuments = 3,
 }) {
   final cache = <String, Uint8List>{};
@@ -825,6 +865,7 @@ PdfBackgroundRenderService _testService({
     sourceRevision: sourceRevision,
     sourceReader: sourceReader,
     maxMemoryEntries: maxMemoryEntries,
+    maxMemoryBytes: maxMemoryBytes,
     maxOpenDocuments: maxOpenDocuments,
     cacheReader: cacheReader ?? (key) async => cache[key],
     cacheWriter:

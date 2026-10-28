@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:xournalpp/src/ContentSpatialIndex.dart';
+import 'package:xournalpp/src/PageGeometry.dart';
+import 'package:xournalpp/layer_contents/XppStroke.dart';
+
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:flutter/foundation.dart';
@@ -233,7 +237,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   final List<_UndoEntry> _undoStack = [];
   Set<XppContent> _selectedContents = {};
   List<({XppLayer layer, XppContent content})>? _copiedContents;
+  PageGeometry? _pageGeometry;
+  PageGeometry get _geometry => _pageGeometry ??= PageGeometry(_file!.pages!);
   List<_SelectionMoveOriginal>? _selectionMoveOriginals;
+  final _selectionTranslation = ValueNotifier<Offset>(Offset.zero);
+  final _selectionIndexes = <XppLayer, ContentSpatialIndex>{};
 
   @override
   void initState() {
@@ -488,6 +496,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         _toolData = newDeviceMap!;
         _setZoomableState();
         if (_activeTool != EditingTool.SELECT) {
+          _cancelSelectionMove();
           _selectedContents = {};
         }
       }),
@@ -496,6 +505,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _setMetadata() {
     _file = widget.file;
+    _pageGeometry = null;
     filePath = widget.filePath;
     currentPage = widget.initialPage
         .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
@@ -731,6 +741,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                   _activatePageForEditing(pageIndex);
                   return _shouldMoveSelection(position);
                 },
+                onSelectionMoveCancel: _cancelSelectionMove,
                 onSelectionMove: (delta, {bool done = false}) {
                   _activatePageForEditing(pageIndex);
                   _moveSelection(delta, done: done);
@@ -759,6 +770,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                             backgroundDisplayHeight * devicePixelRatio,
                         deferBackgroundRasterUpdates: _deferPdfRasterUpdates,
                         activeTool: isActivePage ? _activeTool : null,
+                        selectionTranslation: isActivePage
+                            ? _selectionTranslation
+                            : null,
                         selectedContents: isActivePage
                             ? _selectedContents
                             : const <XppContent>{},
@@ -885,6 +899,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _clearPageWidgetKeys() {
+    _cancelSelectionMove();
+    _selectionIndexes.clear();
+    _pageGeometry = null;
     _cancelPageNavigation();
     _invalidatePrefetch();
     _pinchGeneration++;
@@ -905,6 +922,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (pages == null || pages.isEmpty) return;
     if (pageIndex < 0 || pageIndex >= pages.length) return;
     if (pageIndex == currentPage) return;
+    _cancelSelectionMove();
 
     _invalidatePrefetch();
 
@@ -1157,12 +1175,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   double _pageScrollOffsetForScale(int pageIndex, double scale) {
-    final pages = _file?.pages ?? <XppPage>[];
-    var offset = _pageGap + _pageCardMargin;
-    for (var i = 0; i < pageIndex && i < pages.length; i++) {
-      offset += _pageItemExtentForScale(i, _lastViewportWidth, scale)!;
-    }
-    return offset;
+    return _geometry.offset(
+      pageIndex,
+      _pageDisplayWidthForScale(_lastViewportWidth, scale),
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
   }
 
   double? _pageItemExtent(int pageIndex, double viewportWidth) {
@@ -1190,12 +1208,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (pages.isEmpty) return null;
 
     final scrollOffset = _pagesScrollController.offset;
-    var pageIndex = 0;
-    for (var i = 0; i < pages.length; i++) {
-      final pageTop = _pageScrollOffsetForScale(i, pageScale);
-      if (pageTop > scrollOffset) break;
-      pageIndex = i;
-    }
+    final pageIndex = _geometry.pageAt(
+      scrollOffset,
+      _pageDisplayWidth(_lastViewportWidth),
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
 
     final pageSize = pages[pageIndex].pageSize?.toSize();
     if (pageSize == null) return null;
@@ -1258,6 +1276,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _refreshPageStack(int pageIndex, XppPage page) {
+    for (final layer in page.layers ?? <XppLayer>[]) {
+      _selectionIndexes.remove(layer);
+    }
     _pageStackKeys[pageIndex]?.currentState?.setPageData(page);
   }
 
@@ -1552,14 +1573,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         !_pagesScrollController.hasClients)
       return;
     final y = _pagesScrollController.offset + local.dy;
-    var index = 0;
-    var top = _pageScrollOffset(0);
-    for (var i = 1; i < pages.length; i++) {
-      final nextTop = top + _pageItemExtent(i - 1, _lastViewportWidth)!;
-      if (nextTop > y) break;
-      index = i;
-      top = nextTop;
-    }
+    final index = _geometry.pageAt(
+      y,
+      _pageDisplayWidth(_lastViewportWidth),
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
+    final top = _pageScrollOffset(index);
     final x =
         (_pagesHorizontalScrollController.hasClients
             ? _pagesHorizontalScrollController.offset
@@ -1580,7 +1600,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final anchor = _pinchAnchor;
     final focal = _pinchFocalPoint;
     if (anchor == null || focal == null) return;
-    final index = _file!.pages!.indexOf(anchor.page);
+    final index = _geometry.indexOf(anchor.page);
     final local = _viewportLocalPoint(focal);
     if (index < 0 || local == null) return;
     void jump(ScrollController controller, double target) {
@@ -1904,20 +1924,21 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
     final selected = <XppContent>{};
     for (final layer in _file!.pages![currentPage].layers ?? <XppLayer>[]) {
-      for (final content in layer.content ?? <XppContent?>[]) {
-        final bounds = content?.selectionBounds;
-        if (content == null || bounds == null || bounds.isEmpty) continue;
-        if (region.overlaps(bounds) || region.contains(bounds.center)) {
-          selected.add(content);
-        }
-      }
+      final index = _selectionIndexes.putIfAbsent(
+        layer,
+        () => ContentSpatialIndex(layer.content ?? []),
+      );
+      selected.addAll(index.query(region));
     }
 
-    setState(() => _selectedContents = selected);
+    if (!setEquals(_selectedContents, selected)) {
+      setState(() => _selectedContents = selected);
+    }
   }
 
   void _clearSelection() {
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
+    _cancelSelectionMove();
     setState(() => _selectedContents = {});
   }
 
@@ -2097,37 +2118,33 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
 
     _selectionMoveOriginals ??= _selectionMoveStartData();
-
-    if (delta != Offset.zero) {
-      final translatedSelection = <XppContent>{};
-      final page = _file!.pages![currentPage];
-
-      for (final layer in page.layers ?? <XppLayer>[]) {
-        final content = List<XppContent?>.from(layer.content ?? []);
-        var changedLayer = false;
-
-        for (var index = 0; index < content.length; index++) {
-          final item = content[index];
-          if (item == null || !_selectedContents.contains(item)) continue;
-
-          final translated = item.translatedBy(delta);
-          content[index] = translated;
-          translatedSelection.add(translated);
-          changedLayer = true;
-        }
-
-        if (changedLayer) layer.content = content;
-      }
-
-      setState(() {
-        _selectedContents = translatedSelection;
-        _invalidateEraserIndex();
-        _markDirty();
-      });
-      _refreshPageStack(currentPage, page);
+    _selectionTranslation.value += delta;
+    if (!done) return;
+    final total = _selectionTranslation.value;
+    if (total == Offset.zero) {
+      _cancelSelectionMove();
+      return;
     }
+    final selected = <XppContent>{};
+    for (final original in _selectionMoveOriginals!) {
+      final content = original.layer.content!;
+      if (original.index >= content.length ||
+          !identical(content[original.index], original.content))
+        continue;
+      final translated = original.content.translatedBy(total);
+      content[original.index] = translated;
+      selected.add(translated);
+    }
+    _selectionTranslation.value = Offset.zero;
+    _selectedContents = selected;
+    _invalidateEraserIndex();
+    _finishSelectionMove();
+    _refreshPageStack(currentPage, _file!.pages![currentPage]);
+  }
 
-    if (done) _finishSelectionMove();
+  void _cancelSelectionMove() {
+    _selectionMoveOriginals = null;
+    _selectionTranslation.value = Offset.zero;
   }
 
   List<_SelectionMoveOriginal> _selectionMoveStartData() {
@@ -2197,13 +2214,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final operations = <_LayerOperation>[];
     for (final layer in page.layers ?? <XppLayer>[]) {
       final eraserIndex = _eraserIndexForLayer(layer);
-      final eraseCandidates = <XppContent>{};
+      final eraseCandidates = <XppContent, List<Offset>>{};
       for (final coordinate in coordinates) {
-        eraseCandidates.addAll(
-          eraserIndex.query(
-            Rect.fromCircle(center: coordinate, radius: radius / 2),
-          ),
-        );
+        for (final candidate in eraserIndex.query(
+          Rect.fromCircle(center: coordinate, radius: radius / 2),
+        )) {
+          (eraseCandidates[candidate] ??= []).add(coordinate);
+        }
       }
       if (eraseCandidates.isEmpty) continue;
 
@@ -2211,14 +2228,14 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       var erasedFromLayer = false;
       for (var index = 0; index < layer.content!.length; index++) {
         final content = layer.content![index];
-        if (content == null || !eraseCandidates.contains(content)) {
+        if (content == null || !eraseCandidates.containsKey(content)) {
           updatedContent.add(content);
           continue;
         }
 
         final delta = _eraseContentWithPath(
           content: content,
-          coordinates: coordinates,
+          coordinates: eraseCandidates[content]!,
           radius: radius,
         );
         if (!delta.affected) {
@@ -2265,6 +2282,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     required List<Offset> coordinates,
     required double radius,
   }) {
+    if (content is XppStroke)
+      return content.eraseAlongPath(coordinates, radius);
     var remainingContent = <XppContent>[content];
     var affected = false;
 
@@ -2304,6 +2323,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   void _invalidateEraserIndex() {
+    _selectionIndexes.clear();
     _eraserIndexes.clear();
   }
 
@@ -2590,6 +2610,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     _backgroundRenderCommitTimer?.cancel();
     _viewportInteractionIdleTimer?.cancel();
     _deferPdfRasterUpdates.dispose();
+    _selectionTranslation.dispose();
     _invalidatePrefetch();
     _navigationGeneration++;
     _pinchGeneration++;

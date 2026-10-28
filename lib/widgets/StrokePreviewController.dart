@@ -1,44 +1,43 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 
 class StrokePreviewController {
   static const int _chunkPointCount = 24;
-  static const Duration _fadeTickDuration = Duration(milliseconds: 50);
 
   final Color? Function() colorProvider;
   final ValueNotifier<int> repaint = ValueNotifier<int>(0);
   final ValueNotifier<Rect?> activeBounds = ValueNotifier<Rect?>(null);
 
   final List<_PreviewPictureChunk> _chunks = [];
-  final List<Picture> _activePictureDependencies = [];
+  final ValueNotifier<int> settledRepaint = ValueNotifier<int>(0);
   final List<XppStrokePoint> _activePoints = [];
 
   Picture? _activePicture;
-  Timer? _fadeTimer;
+  Duration _fadeTime = Duration.zero;
+  Duration _lastTick = Duration.zero;
+  late final Ticker _fadeTicker = Ticker((elapsed) {
+    _fadeTime += elapsed - _lastTick;
+    _lastTick = elapsed;
+    _removeExpiredFadingChunks();
+    settledRepaint.value++;
+  });
 
   StrokePreviewController({required this.colorProvider});
 
   List<Widget> buildWidgets() {
     return [
-      ..._chunks.map((chunk) {
-        return Positioned.fromRect(
-          rect: chunk.bounds,
-          child: ValueListenableBuilder<int>(
-            valueListenable: repaint,
-            builder: (context, value, child) {
-              return Opacity(opacity: chunk.opacity, child: child);
-            },
-            child: RepaintBoundary(
-              child: CustomPaint(
-                foregroundPainter: _PreviewPicturePainter(chunk.picture),
-              ),
+      Positioned.fill(
+        child: IgnorePointer(
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _SettledPreviewPainter(() => _chunks, settledRepaint),
             ),
           ),
-        );
-      }),
+        ),
+      ),
       ValueListenableBuilder<Rect?>(
         valueListenable: activeBounds,
         builder: (context, bounds, child) {
@@ -78,7 +77,6 @@ class StrokePreviewController {
       final bounds = activeBounds.value;
       if (picture != null && bounds != null) {
         _addChunk(picture, bounds, fadeOutDuration: fadeOutDuration);
-        _activePictureDependencies.remove(picture);
       }
       _activePoints
         ..clear()
@@ -101,7 +99,6 @@ class StrokePreviewController {
     final bounds = activeBounds.value;
     if (picture != null && bounds != null) {
       _addChunk(picture, bounds, fadeOutDuration: fadeOutDuration);
-      _activePictureDependencies.remove(picture);
     }
     _activePoints.clear();
     _activePicture = null;
@@ -115,11 +112,9 @@ class StrokePreviewController {
         chunk.dispose();
       }
     }
-    for (final picture in _activePictureDependencies) {
-      picture.dispose();
-    }
+    _activePicture?.dispose();
     _chunks.removeWhere((chunk) => clearFading || !chunk.isFading);
-    _activePictureDependencies.clear();
+    settledRepaint.value++;
     _activePoints.clear();
     _activePicture = null;
     activeBounds.value = null;
@@ -127,31 +122,60 @@ class StrokePreviewController {
   }
 
   void dispose() {
-    _fadeTimer?.cancel();
+    _fadeTicker.stop();
     _reset(clearFading: true);
+    _fadeTicker.dispose();
+    settledRepaint.dispose();
     repaint.dispose();
     activeBounds.dispose();
   }
 
   void _addChunk(Picture picture, Rect bounds, {Duration? fadeOutDuration}) {
     _chunks.add(
-      _PreviewPictureChunk(picture, bounds, fadeOutDuration: fadeOutDuration),
+      _PreviewPictureChunk(
+        picture,
+        bounds,
+        clock: () => _fadeTime,
+        fadeOutDuration: fadeOutDuration,
+      ),
     );
+    _compactSettledChunks();
+    settledRepaint.value++;
     _updateFadeTimer();
+  }
+
+  void _compactSettledChunks() {
+    // Keep widget and picture-handle counts bounded during long pen gestures.
+    if (_chunks.length <= 32 || _chunks.take(16).any((c) => c.isFading)) return;
+    final batch = _chunks.take(16).toList();
+    final bounds = batch
+        .map((c) => c.bounds)
+        .reduce((a, b) => a.expandToInclude(b));
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder)..translate(-bounds.left, -bounds.top);
+    for (final chunk in batch) {
+      canvas.save();
+      canvas.translate(chunk.bounds.left, chunk.bounds.top);
+      canvas.drawPicture(chunk.picture);
+      canvas.restore();
+    }
+    final picture = recorder.endRecording();
+    for (final chunk in batch) {
+      chunk.dispose();
+    }
+    _chunks.replaceRange(0, 16, [
+      _PreviewPictureChunk(picture, bounds, clock: () => _fadeTime),
+    ]);
   }
 
   void _updateFadeTimer() {
     final hasFadingChunks = _chunks.any((chunk) => chunk.isFading);
     if (!hasFadingChunks) {
-      _fadeTimer?.cancel();
-      _fadeTimer = null;
-      return;
+      _fadeTicker.stop();
+      _lastTick = Duration.zero;
+    } else if (!_fadeTicker.isActive) {
+      _fadeTicker.start();
     }
-
-    _fadeTimer ??= Timer.periodic(_fadeTickDuration, (_) {
-      _removeExpiredFadingChunks();
-      repaint.value++;
-    });
   }
 
   void _removeExpiredFadingChunks() {
@@ -194,7 +218,7 @@ class StrokePreviewController {
     ).paint(canvas, bounds.size);
 
     _activePicture = recorder.endRecording();
-    _activePictureDependencies.add(_activePicture!);
+    previousPicture?.dispose();
     activeBounds.value = bounds;
   }
 }
@@ -202,11 +226,16 @@ class StrokePreviewController {
 class _PreviewPictureChunk {
   final Picture picture;
   final Rect bounds;
-  final DateTime? fadeStartedAt;
+  final Duration? fadeStartedAt;
+  final Duration Function() clock;
   final Duration? fadeOutDuration;
 
-  _PreviewPictureChunk(this.picture, this.bounds, {this.fadeOutDuration})
-    : fadeStartedAt = fadeOutDuration == null ? null : DateTime.now();
+  _PreviewPictureChunk(
+    this.picture,
+    this.bounds, {
+    required this.clock,
+    this.fadeOutDuration,
+  }) : fadeStartedAt = fadeOutDuration == null ? null : clock();
 
   bool get isFading => fadeStartedAt != null && fadeOutDuration != null;
 
@@ -219,7 +248,7 @@ class _PreviewPictureChunk {
 
   double get _fadeProgress {
     if (!isFading) return 0;
-    final elapsed = DateTime.now().difference(fadeStartedAt!);
+    final elapsed = (clock() - fadeStartedAt!);
     return elapsed.inMilliseconds / fadeOutDuration!.inMilliseconds;
   }
 
@@ -252,4 +281,28 @@ class _PreviewPicturePainter extends CustomPainter {
     return oldDelegate.picture != picture ||
         oldDelegate.pictureProvider != pictureProvider;
   }
+}
+
+class _SettledPreviewPainter extends CustomPainter {
+  _SettledPreviewPainter(this.chunks, Listenable repaint)
+    : super(repaint: repaint);
+  final List<_PreviewPictureChunk> Function() chunks;
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final chunk in chunks()) {
+      canvas.save();
+      if (chunk.isFading)
+        canvas.saveLayer(
+          chunk.bounds,
+          Paint()..color = Colors.white.withValues(alpha: chunk.opacity),
+        );
+      canvas.translate(chunk.bounds.left, chunk.bounds.top);
+      canvas.drawPicture(chunk.picture);
+      if (chunk.isFading) canvas.restore();
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SettledPreviewPainter oldDelegate) => true;
 }

@@ -27,6 +27,7 @@ class PointerListener extends StatefulWidget {
   final Function()? removeLastContent;
   final void Function(Rect? region)? onSelectionRegionChange;
   final VoidCallback? onSelectionClear;
+  final VoidCallback? onSelectionMoveCancel;
   final bool Function(Offset position)? shouldMoveSelection;
   final void Function(Offset delta, {bool done})? onSelectionMove;
   final VoidCallback? onSwipeLeft;
@@ -62,6 +63,7 @@ class PointerListener extends StatefulWidget {
     this.removeLastContent,
     this.onSelectionRegionChange,
     this.onSelectionClear,
+    this.onSelectionMoveCancel,
     this.shouldMoveSelection,
     this.onSelectionMove,
     this.onSwipeLeft,
@@ -109,6 +111,8 @@ class PointerListenerState extends State<PointerListener> {
   bool _dragSelecting = false;
   Offset? _selectionMoveLastPosition;
   bool _movingSelection = false;
+  int _selectionGeneration = 0;
+  bool _selectionUpdateScheduled = false;
   Offset? _pageSwipeStart;
   int? _pageSwipePointerDevice;
   Offset? _panLastPosition;
@@ -297,6 +301,7 @@ class PointerListenerState extends State<PointerListener> {
                 child: RepaintBoundary(
                   child: CustomPaint(
                     foregroundPainter: EraserPreviewPainter(
+                      previewPath: eraserPreview.previewPath,
                       pointsProvider: () => eraserPreview.points,
                       radiusProvider: () => widget.eraserWidth ?? 1,
                       repaint: eraserPreview.repaint,
@@ -486,11 +491,22 @@ class PointerListenerState extends State<PointerListener> {
     if (!_dragSelecting && distance < 4) return;
 
     _dragSelecting = true;
-    widget.onSelectionRegionChange?.call(_selectionRect);
+    if (!_selectionUpdateScheduled) {
+      _selectionUpdateScheduled = true;
+      final generation = _selectionGeneration;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || generation != _selectionGeneration) return;
+        _selectionUpdateScheduled = false;
+        if (_dragSelecting)
+          widget.onSelectionRegionChange?.call(_selectionRect);
+      });
+    }
     _setStateIfMounted(() {});
   }
 
   void _finishSelectionRegion() {
+    _selectionGeneration++;
+    _selectionUpdateScheduled = false;
     if (_movingSelection) {
       widget.onSelectionMove?.call(Offset.zero, done: true);
     } else if (_dragSelecting) {
@@ -503,6 +519,7 @@ class PointerListenerState extends State<PointerListener> {
         widget.onSelectionClear?.call();
       });
     }
+    _movingSelection = false;
     _selectionPointerDevice = null;
     _selectionStart = null;
     _selectionCurrent = null;
@@ -513,6 +530,10 @@ class PointerListenerState extends State<PointerListener> {
   }
 
   void _cancelSelectionRegion() {
+    _selectionGeneration++;
+    _selectionUpdateScheduled = false;
+    if (_movingSelection) widget.onSelectionMoveCancel?.call();
+    _movingSelection = false;
     if (_selectionStart == null && !_dragSelecting) return;
     _selectionStart = null;
     _selectionCurrent = null;

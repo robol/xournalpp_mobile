@@ -1,9 +1,52 @@
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppBackground.dart';
 
 void main() {
+  test('indexed eraser path matches sequential splitting and point widths', () {
+    final random = Random(12);
+    for (var trial = 0; trial < 20; trial++) {
+      final stroke = XppStrokePen(
+        points: List.generate(
+          300,
+          (i) => XppStrokePoint(
+            x: random.nextDouble() * 200 - 100,
+            y: random.nextDouble() * 200 - 100,
+            width: 1 + random.nextDouble() * 10,
+          ),
+        ),
+      );
+      final path = List.generate(
+        100,
+        (_) => Offset(
+          random.nextDouble() * 200 - 100,
+          random.nextDouble() * 200 - 100,
+        ),
+      );
+      var expected = <XppStroke>[stroke];
+      for (final coordinate in path) {
+        expected = expected.expand((piece) {
+          final delta = piece.eraseWhere(coordinates: coordinate, radius: 8);
+          return delta.affected ? delta.newContent.cast<XppStroke>() : [piece];
+        }).toList();
+      }
+      final delta = stroke.eraseAlongPath(path, 8);
+      final actual = delta.affected
+          ? delta.newContent.cast<XppStroke>()
+          : [stroke];
+      expect(
+        actual
+            .map((s) => s.points!.map((p) => (p.x, p.y, p.width)).toList())
+            .toList(),
+        expected
+            .map((s) => s.points!.map((p) => (p.x, p.y, p.width)).toList())
+            .toList(),
+      );
+    }
+  });
+
   test('eraseWhere splits a stroke around erased points', () {
     final stroke = XppStrokePen(
       points: [
