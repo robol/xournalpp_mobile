@@ -286,6 +286,16 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     }
   }
 
+  void _rememberCurrentPage() {
+    final path = filePath;
+    if (path == null || path.isEmpty) return;
+    unawaited(
+      RecentFiles.updatePage(path, currentPage).catchError((Object error) {
+        debugPrint('Could not remember document position: $error');
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AbsorbPointer(
@@ -966,6 +976,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _selectedContents = {};
       _invalidateEraserIndex();
     });
+    _rememberCurrentPage();
     _schedulePdfBackgroundPrefetch();
   }
 
@@ -1821,6 +1832,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _clearPageWidgetKeys();
       _markDirty();
     });
+    _rememberCurrentPage();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scrollToPage(currentPage);
     });
@@ -1845,6 +1857,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _clearPageWidgetKeys();
       _markDirty();
     });
+    _rememberCurrentPage();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scrollToPage(currentPage, animated: false);
     });

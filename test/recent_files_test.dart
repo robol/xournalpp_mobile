@@ -10,6 +10,7 @@ import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
@@ -136,6 +137,93 @@ void main() {
       expect(files.first['modified'], modified.toIso8601String());
       expect(files.first['preview'], base64Encode([1, 2]));
       expect(files.last.containsKey('modified'), isFalse);
+    },
+  );
+
+  test(
+    'position updates preserve metadata and do not resurrect forgotten files',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        PreferencesKeys.kRecentFiles: jsonEncode([
+          {
+            'path': '/one.xopp',
+            'name': 'One',
+            'modified': '2025-01-01',
+            'preview': 'existing',
+            'currentPage': 0,
+          },
+          {'path': '/two.xopp', 'name': 'Two'},
+        ]),
+      });
+      await Future.wait([
+        RecentFiles.updatePage('/one.xopp', 2),
+        RecentFiles.updatePage('/one.xopp', 4),
+      ]);
+      final prefs = await SharedPreferences.getInstance();
+      var files =
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+      expect(files.map((entry) => entry['path']), ['/one.xopp', '/two.xopp']);
+      expect(files.first['currentPage'], 4);
+      expect(files.first['modified'], '2025-01-01');
+      expect(files.first['preview'], 'existing');
+      await Future.wait([
+        RecentFiles.forget('/one.xopp'),
+        RecentFiles.updatePage('/one.xopp', 5),
+      ]);
+      files =
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+      expect(files, hasLength(1));
+      expect(files.single['path'], '/two.xopp');
+    },
+  );
+
+  testWidgets(
+    'scrolling saves the page without saving the notebook and restores it',
+    (tester) async {
+      const path = '/position-test.xopp';
+      SharedPreferences.setMockInitialValues({});
+      final file = XppFile(
+        title: 'Position test',
+        pages: List.generate(8, (_) => XppPage.empty(background: Colors.white)),
+      );
+      await tester.binding.setSurfaceSize(const Size(800, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      final navigator = Navigator.of(tester.element(find.byType(OpenPage)));
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => CanvasPage(file: file, filePath: path),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final vertical = tester
+          .stateList<ScrollableState>(find.byType(Scrollable))
+          .firstWhere((state) => state.position.axis == Axis.vertical)
+          .position;
+      vertical.jumpTo(vertical.maxScrollExtent * .7);
+      await tester.pumpAndSettle();
+      final dynamic canvas = tester.state(find.byType(CanvasPage));
+      final page = canvas.currentPage as int;
+      expect(page, greaterThan(0));
+      final prefs = await SharedPreferences.getInstance();
+      final files =
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+      expect(files.single['currentPage'], page);
+      expect(files.single.containsKey('modified'), isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final restoredPage = await XppFile.lastOpenedPageForPath(path);
+      expect(restoredPage, page);
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              CanvasPage(file: file, filePath: path, initialPage: restoredPage),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final dynamic reopened = tester.state(find.byType(CanvasPage));
+      expect(reopened.currentPage, page);
     },
   );
 

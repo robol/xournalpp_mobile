@@ -24,7 +24,7 @@ class _BlockingRecentStore extends InMemorySharedPreferencesStore {
   @override
   Future<bool> setValue(String valueType, String key, Object value) async {
     if (blockWrites && key == 'flutter.recentFiles') {
-      started.complete();
+      if (!started.isCompleted) started.complete();
       await release.future;
     }
     return super.setValue(valueType, key, value);

@@ -351,6 +351,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       );
       final XppFile file;
       final String? filePath;
+      var initialPage = 0;
       if (extension == 'pdf') {
         if (!kIsWeb &&
             defaultTargetPlatform == TargetPlatform.android &&
@@ -372,6 +373,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           showMissingFileDialog,
         );
         filePath = writable ? pickedFile.path : null;
+        if (filePath != null) {
+          initialPage = await XppFile.lastOpenedPageForPath(filePath);
+        }
       }
       if (_aborted || !context.mounted) {
         if (_aborted) lastIntentData = null;
@@ -380,7 +384,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       if (_dialogVisible) Navigator.of(context, rootNavigator: true).pop();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => CanvasPage(file: file, filePath: filePath),
+          builder: (context) => CanvasPage(
+            file: file,
+            filePath: filePath,
+            initialPage: initialPage,
+          ),
         ),
       );
     } catch (e) {

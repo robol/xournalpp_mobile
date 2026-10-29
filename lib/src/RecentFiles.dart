@@ -24,6 +24,27 @@ class RecentFiles {
     changes.value++;
   });
 
+  /// Updates reading position without changing recency or saved metadata.
+  static Future<void> updatePage(String path, int currentPage) =>
+      _enqueue(() async {
+        final prefs = await SharedPreferences.getInstance();
+        final files =
+            (jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles) ?? '[]')
+                    as List)
+                .map((entry) => Map<String, dynamic>.from(entry as Map))
+                .toList();
+        final entry = files.where((entry) => entry['path'] == path).lastOrNull;
+        if (entry == null || entry['currentPage'] == currentPage) return;
+        entry['currentPage'] = currentPage;
+        if (!await prefs.setString(
+          PreferencesKeys.kRecentFiles,
+          jsonEncode(files),
+        )) {
+          throw StateError('Could not update document position.');
+        }
+        changes.value++;
+      });
+
   static Future<void> remember({
     required String path,
     required String name,

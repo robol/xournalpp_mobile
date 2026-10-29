@@ -172,7 +172,7 @@ class XppFile {
           type: XppFilePickType.custom,
           fileExtension: 'xopp',
         );
-        initialPage = await _lastOpenedPageForPath(rawFile.path);
+        initialPage = await lastOpenedPageForPath(rawFile.path);
         return await fromXppPickedFile(
           rawFile,
           (percentage) => null,
@@ -548,7 +548,7 @@ class XppFile {
     return file;
   }
 
-  static Future<int> _lastOpenedPageForPath(String? path) async {
+  static Future<int> lastOpenedPageForPath(String? path) async {
     if (path == null || path.isEmpty) return 0;
     final prefs = await SharedPreferences.getInstance();
     final jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
