@@ -299,7 +299,7 @@ void main() {
     await tester.pumpWidget(XournalppMobile());
     await tester.pump();
 
-    expect(find.text('Xournal++'), findsOneWidget);
+    expect(find.text('Xournal++ Mobile'), findsOneWidget);
   });
 
   testWidgets('canvas menu includes PDF export and share actions', (

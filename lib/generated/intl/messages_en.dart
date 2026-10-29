@@ -100,7 +100,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "movePage": MessageLookupByLibrary.simpleMessage("Move page"),
     "newDocument": MessageLookupByLibrary.simpleMessage("New Document"),
     "newFile": MessageLookupByLibrary.simpleMessage("New"),
-    "newNotebook": MessageLookupByLibrary.simpleMessage("New Notebook"),
+    "newNotebook": MessageLookupByLibrary.simpleMessage("New notebook"),
     "newPageIndex": MessageLookupByLibrary.simpleMessage("New page index"),
     "newTitle": MessageLookupByLibrary.simpleMessage("New title"),
     "noFileSelected": MessageLookupByLibrary.simpleMessage("No file selected"),

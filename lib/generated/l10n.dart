@@ -320,10 +320,10 @@ class S {
     );
   }
 
-  /// `New Notebook`
+  /// `New notebook`
   String get newNotebook {
     return Intl.message(
-      'New Notebook',
+      'New notebook',
       name: 'newNotebook',
       desc: '',
       args: [],

@@ -63,7 +63,7 @@ class _MainDrawerState extends State<MainDrawer> {
                 ),
                 ListTile(
                   leading: Icon(Icons.insert_drive_file),
-                  title: Text(S.of(context).newFile),
+                  title: Text(S.of(context).newNotebook),
                   onTap: _newFile,
                 ),
                 Divider(),
