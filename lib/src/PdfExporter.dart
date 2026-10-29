@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:image/image.dart' as img;
 import 'package:xournalpp/layer_contents/XppImage.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
@@ -32,15 +34,60 @@ Future<Uint8List> exportPdfDocument(
   PdfSourceResolver? pdfResolver,
 }) async {
   final plan = _pdfSourcePlan(file);
+  Uint8List? sourceBytes;
   if (plan != null) {
     final pickedPdf = pdfResolver == null
         ? await XppPickedFile.fromInternalPath(path: plan.filename)
         : await pdfResolver(plan.background);
-    final writer = _IncrementalPdfWriter(pickedPdf.toUint8List());
-    return writer.export(file: file, source: plan);
+    sourceBytes = pickedPdf.toUint8List();
   }
+  // Do not send the live document: it can own renderer caches and callbacks
+  // connected to the widget tree. Copy the structural lists as a snapshot.
+  final snapshot = XppFile(
+    pages: file.pages
+        ?.map(
+          (page) => XppPage(
+            pageSize: page.pageSize,
+            background: page.background is XppBackgroundPdf
+                ? XppBackgroundPdf(onUnavailable: _unusedPdfResolver)
+                : page.background,
+            layers: page.layers
+                ?.map(
+                  (layer) => XppLayer(
+                    content: layer.content
+                        ?.map(
+                          (content) => content is XppStroke
+                              ? content.newStroke(
+                                  color: content.color,
+                                  points: content.points == null
+                                      ? null
+                                      : List.of(content.points!),
+                                )
+                              : content,
+                        )
+                        .toList(),
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList(),
+  );
+  return compute(_writePdf, (snapshot, sourceBytes, plan?.pageNumbers));
+}
 
-  return _GeneratedPdfWriter().export(file);
+Future<XppPickedFile> _unusedPdfResolver(BuildContext context, String? path) =>
+    throw StateError('PDF sources must be resolved before export');
+
+Uint8List _writePdf((XppFile, Uint8List?, List<int?>?) input) {
+  final (file, bytes, pageNumbers) = input;
+  if (bytes == null) return _GeneratedPdfWriter().export(file);
+  final source = _PdfSource(
+    filename: '',
+    background: XppBackgroundPdf(onUnavailable: _unusedPdfResolver),
+    pageNumbers: pageNumbers!,
+  );
+  return _IncrementalPdfWriter(bytes).export(file: file, source: source);
 }
 
 _PdfSource? _pdfSourcePlan(XppFile file) {

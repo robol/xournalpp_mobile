@@ -2450,7 +2450,17 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final exportSnackBar = _showSnackBar(
       scaffoldMessenger,
       SnackBar(
-        content: Text('Exporting PDF...'),
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 16),
+            Text('Exporting PDF...'),
+          ],
+        ),
         duration: Duration(days: 999),
       ),
     );
@@ -2511,7 +2521,17 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
     final exportSnackBar = _showSnackBar(
       scaffoldMessenger,
       SnackBar(
-        content: Text('Exporting PDF...'),
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 16),
+            Text('Exporting PDF...'),
+          ],
+        ),
         duration: Duration(days: 999),
       ),
     );

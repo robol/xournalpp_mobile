@@ -17,6 +17,15 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  test('PDF generation yields to the calling isolate', () async {
+    final file = XppFile.empty();
+    var timerRan = false;
+    final export = exportPdfDocument(file);
+    await Future<void>.delayed(Duration.zero, () => timerRan = true);
+    expect(timerRan, isTrue);
+    expect(latin1.decode(await export), startsWith('%PDF-'));
+  });
+
   test('exportPdfDocument appends vector overlay update', () async {
     final pdfPath = await _writePdf(_minimalPdf());
     final file = _pdfBackedFile(
