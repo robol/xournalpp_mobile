@@ -2675,8 +2675,10 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       _file!.previewImage = kIsWeb
           ? kTransparentImage
           : await _currentPagePng();
-      XppPickedFile file = _file!.toXppPickedFile(filePath: path);
       final savedRevision = _revision;
+      final bytes = await _file!.toUint8ListAsync();
+      if (!mounted) return false;
+      final file = XppPickedFile(bytes, fileExtension: 'xopp', path: path);
       final savedPath = !saveAs && filePath != null
           ? await file
                 .saveToPath(path: filePath!)

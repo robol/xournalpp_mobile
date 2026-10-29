@@ -28,6 +28,36 @@ Future<XppFile> parseNotebook(XppPickedFile file) =>
     XppFile.fromXppPickedFile(file, null, (_, __) => throw StateError('PDF'));
 
 void main() {
+  test(
+    'async save serializes a detached snapshot with PDF attributes',
+    () async {
+      final original = await parseNotebook(
+        notebook('''
+      <stroke tool="pen" color="#000000" width="1 2">10 20 30 40</stroke>
+      <text font="Sans" size="12" x="1" y="2" color="#000000">First</text>
+    '''),
+      );
+      original.previewImage = Uint8List.fromList([1, 2, 3]);
+      original.pages!.single.background = XppBackgroundPdf(
+        onUnavailable: (_, __) => throw StateError('not used'),
+        filename: 'source.pdf',
+        page: 3,
+        domain: XppBackgroundImageDomain.ATTACH,
+      );
+      final expected = original.toXmlString();
+      final saving = original.toUint8ListAsync();
+      original.pages!.single.layers!.single.content!.clear();
+      original.previewImage![0] = 99;
+      final xml = utf8.decode(GZipDecoder().decodeBytes(await saving));
+      expect(xml, expected);
+      final reloaded = await parseNotebook(XppPickedFile(await saving));
+      expect(reloaded.pages!.single.layers!.single.content, hasLength(2));
+      final background = reloaded.pages!.single.background as XppBackgroundPdf;
+      expect(background.filename, 'source.pdf');
+      expect(background.page, 3);
+    },
+  );
+
   test('parses mixed content in order and accepts stroke whitespace', () async {
     final file = await parseNotebook(
       notebook('''

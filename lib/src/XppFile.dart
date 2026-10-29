@@ -606,6 +606,87 @@ class XppFile {
     return GZipEncoder().encode(utf8.encode(toXmlString())) as Uint8List?;
   }
 
+  /// Serialize a detached snapshot without sending renderer state or callbacks.
+  Future<Uint8List> toUint8ListAsync() {
+    final snapshot = XppFile(
+      previewImage: previewImage == null
+          ? null
+          : Uint8List.fromList(previewImage!),
+      pages: pages?.map((page) {
+        final background = page.background;
+        return XppPage(
+          pageSize: page.pageSize,
+          background: switch (background) {
+            XppBackgroundPdf b => XppBackgroundPdf(
+              onUnavailable: _unusedPdfRecovery,
+              filename: b.filename,
+              page: b.page,
+              domain: b.domain,
+            ),
+            XppBackgroundSolidLined b => XppBackgroundSolidLined(
+              color: b.color,
+              size: b.size,
+            ),
+            XppBackgroundSolidRuled b => XppBackgroundSolidRuled(
+              color: b.color,
+              size: b.size,
+            ),
+            XppBackgroundSolidGraph b => XppBackgroundSolidGraph(
+              color: b.color,
+              size: b.size,
+            ),
+            XppBackgroundSolidDot b => XppBackgroundSolidDot(
+              color: b.color,
+              size: b.size,
+            ),
+            XppBackgroundSolidPlain b => XppBackgroundSolidPlain(
+              color: b.color,
+              size: b.size,
+            ),
+            _ => background,
+          },
+          layers: page.layers
+              ?.map(
+                (layer) => XppLayer(
+                  content: layer.content?.map((content) {
+                    if (content is XppStroke) {
+                      return content.newStroke(
+                        color: content.color,
+                        points: content.points == null
+                            ? null
+                            : List.of(content.points!),
+                      );
+                    }
+                    if (content is XppImage) {
+                      return XppImage(
+                        data: content.data == null
+                            ? null
+                            : Uint8List.fromList(content.data!),
+                        topLeft: content.topLeft,
+                        bottomRight: content.bottomRight,
+                      );
+                    }
+                    if (content is XppTexImage) {
+                      return XppTexImage(
+                        text: content.text,
+                        topLeft: content.topLeft,
+                        bottomRight: content.bottomRight,
+                        color: content.color,
+                      );
+                    }
+                    return content;
+                  }).toList(),
+                ),
+              )
+              .toList(),
+        );
+      }).toList(),
+    );
+    return compute(_encodeNotebook, snapshot, debugLabel: 'save xopp');
+  }
+
+  static Uint8List _encodeNotebook(XppFile file) => file.toUint8List()!;
+
   /// creating a [XppPickedFile] from the [toUint8List]
   XppPickedFile toXppPickedFile({String? filePath}) {
     Uint8List bytes = toUint8List()!;
