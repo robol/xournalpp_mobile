@@ -2,7 +2,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
-import 'package:xournalpp/layer_contents/XppTexImage.dart';
 import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/widgets/EraserPreviewController.dart';
@@ -10,9 +9,12 @@ import 'package:xournalpp/widgets/StrokePointBuffer.dart';
 import 'package:xournalpp/widgets/StrokePreviewController.dart';
 import 'package:xournalpp/widgets/StrokeSimplifier.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
+import 'package:xournalpp/widgets/ShapeTool.dart';
 
 class PointerListener extends StatefulWidget {
   final Function(XppContent?)? onNewContent;
+  final void Function(List<XppContent>)? onNewShape;
+  final ShapeSettings shapeSettings;
   final Function({int? device, PointerDeviceKind? kind})? onDeviceChange;
   final Widget? child;
   final Map<PointerDeviceKind?, EditingTool> toolData;
@@ -51,6 +53,8 @@ class PointerListener extends StatefulWidget {
   const PointerListener({
     Key? key,
     this.onNewContent,
+    this.onNewShape,
+    this.shapeSettings = const ShapeSettings(),
     this.child,
     this.toolData = const {},
     this.translationMatrix,
@@ -84,6 +88,31 @@ class PointerListener extends StatefulWidget {
 
   @override
   PointerListenerState createState() => PointerListenerState();
+}
+
+class _ShapePreviewPainter extends CustomPainter {
+  _ShapePreviewPainter(this.start, this.end, this.settings);
+  final Offset start;
+  final Offset end;
+  final ShapeSettings settings;
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final stroke in shapeStrokes(start, end, settings)) {
+      XppStrokePainter(
+        points: stroke.points,
+        color: stroke.color,
+        topLeft: Offset.zero,
+        smoothPressure: true,
+        fill: stroke.fill,
+      ).paint(canvas, size);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ShapePreviewPainter oldDelegate) =>
+      start != oldDelegate.start ||
+      end != oldDelegate.end ||
+      settings != oldDelegate.settings;
 }
 
 class PointerListenerState extends State<PointerListener> {
@@ -130,9 +159,21 @@ class PointerListenerState extends State<PointerListener> {
   double? _lastPinchDistance;
   Offset? _lastPinchFocalPoint;
   final Set<int> _suppressedTouchPointers = {};
+  int? _shapePointer;
+  Offset? _shapeStart;
+  Offset? _shapeEnd;
+  ShapeSettings? _gestureShapeSettings;
+
+  void _clearShape() {
+    _shapePointer = null;
+    _shapeStart = null;
+    _shapeEnd = null;
+    _gestureShapeSettings = null;
+  }
 
   /// Called synchronously when the canvas starts a pinch, including across pages.
   void cancelForViewportGesture() {
+    _clearShape();
     _suppressedTouchPointers.addAll(_touchPositions.keys);
     strokePoints.clear();
     eraserPreview.reset();
@@ -179,6 +220,10 @@ class PointerListenerState extends State<PointerListener> {
           _updatePageSwipe(data);
           notifyDeviceChange(data);
           if (!drawingEnabled) return;
+          if (_shapePointer == data.pointer) {
+            _setStateIfMounted(() => _shapeEnd = data.localPosition);
+            return;
+          }
           if (isSelect(data)) {
             _updateSelectionRegion(data);
             return;
@@ -216,6 +261,17 @@ class PointerListenerState extends State<PointerListener> {
           }
           _startPageSwipe(data);
           notifyDeviceChange(data);
+          if (drawingEnabled &&
+              activeEditingTool == EditingTool.SHAPE &&
+              _shapePointer == null) {
+            _setStateIfMounted(() {
+              _shapePointer = data.pointer;
+              _shapeStart = data.localPosition;
+              _shapeEnd = data.localPosition;
+              _gestureShapeSettings = widget.shapeSettings;
+            });
+            return;
+          }
           if (isSelect(data)) {
             _startSelectionRegion(data);
             return;
@@ -228,9 +284,6 @@ class PointerListenerState extends State<PointerListener> {
           if (drawingEnabled && isEraser(data)) {
             eraserPreview.start();
             eraseAt(data);
-          }
-          if (isLaTeX(data)) {
-            _insertLatex(data);
           }
           if (isText(data)) {
             _insertText(data);
@@ -249,6 +302,16 @@ class PointerListenerState extends State<PointerListener> {
             poppedContentForCurrentPointer = true;
           }
           final changedPage = _finishPageSwipe(data);
+          if (_shapePointer == data.pointer) {
+            final shapes = shapeStrokes(
+              _shapeStart!,
+              data.localPosition,
+              _gestureShapeSettings!,
+            );
+            if (!changedPage && !poppedContentForCurrentPointer)
+              widget.onNewShape?.call(shapes);
+            _clearShape();
+          }
           if (changedPage) {
             poppedContentForCurrentPointer = true;
           } else if (activeEditingTool == EditingTool.SELECT) {
@@ -270,6 +333,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerCancel: (data) {
           if (!mounted) return;
+          if (_shapePointer == data.pointer) _clearShape();
           _suppressedTouchPointers.remove(data.pointer);
           _finishPinchZoom(data);
           _finishPan(data);
@@ -305,6 +369,18 @@ class PointerListenerState extends State<PointerListener> {
           children: [
             child,
             ...strokePreview.buildWidgets(),
+            if (_shapeStart != null && _shapeEnd != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _ShapePreviewPainter(
+                      _shapeStart!,
+                      _shapeEnd!,
+                      _gestureShapeSettings!,
+                    ),
+                  ),
+                ),
+              ),
             if (_selectionRect != null)
               Positioned.fromRect(
                 rect: _selectionRect!,
@@ -342,6 +418,7 @@ class PointerListenerState extends State<PointerListener> {
   //   key.currentState.clearPoints();
 
   void clearPoints() {
+    _clearShape();
     strokePoints.clear();
     eraserPreview.reset();
     _eraserOverridePointers.clear();
@@ -401,6 +478,7 @@ class PointerListenerState extends State<PointerListener> {
 
     _cancelPageSwipe(data);
     _cancelSelectionRegion();
+    _clearShape();
     _panLastPosition = null;
     _panPointer = null;
     _twoFingerPanning = false;
@@ -616,19 +694,6 @@ class PointerListenerState extends State<PointerListener> {
         getEditingToolFromPointer(data) == EditingTool.MOVE;
   }
 
-  void _insertLatex(PointerDownEvent data) {
-    final topLeft = data.localPosition;
-    final color = _activeStrokeColor;
-    Future<void>.delayed(Duration.zero, () {
-      if (!mounted || _consumeContentPointerDown(data)) return;
-      XppTexImage.edit(context: context, topLeft: topLeft, color: color)
-          .then((value) {
-            if (mounted) widget.onNewContent?.call(value);
-          })
-          .catchError((_) {});
-    });
-  }
-
   void _insertText(PointerDownEvent data) {
     final offset = data.localPosition;
     final color = _activeStrokeColor;
@@ -759,10 +824,6 @@ class PointerListenerState extends State<PointerListener> {
 
   bool isText(PointerEvent data) {
     return getEditingToolFromPointer(data) == EditingTool.TEXT;
-  }
-
-  bool isLaTeX(PointerEvent data) {
-    return getEditingToolFromPointer(data) == EditingTool.LATEX;
   }
 
   bool isSelect(PointerEvent data) {

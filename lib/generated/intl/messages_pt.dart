@@ -136,6 +136,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Definir título do documento.",
     ),
+    "shapeCircle": MessageLookupByLibrary.simpleMessage("Círculo"),
+    "shapeLine": MessageLookupByLibrary.simpleMessage("Linha"),
+    "shapeOutlineColor": MessageLookupByLibrary.simpleMessage(
+      "Cor do contorno",
+    ),
+    "shapeSquare": MessageLookupByLibrary.simpleMessage("Quadrado"),
+    "shapes": MessageLookupByLibrary.simpleMessage("Formas"),
     "sharePage": MessageLookupByLibrary.simpleMessage("Compartilhar página..."),
     "simplifyStrokes": MessageLookupByLibrary.simpleMessage(
       "Simplificar traços",

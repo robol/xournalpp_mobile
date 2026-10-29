@@ -1,4 +1,9 @@
 {
+  "shapes": "Formen",
+  "shapeLine": "Linie",
+  "shapeCircle": "Kreis",
+  "shapeSquare": "Quadrat",
+  "shapeOutlineColor": "Umrissfarbe",
   "simplifyStrokes": "Stiftstriche vereinfachen",
   "simplifyStrokesDescription": "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
   "newDocument": "Neues Dokument",

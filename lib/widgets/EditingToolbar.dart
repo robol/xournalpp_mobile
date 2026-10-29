@@ -5,6 +5,7 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:xournalpp/widgets/ToolSettingDialog.dart';
+import 'package:xournalpp/widgets/ShapeTool.dart';
 
 class EditingToolBar extends StatefulWidget {
   final Function(Map<PointerDeviceKind?, EditingTool>?)? onNewDeviceMap;
@@ -19,6 +20,8 @@ class EditingToolBar extends StatefulWidget {
   final VoidCallback? onBackgroundSettings;
   final VoidCallback? onPasteSelection;
   final bool compact;
+  final ShapeSettings shapeSettings;
+  final ValueChanged<ShapeSettings>? onShapeSettingsChanged;
 
   const EditingToolBar({
     Key? key,
@@ -34,6 +37,8 @@ class EditingToolBar extends StatefulWidget {
     this.onBackgroundSettings,
     this.onPasteSelection,
     this.compact = false,
+    this.shapeSettings = const ShapeSettings(),
+    this.onShapeSettingsChanged,
   }) : super(key: key);
 
   @override
@@ -87,8 +92,8 @@ class EditingToolBarState extends State<EditingToolBar> {
             usePrimaryColor: true,
           ),
           getInkwellButton(
-            EditingTool.LATEX,
-            Icon(Icons.science),
+            EditingTool.SHAPE,
+            Icon(Icons.category_outlined),
             usePrimaryColor: true,
           ),
           // TODO: Currently not implemented
@@ -190,7 +195,16 @@ class EditingToolBarState extends State<EditingToolBar> {
         (theme.useMaterial3 ? colors.onPrimaryContainer : colors.onSecondary);
 
     void selectTool() {
-      if (enableSettings && getTool() == tool) {
+      if (tool == EditingTool.SHAPE && getTool() == tool) {
+        showDialog(
+          context: context,
+          builder: (_) => ShapeSettingsDialog(
+            settings: widget.shapeSettings,
+            onChanged: (settings) =>
+                widget.onShapeSettingsChanged?.call(settings),
+          ),
+        );
+      } else if (enableSettings && getTool() == tool) {
         showCustomDialog(context);
       } else {
         setState(() => setTool(tool));
@@ -216,6 +230,7 @@ class EditingToolBarState extends State<EditingToolBar> {
             EditingTool.HIGHLIGHT => S.of(context).highlighter,
             EditingTool.ERASER => S.of(context).eraser,
             EditingTool.MOVE => S.of(context).move,
+            EditingTool.SHAPE => S.of(context).shapes,
             _ => tool.name[0] + tool.name.substring(1).toLowerCase(),
           },
           constraints: const BoxConstraints.tightFor(width: 48, height: 48),

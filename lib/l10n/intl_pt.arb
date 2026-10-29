@@ -1,4 +1,9 @@
 {
+  "shapes": "Formas",
+  "shapeLine": "Linha",
+  "shapeCircle": "Círculo",
+  "shapeSquare": "Quadrado",
+  "shapeOutlineColor": "Cor do contorno",
   "simplifyStrokes": "Simplificar traços",
   "simplifyStrokesDescription": "Reduzir pontos em novos traços para poupar espaço.",
   "newDocument": "Novo Documento",

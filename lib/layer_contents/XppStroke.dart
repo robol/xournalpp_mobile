@@ -20,6 +20,7 @@ abstract class XppStroke extends XppContent {
   List<XppStrokePoint>? points;
   Color? color;
   EditingTool? editingTool;
+  int? fill;
   XppStrokeBounds? _cachedBounds;
 
   @override
@@ -56,7 +57,7 @@ abstract class XppStroke extends XppContent {
       colorToUse = color!.withValues(alpha: .5);
     }
     final strokeBounds = _strokeBounds;
-    final chunks = _chunkPoints(points!);
+    final chunks = fill == null ? _chunkPoints(points!) : [points!];
     return XppPageContentWidget(
       child: SizedBox(
         width: strokeBounds.rect.width,
@@ -75,6 +76,7 @@ abstract class XppStroke extends XppContent {
                     color: colorToUse,
                     topLeft: bounds.rect.topLeft,
                     smoothPressure: tool == XppStrokeTool.PEN,
+                    fill: fill,
                   ),
                 ),
               ),
@@ -124,6 +126,7 @@ abstract class XppStroke extends XppContent {
       [
         XmlAttribute(XmlName.parts('tool'), toolString),
         XmlAttribute(XmlName.parts('color'), color!.toHexTriplet()),
+        if (fill != null) XmlAttribute(XmlName.parts('fill'), '$fill'),
         XmlAttribute(
           XmlName.parts('width'),
           points!.map((e) => _formatStrokeNumber(e.width!)).join(' '),
@@ -150,6 +153,12 @@ abstract class XppStroke extends XppContent {
     }
     if (!_mightErase(coordinates: coordinates, radius: radius)) {
       return XppContentEraseData();
+    }
+    if (fill != null &&
+        points!.any(
+          (point) => _shouldRemovePoint(point, coordinates, radius),
+        )) {
+      return XppContentEraseData(affected: true, delete: true);
     }
 
     List<XppStroke> newStrokes = [];
@@ -266,6 +275,10 @@ abstract class XppStroke extends XppContent {
       yield XppContentEraseData();
       return;
     }
+    if (fill != null) {
+      yield XppContentEraseData(affected: true, delete: true);
+      return;
+    }
     if (segment.isNotEmpty)
       strokes.add(newStroke(color: color, points: segment));
     yield XppContentEraseData(
@@ -289,7 +302,7 @@ abstract class XppStroke extends XppContent {
           ),
         )
         .toList(),
-  );
+  )..fill = fill;
 
   XppStrokeBounds get _strokeBounds {
     return _cachedBounds ??= XppStrokeBounds.fromPoints(points!);
@@ -401,18 +414,37 @@ class XppStrokePainter extends CustomPainter {
   final Color? color;
   final Offset? topLeft;
   final bool? smoothPressure;
+  final int? fill;
 
   XppStrokePainter({
     this.points,
     this.color,
     this.topLeft,
     this.smoothPressure,
+    this.fill,
     Listenable? repaint,
   }) : super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
     if (points!.isEmpty) return;
+    if (fill != null && points!.length > 2) {
+      final path = Path()
+        ..moveTo(
+          points!.first.x! - topLeft!.dx,
+          points!.first.y! - topLeft!.dy,
+        );
+      for (final point in points!.skip(1)) {
+        path.lineTo(point.x! - topLeft!.dx, point.y! - topLeft!.dy);
+      }
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color!.withValues(alpha: fill!.clamp(0, 255) / 255)
+          ..style = PaintingStyle.fill,
+      );
+    }
     if (points!.length == 1) {
       var paint = Paint()
         ..color = color!

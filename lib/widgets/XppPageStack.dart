@@ -871,6 +871,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
             color: _strokeColor(stroke),
             topLeft: Offset.zero,
             smoothPressure: stroke.tool == XppStrokeTool.PEN,
+            fill: stroke.fill,
           ).paint(canvas, Size.zero);
           pointsRecorded += batch.length;
           if (pointsRecorded >= 512 ||
@@ -979,6 +980,7 @@ void _paintStrokes(Canvas canvas, Iterable<XppStroke> strokes) {
       color: _strokeColor(stroke),
       topLeft: Offset.zero,
       smoothPressure: stroke.tool == XppStrokeTool.PEN,
+      fill: stroke.fill,
     ).paint(canvas, Size.zero);
   }
 }
@@ -1023,7 +1025,9 @@ Iterable<List<XppStrokePoint>> _strokeBatches(
   XppStroke stroke,
   List<XppStrokePoint> points,
 ) sync* {
-  if (stroke.tool != XppStrokeTool.PEN || points.length <= 512) {
+  if (stroke.fill != null ||
+      stroke.tool != XppStrokeTool.PEN ||
+      points.length <= 512) {
     yield points;
     return;
   }

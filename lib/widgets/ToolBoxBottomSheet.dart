@@ -234,10 +234,10 @@ enum EditingTool {
   STYLUS,
   HIGHLIGHT,
   TEXT,
-  LATEX,
   LASER,
   IMAGE,
   MOVE,
   SELECT,
   ERASER,
+  SHAPE,
 }

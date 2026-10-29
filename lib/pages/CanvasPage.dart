@@ -26,6 +26,7 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
@@ -188,6 +189,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   bool simplifyStrokes = true;
 
   Map<PointerDeviceKind?, EditingTool> _toolData = {};
+  ShapeSettings _shapeSettings = const ShapeSettings();
   PointerDeviceKind? _currentDevice = PointerDeviceKind.touch;
   final ValueNotifier<bool> _canPanViewportListenable = ValueNotifier(false);
 
@@ -480,6 +482,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       compact: compact,
       key: _editingToolbarKey,
       deviceMap: _toolData,
+      shapeSettings: _shapeSettings,
+      onShapeSettingsChanged: (settings) =>
+          setState(() => _shapeSettings = settings),
       getColor: getColor,
       getWidth: getWidth,
       getMinWidth: getMinWidth,
@@ -735,6 +740,9 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 key: _pointerListenerKeyFor(pageIndex),
                 viewportGesturesExternallyManaged: true,
                 toolData: _toolData,
+                shapeSettings: _shapeSettings,
+                onNewShape: (contents) =>
+                    _addContentsToPage(pageIndex, contents),
                 strokeWidth: toolWidth,
                 highlighterWidth: highlighterWidth,
                 eraserWidth: eraserWidth,
@@ -1336,27 +1344,37 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _addContentToPage(int pageIndex, XppContent? newContent) {
     if (newContent == null) return;
+    _addContentsToPage(pageIndex, [newContent]);
+  }
+
+  void _addContentsToPage(int pageIndex, List<XppContent> newContents) {
+    if (newContents.isEmpty) return;
     _activatePageForEditing(pageIndex);
 
     /// TODO: manage layers
     final page = _file!.pages![pageIndex];
     final layer = page.layers!.last;
     setState(() {
-      final content = List<XppContent?>.from(layer.content!)..add(newContent);
+      final content = List<XppContent?>.from(layer.content!);
+      final start = content.length;
+      content.addAll(newContents);
       layer.content = content;
       _undoStack.add(
         _UndoEntry([
-          _LayerOperation.added(
-            page: page,
-            layer: layer,
-            content: newContent,
-            index: content.length - 1,
-          ),
+          for (var i = 0; i < newContents.length; i++)
+            _LayerOperation.added(
+              page: page,
+              layer: layer,
+              content: newContents[i],
+              index: start + i,
+            ),
         ]),
       );
       _markDirty();
     });
-    _eraserIndexes[layer]?.add(newContent);
+    for (final content in newContents) {
+      _eraserIndexes[layer]?.add(content);
+    }
 
     _refreshPageStack(pageIndex, page);
   }

@@ -55,6 +55,36 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Shapes`
+  String get shapes {
+    return Intl.message('Shapes', name: 'shapes', desc: '', args: []);
+  }
+
+  /// `Line`
+  String get shapeLine {
+    return Intl.message('Line', name: 'shapeLine', desc: '', args: []);
+  }
+
+  /// `Circle`
+  String get shapeCircle {
+    return Intl.message('Circle', name: 'shapeCircle', desc: '', args: []);
+  }
+
+  /// `Square`
+  String get shapeSquare {
+    return Intl.message('Square', name: 'shapeSquare', desc: '', args: []);
+  }
+
+  /// `Outline color`
+  String get shapeOutlineColor {
+    return Intl.message(
+      'Outline color',
+      name: 'shapeOutlineColor',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Simplify strokes`
   String get simplifyStrokes {
     return Intl.message(

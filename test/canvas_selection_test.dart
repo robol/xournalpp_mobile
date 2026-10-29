@@ -5,6 +5,7 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
+import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,38 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 
 void main() {
+  testWidgets('shape is undone', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final page = XppPage.empty();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(
+          file: XppFile(title: 'Shapes', pages: [page]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final strokes = shapeStrokes(
+      const Offset(20, 20),
+      const Offset(80, 80),
+      const ShapeSettings(kind: ShapeKind.square),
+    );
+    tester.widget<PointerListener>(find.byType(PointerListener)).onNewShape!(
+      strokes,
+    );
+    await tester.pump();
+    expect(page.layers!.last.content, hasLength(1));
+    await tester.tap(find.byTooltip('Undo last operation'));
+    await tester.pump();
+    expect(page.layers!.last.content, isEmpty);
+  });
   testWidgets(
     'large eraser publishes atomically and undo restores all layers',
     (tester) async {

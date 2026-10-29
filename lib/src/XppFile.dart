@@ -500,8 +500,14 @@ class XppFile {
             );
           }
           if (points.isEmpty) throw FormatException('Stroke has no points.');
+          final fillAttribute = strokeElement.getAttribute('fill');
+          final fill = fillAttribute == null ? null : int.parse(fillAttribute);
+          if (fill != null && (fill < -1 || fill > 255)) {
+            throw FormatException('Invalid stroke fill: $fill');
+          }
           content[int.parse(strokeElement.getAttribute('counter')!)] =
-              XppStroke.byTool(tool: tool, color: color, points: points);
+              XppStroke.byTool(tool: tool, color: color, points: points)
+                ..fill = fill == -1 ? null : fill;
         });
 
         layers.add(
@@ -655,7 +661,7 @@ class XppFile {
                         points: content.points == null
                             ? null
                             : List.of(content.points!),
-                      );
+                      )..fill = content.fill;
                     }
                     if (content is XppImage) {
                       return XppImage(

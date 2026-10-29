@@ -18,43 +18,6 @@ class XppTexImage extends XppContent {
 
   XppTexImage({this.text, this.topLeft, this.bottomRight, this.color});
 
-  static Future<XppTexImage> edit({
-    required BuildContext context,
-    String text = 'x^2',
-    Offset? topLeft,
-    Color? color,
-  }) async {
-    final laTeXController = TextEditingController(text: text);
-    bool? result = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Enter LaTeX code'),
-        content: TextField(
-          controller: laTeXController,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: 'LaTeX code',
-            helperText: 'No delimiter required',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Okay'),
-          ),
-        ],
-      ),
-    );
-    final enteredText = laTeXController.text;
-    laTeXController.dispose();
-    if (result != true) throw UnsupportedError('Aborted.');
-    return XppTexImage(text: enteredText, topLeft: topLeft, color: color);
-  }
-
   @override
   XppPageContentWidget render({
     void Function(XppContent newContent)? onReplace,

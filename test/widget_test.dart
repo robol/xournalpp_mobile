@@ -123,6 +123,17 @@ void main() {
     await tester.pumpAndSettle();
 
     final toolbar = find.byType(EditingToolBar);
+    expect(
+      find.descendant(
+        of: toolbar,
+        matching: find.byIcon(Icons.category_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: toolbar, matching: find.byIcon(Icons.science)),
+      findsNothing,
+    );
     final state = tester.state<EditingToolBarState>(toolbar);
     final pasteButton = find.descendant(
       of: toolbar,
@@ -156,6 +167,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNull);
     expect(tester.widget<EditingToolBar>(toolbar).compact, isTrue);
+    expect(
+      find.descendant(
+        of: toolbar,
+        matching: find.byIcon(Icons.category_outlined),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: toolbar, matching: find.byIcon(Icons.science)),
+      findsNothing,
+    );
     final compactPasteButton = find.descendant(
       of: toolbar,
       matching: find.byWidgetPredicate(

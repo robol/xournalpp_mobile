@@ -28,6 +28,23 @@ Future<XppFile> parseNotebook(XppPickedFile file) =>
     XppFile.fromXppPickedFile(file, null, (_, __) => throw StateError('PDF'));
 
 void main() {
+  test('filled strokes survive parsing, translation and async save', () async {
+    final file = await parseNotebook(
+      notebook(
+        '<stroke tool="pen" color="#ff0000" fill="128" width="1">10 10 50 10 50 50 10 10</stroke>',
+      ),
+    );
+    final stroke =
+        file.pages!.single.layers!.single.content!.single as XppStroke;
+    expect(stroke.fill, 128);
+    expect((stroke.translatedBy(const Offset(3, 4)) as XppStroke).fill, 128);
+    final saved = await file.toUint8ListAsync();
+    final reloaded = await parseNotebook(XppPickedFile(saved));
+    expect(
+      (reloaded.pages!.single.layers!.single.content!.single as XppStroke).fill,
+      128,
+    );
+  });
   test(
     'async save serializes a detached snapshot with PDF attributes',
     () async {

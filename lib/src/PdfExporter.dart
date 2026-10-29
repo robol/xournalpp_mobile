@@ -57,12 +57,12 @@ Future<Uint8List> exportPdfDocument(
                     content: layer.content
                         ?.map(
                           (content) => content is XppStroke
-                              ? content.newStroke(
+                              ? (content.newStroke(
                                   color: content.color,
                                   points: content.points == null
                                       ? null
                                       : List.of(content.points!),
-                                )
+                                )..fill = content.fill)
                               : content,
                         )
                         .toList(),
@@ -1033,6 +1033,11 @@ class _OverlayBuilder {
   }) {
     final points = stroke.points;
     if (points == null || points.isEmpty) return;
+    if (stroke.fill != null && stroke.fill != 255) {
+      throw const PdfExportException(
+        'PDF export does not support translucent filled strokes.',
+      );
+    }
     final color = stroke.tool == XppStrokeTool.ERASER
         ? const Color(0xffffffff)
         : stroke.color ?? const Color(0xff000000);
@@ -1040,6 +1045,17 @@ class _OverlayBuilder {
     if (stroke.tool == XppStrokeTool.HIGHLIGHTER)
       buffer.writeln('/FXPHighlight gs');
     buffer.writeln('${_rgb(color)} RG ${_rgb(color)} rg 1 J 1 j');
+    if (stroke.fill == 255 && points.length > 2) {
+      buffer.write(
+        '${_n(_x(points.first.x!, scaleX))} ${_n(_y(points.first.y!, scaleY))} m ',
+      );
+      for (final point in points.skip(1)) {
+        buffer.write(
+          '${_n(_x(point.x!, scaleX))} ${_n(_y(point.y!, scaleY))} l ',
+        );
+      }
+      buffer.writeln('h f');
+    }
     if (points.length == 1) {
       final point = points.first;
       final radius = (point.width ?? 1) / 2;

@@ -17,6 +17,25 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  test('exports opaque filled strokes and rejects translucent fills', () async {
+    final file = XppFile.empty();
+    final stroke = XppStrokePen(
+      color: const Color(0xffff0000),
+      points: [
+        XppStrokePoint(x: 10, y: 10, width: 1),
+        XppStrokePoint(x: 50, y: 10, width: 1),
+        XppStrokePoint(x: 50, y: 50, width: 1),
+        XppStrokePoint(x: 10, y: 10, width: 1),
+      ],
+    )..fill = 255;
+    file.pages!.first.layers!.last.content!.add(stroke);
+    expect(latin1.decode(await exportPdfDocument(file)), contains('h f'));
+    stroke.fill = 128;
+    await expectLater(
+      exportPdfDocument(file),
+      throwsA(isA<PdfExportException>()),
+    );
+  });
   test('PDF generation yields to the calling isolate', () async {
     final file = XppFile.empty();
     var timerRan = false;

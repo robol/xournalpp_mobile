@@ -130,6 +130,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Set document title",
     ),
+    "shapeCircle": MessageLookupByLibrary.simpleMessage("Circle"),
+    "shapeLine": MessageLookupByLibrary.simpleMessage("Line"),
+    "shapeOutlineColor": MessageLookupByLibrary.simpleMessage("Outline color"),
+    "shapeSquare": MessageLookupByLibrary.simpleMessage("Square"),
+    "shapes": MessageLookupByLibrary.simpleMessage("Shapes"),
     "sharePage": MessageLookupByLibrary.simpleMessage("Share page..."),
     "simplifyStrokes": MessageLookupByLibrary.simpleMessage("Simplify strokes"),
     "simplifyStrokesDescription": MessageLookupByLibrary.simpleMessage(
