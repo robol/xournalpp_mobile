@@ -126,12 +126,17 @@ abstract class XppStroke extends XppContent {
         XmlAttribute(XmlName.parts('color'), color!.toHexTriplet()),
         XmlAttribute(
           XmlName.parts('width'),
-          points!.map((e) => e.width.toString()).join(' '),
+          points!.map((e) => _formatStrokeNumber(e.width!)).join(' '),
         ),
       ],
       [
         XmlText(
-          points!.map((e) => e.x.toString() + ' ' + e.y.toString()).join(' '),
+          points!
+              .map(
+                (e) =>
+                    '${_formatStrokeNumber(e.x!)} ${_formatStrokeNumber(e.y!)}',
+              )
+              .join(' '),
         ),
       ],
     );
@@ -324,6 +329,12 @@ abstract class XppStroke extends XppContent {
     return stroke;
   }
 }
+
+/// Six significant decimal digits bound the precision written to notebooks.
+/// Parsing the rounded value removes unnecessary trailing zeros and preserves
+/// small nonzero values through scientific notation when needed.
+String _formatStrokeNumber(double value) =>
+    double.parse(value.toStringAsPrecision(6)).toString();
 
 class XppStrokePen extends XppStroke {
   XppStrokeTool tool = XppStrokeTool.PEN;

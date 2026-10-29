@@ -185,6 +185,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double highlighterWidth = 20;
   double eraserWidth = 20;
   bool drawWithStylusOnly = false;
+  bool simplifyStrokes = true;
 
   Map<PointerDeviceKind?, EditingTool> _toolData = {};
   PointerDeviceKind? _currentDevice = PointerDeviceKind.touch;
@@ -741,6 +742,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 highlighterColor: highlighterColor,
                 laserColor: _laserColor,
                 drawWithStylusOnly: drawWithStylusOnly,
+                simplifyStrokes: simplifyStrokes,
                 canPanViewportListenable: _canPanViewportListenable,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
                 onPan: _panPages,
@@ -2804,6 +2806,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         drawWithStylusOnly =
             prefs.getBool(PreferencesKeys.kDrawWithStylusOnly) ??
             drawWithStylusOnly;
+        simplifyStrokes =
+            prefs.getBool(PreferencesKeys.kSimplifyStrokes) ?? true;
       });
       _scheduleInputModeRefresh();
     });

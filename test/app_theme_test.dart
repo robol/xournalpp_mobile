@@ -53,7 +53,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       checkRouteTheme(find.byType(SettingsPage));
-      expect(find.byType(SwitchListTile), findsOneWidget);
+      expect(find.byType(SwitchListTile), findsNWidgets(2));
       navigator.pop();
       await tester.pumpAndSettle();
       navigator.push(

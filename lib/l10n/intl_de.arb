@@ -1,4 +1,6 @@
 {
+  "simplifyStrokes": "Stiftstriche vereinfachen",
+  "simplifyStrokesDescription": "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
   "newDocument": "Neues Dokument",
   "tools": "Werkzeuge",
   "toolboxNotImplementedYet": "Werkzeugkasten noch nicht implementiert.",

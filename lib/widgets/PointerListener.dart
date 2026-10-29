@@ -8,6 +8,7 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/widgets/EraserPreviewController.dart';
 import 'package:xournalpp/widgets/StrokePointBuffer.dart';
 import 'package:xournalpp/widgets/StrokePreviewController.dart';
+import 'package:xournalpp/widgets/StrokeSimplifier.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 class PointerListener extends StatefulWidget {
@@ -23,6 +24,7 @@ class PointerListener extends StatefulWidget {
   final Color? highlighterColor;
   final Color? laserColor;
   final bool drawWithStylusOnly;
+  final bool simplifyStrokes;
   final ValueListenable<bool>? canPanViewportListenable;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
@@ -60,6 +62,7 @@ class PointerListener extends StatefulWidget {
     this.highlighterColor,
     this.laserColor,
     this.drawWithStylusOnly = false,
+    this.simplifyStrokes = true,
     this.canPanViewportListenable,
     this.filterEraser,
     this.filterEraserPath,
@@ -645,7 +648,9 @@ class PointerListenerState extends State<PointerListener> {
     if (smoothedPoints.isNotEmpty) {
       XppStroke stroke = XppStroke.byTool(
         tool: tool,
-        points: smoothedPoints,
+        points: widget.simplifyStrokes
+            ? simplifyStrokePoints(smoothedPoints)
+            : smoothedPoints,
         color: _colorForTool(tool),
       );
       widget.onNewContent!(stroke);

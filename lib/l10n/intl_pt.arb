@@ -1,4 +1,6 @@
 {
+  "simplifyStrokes": "Simplificar traços",
+  "simplifyStrokesDescription": "Reduzir pontos em novos traços para poupar espaço.",
   "newDocument": "Novo Documento",
   "tools": "Ferramentas",
   "toolboxNotImplementedYet": "Caixa de ferramentas ainda não implementada.",

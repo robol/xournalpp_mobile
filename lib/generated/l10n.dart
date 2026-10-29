@@ -55,6 +55,26 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Simplify strokes`
+  String get simplifyStrokes {
+    return Intl.message(
+      'Simplify strokes',
+      name: 'simplifyStrokes',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reduce points in newly drawn strokes to save space.`
+  String get simplifyStrokesDescription {
+    return Intl.message(
+      'Reduce points in newly drawn strokes to save space.',
+      name: 'simplifyStrokesDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `New Document`
   String get newDocument {
     return Intl.message(

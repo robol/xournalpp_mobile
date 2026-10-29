@@ -138,6 +138,12 @@ class MessageLookup extends MessageLookupByLibrary {
       "Titel des Dokuments ändern",
     ),
     "sharePage": MessageLookupByLibrary.simpleMessage("Seite teilen..."),
+    "simplifyStrokes": MessageLookupByLibrary.simpleMessage(
+      "Stiftstriche vereinfachen",
+    ),
+    "simplifyStrokesDescription": MessageLookupByLibrary.simpleMessage(
+      "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
+    ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Quellcode"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stiftstärke:"),
     "successfullySaved": MessageLookupByLibrary.simpleMessage(

@@ -48,6 +48,39 @@ void main() {
     expect((content[2] as XppText).text, 'Last');
   });
 
+  test(
+    'stroke serialization rounds to six significant digits and reloads',
+    () async {
+      final original = await parseNotebook(
+        notebook(
+          '''<stroke tool="pen" color="#000000" width="0.123456789 0.000000123456789">
+        123.456789 -0.000000123456789 9999.99999 0
+      </stroke>''',
+        ),
+      );
+      final stroke =
+          original.pages!.single.layers!.single.content!.single as XppStroke;
+      final xml = stroke.toXmlElement();
+      expect(xml.getAttribute('width'), '0.123457 1.23457e-7');
+      expect(xml.children.single.value, '123.457 -1.23457e-7 10000.0 0.0');
+      // Saving does not round the in-memory model.
+      expect(stroke.points!.first.x, 123.456789);
+      final saved = XppPickedFile(
+        Uint8List.fromList(
+          GZipEncoder().encode(utf8.encode(original.toXmlString())),
+        ),
+      );
+      final reloaded = await parseNotebook(saved);
+      final points =
+          (reloaded.pages!.single.layers!.single.content!.single as XppStroke)
+              .points!;
+      expect(points.first.x, 123.457);
+      expect(points.first.y, -1.23457e-7);
+      expect(points.last.width, 1.23457e-7);
+      expect(points.last.x, 10000);
+    },
+  );
+
   test('rejects unknown content before a lossy save', () async {
     await expectLater(
       parseNotebook(notebook('<unsupported/><text/>')),

@@ -1,4 +1,6 @@
 {
+  "simplifyStrokes": "Simplify strokes",
+  "simplifyStrokesDescription": "Reduce points in newly drawn strokes to save space.",
   "newDocument": "New Document",
   "tools": "Tools",
   "toolboxNotImplementedYet": "Toolbox not implemented yet.",

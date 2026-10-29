@@ -131,6 +131,10 @@ class MessageLookup extends MessageLookupByLibrary {
       "Set document title",
     ),
     "sharePage": MessageLookupByLibrary.simpleMessage("Share page..."),
+    "simplifyStrokes": MessageLookupByLibrary.simpleMessage("Simplify strokes"),
+    "simplifyStrokesDescription": MessageLookupByLibrary.simpleMessage(
+      "Reduce points in newly drawn strokes to save space.",
+    ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Source Code"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stroke width:"),
     "successfullySaved": MessageLookupByLibrary.simpleMessage(

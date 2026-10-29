@@ -9,4 +9,5 @@ class PreferencesKeys {
   static const String kHighlighterWidth = 'highlighterWidth';
   static const String kEraserWidth = 'eraserWidth';
   static const String kDrawWithStylusOnly = 'drawWithStylusOnly';
+  static const String kSimplifyStrokes = 'simplifyStrokes';
 }
