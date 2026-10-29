@@ -18,7 +18,8 @@ Future<Uint8List> readFileBytes(String path) async {
     return bytes;
   }
 
-  return File(path).readAsBytes();
+  final uri = Uri.tryParse(path);
+  return File(uri?.scheme == 'file' ? uri!.toFilePath() : path).readAsBytes();
 }
 
 Future<String> writeFileBytes(String path, Uint8List bytes) async {
@@ -95,6 +96,18 @@ Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) async {
   final path = '${directory.path}/$safeName';
   await File(path).writeAsBytes(bytes);
   return path;
+}
+
+Future<String> writePersistentFile(Uint8List bytes, {String? fileName}) async {
+  final documents = await getApplicationDocumentsDirectory();
+  final directory = await Directory(
+    '${documents.path}/imported_pdfs',
+  ).create(recursive: true);
+  final uniqueDirectory = await directory.createTemp('pdf_');
+  final safeName = _safeFileName(fileName ?? 'background.pdf');
+  final file = File('${uniqueDirectory.path}/$safeName');
+  await file.writeAsBytes(bytes, flush: true);
+  return file.path;
 }
 
 Future<File> _cacheFile(String key) async {

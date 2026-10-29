@@ -93,6 +93,10 @@ class XppPickedFile {
     return writeTemporaryFile(bytes, fileName: fileName);
   }
 
+  Future<String> saveToPersistentPath() {
+    return writePersistentFile(bytes, fileName: fileName);
+  }
+
   static Future<void> delete({required String path}) => deleteFile(path);
 
   static bool canDelete({required String path}) => canDeleteFile(path);

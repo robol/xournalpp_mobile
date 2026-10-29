@@ -40,3 +40,9 @@ Future<String> writeTemporaryFile(Uint8List bytes, {String? fileName}) {
     'Writing temporary local files is not supported here.',
   );
 }
+
+Future<String> writePersistentFile(Uint8List bytes, {String? fileName}) {
+  throw UnsupportedError(
+    'Writing persistent local files is not supported here.',
+  );
+}

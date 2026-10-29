@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
@@ -172,11 +173,70 @@ final kAppTheme = ThemeData(
   snackBarTheme: kSnackBarTheme,
 );
 
-class XournalppMobile extends StatelessWidget {
+class XournalppMobile extends StatefulWidget {
+  @override
+  State<XournalppMobile> createState() => _XournalppMobileState();
+}
+
+class _XournalppMobileState extends State<XournalppMobile> {
+  static const _intentChannel = MethodChannel('it.robol.xournal.mobile/intent');
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  bool _drainingIntents = false;
+  bool _intentNotificationPending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _intentChannel.setMethodCallHandler((call) async {
+        if (call.method == 'openIntentsAvailable') _drainIntents();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _drainIntents());
+    }
+  }
+
+  Future<void> _drainIntents() async {
+    if (!mounted) return;
+    if (_drainingIntents) {
+      _intentNotificationPending = true;
+      return;
+    }
+    _drainingIntents = true;
+    try {
+      do {
+        _intentNotificationPending = false;
+        final intents = await _intentChannel.invokeListMethod<dynamic>(
+          'takeOpenIntents',
+        );
+        for (final intent in intents ?? const []) {
+          if (!mounted) return;
+          await _navigatorKey.currentState?.push(
+            MaterialPageRoute<void>(
+              builder: (_) => OpenPage(initialExternalIntent: intent),
+            ),
+          );
+        }
+      } while (mounted && _intentNotificationPending);
+    } on MissingPluginException {
+      // The native channel is unavailable in widget tests and non-Android hosts.
+    } finally {
+      _drainingIntents = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _intentChannel.setMethodCallHandler(null);
+    }
+    super.dispose();
+  }
+
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       title: kIsWeb ? 'Xournal++ Web' : 'Xournal++ Mobile',
       localizationsDelegates: [

@@ -18,7 +18,8 @@ class MainActivity: FlutterActivity() {
     private var pendingCreateResult: MethodChannel.Result? = null
     private var pendingCreateBytes: ByteArray? = null
     private var openIntentChannel: MethodChannel? = null
-    private var initialOpenIntentConsumed = false
+    private val pendingOpenIntents = mutableListOf<Map<String, Any?>>()
+    private var intentListenerReady = false
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (shouldConsumeStylusButtonEvent(event)) return true
@@ -81,9 +82,15 @@ class MainActivity: FlutterActivity() {
                 }
             }
         openIntentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, intentChannel)
+        enqueueOpenIntent(intent)
         openIntentChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
-                "getInitialOpenIntent" -> result.success(consumeInitialOpenIntent())
+                "takeOpenIntents" -> {
+                    intentListenerReady = true
+                    val pending = pendingOpenIntents.toList()
+                    pendingOpenIntents.clear()
+                    result.success(pending)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -151,22 +158,10 @@ class MainActivity: FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        openIntentPayload(intent)?.let {
-            openIntentChannel?.invokeMethod("openIntent", it)
-            clearStoredOpenIntent()
+        enqueueOpenIntent(intent)
+        if (intentListenerReady && pendingOpenIntents.isNotEmpty()) {
+            openIntentChannel?.invokeMethod("openIntentsAvailable", null)
         }
-    }
-
-    private fun consumeInitialOpenIntent(): Map<String, String?>? {
-        if (initialOpenIntentConsumed) return null
-        initialOpenIntentConsumed = true
-        val payload = openIntentPayload(intent)
-        if (payload != null) clearStoredOpenIntent()
-        return payload
-    }
-
-    private fun clearStoredOpenIntent() {
-        setIntent(Intent(Intent.ACTION_MAIN))
     }
 
     private fun createDocument(fileName: String, bytes: ByteArray, result: MethodChannel.Result) {
@@ -297,27 +292,42 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private fun openIntentPayload(intent: Intent?): Map<String, String?>? {
-        if (intent == null) return null
-        if (intent.action != Intent.ACTION_VIEW) return null
-
-        val uri = intent.data ?: return null
-        persistReadableIntentPermission(intent, uri)
-
-        return mapOf(
-            "uri" to uri.toString(),
-            "mimeType" to intent.type,
-            "displayName" to displayName(uri)
-        )
+    @Suppress("DEPRECATION")
+    private fun enqueueOpenIntent(intent: Intent?) {
+        if (intent == null) return
+        val streams: List<Uri> = when (intent.action) {
+            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+            Intent.ACTION_SEND -> listOfNotNull(intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+            Intent.ACTION_SEND_MULTIPLE -> intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+            else -> emptyList()
+        }
+        val uris = if (streams.isNotEmpty()) streams else if (
+            intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE
+        ) {
+            val clip = intent.clipData
+            if (clip == null) emptyList() else (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+        } else emptyList()
+        for (uri in uris) {
+            val persisted = persistIntentPermission(intent, uri)
+            pendingOpenIntents.add(mapOf(
+                "uri" to uri.toString(),
+                "mimeType" to (intent.type ?: try { contentResolver.getType(uri) } catch (_: Exception) { null }),
+                "displayName" to displayName(uri),
+                "writable" to (persisted && intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0)
+            ))
+        }
+        if (uris.isNotEmpty()) setIntent(Intent(Intent.ACTION_MAIN))
     }
 
-    private fun persistReadableIntentPermission(intent: Intent, uri: Uri) {
-        val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
-        if (flags == 0) return
+    private fun persistIntentPermission(intent: Intent, uri: Uri): Boolean {
+        val flags = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (flags == 0) return false
 
-        try {
+        return try {
             contentResolver.takePersistableUriPermission(uri, flags)
+            true
         } catch (_: SecurityException) {
+            false
         }
     }
 

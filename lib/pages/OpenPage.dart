@@ -18,9 +18,11 @@ import 'package:xournalpp/widgets/DropFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 
-const _androidIntentChannel = MethodChannel('it.robol.xournal.mobile/intent');
-
 class OpenPage extends StatefulWidget {
+  final dynamic initialExternalIntent;
+
+  const OpenPage({super.key, this.initialExternalIntent});
+
   @override
   _OpenPageState createState() => _OpenPageState();
 }
@@ -36,7 +38,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   void dispose() {
     RecentFiles.changes.removeListener(_loadRecentFiles);
     _mediaSubscription?.cancel();
-    _androidIntentChannel.setMethodCallHandler(null);
     _animationController.dispose();
     super.dispose();
   }
@@ -49,7 +50,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       value: 0,
     )..addListener((() => setState(() {})));
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) afterFirstLayout(context);
+      if (!mounted) return;
+      if (widget.initialExternalIntent != null) {
+        unawaited(receivedShareNotification(widget.initialExternalIntent));
+      } else {
+        afterFirstLayout(context);
+      }
     });
 
     RecentFiles.changes.addListener(_loadRecentFiles);
@@ -81,25 +87,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   }
 
   void afterFirstLayout(BuildContext context) {
-    if (![
-      TargetPlatform.android,
-      TargetPlatform.iOS,
-    ].contains(defaultTargetPlatform)) {
+    if (defaultTargetPlatform != TargetPlatform.iOS) {
       return;
     }
     try {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        _androidIntentChannel.setMethodCallHandler((call) async {
-          if (call.method == 'openIntent') {
-            await receivedShareNotification(call.arguments);
-          }
-        });
-        _androidIntentChannel
-            .invokeMapMethod<String, String?>('getInitialOpenIntent')
-            .then(receivedShareNotification)
-            .catchError((_) {});
-      }
-
       // For sharing images coming from outside the app while the app is in the memory
       _mediaSubscription = ReceiveSharingIntent.instance
           .getMediaStream()
@@ -291,12 +282,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       if (uri == null || uri.isEmpty) return;
       final token =
           '$uri|${data['mimeType'] ?? ''}|${data['displayName'] ?? ''}';
-      if (lastIntentData == token) return;
       lastIntentData = token;
       await _openExternalFile(
         uri,
         mimeType: data['mimeType']?.toString(),
         displayName: data['displayName']?.toString(),
+        writable: data['writable'] == true,
       );
       return;
     }
@@ -311,6 +302,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     String path, {
     String? mimeType,
     String? displayName,
+    bool writable = true,
   }) async {
     bool _aborted = false;
     bool _dialogVisible = true;
@@ -352,7 +344,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         mimeType: mimeType,
         displayName: displayName,
       );
-      final pickedFile = await XppPickedFile.fromExternalPath(
+      var pickedFile = await XppPickedFile.fromExternalPath(
         path: path,
         fileName: displayName,
         fileExtension: extension,
@@ -360,6 +352,17 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       final XppFile file;
       final String? filePath;
       if (extension == 'pdf') {
+        if (!kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android &&
+            path.startsWith('content://')) {
+          final persistentPath = await pickedFile.saveToPersistentPath();
+          pickedFile = XppPickedFile(
+            pickedFile.bytes,
+            path: persistentPath,
+            fileName: pickedFile.fileName,
+            fileExtension: 'pdf',
+          );
+        }
         file = await XppFile.importPdf(pdf: pickedFile);
         filePath = null;
       } else {
@@ -368,7 +371,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           (percentage) => null,
           showMissingFileDialog,
         );
-        filePath = pickedFile.path;
+        filePath = writable ? pickedFile.path : null;
       }
       if (_aborted || !context.mounted) {
         if (_aborted) lastIntentData = null;
