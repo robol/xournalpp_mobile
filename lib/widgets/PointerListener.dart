@@ -27,6 +27,7 @@ class PointerListener extends StatefulWidget {
   final Color? laserColor;
   final bool drawWithStylusOnly;
   final bool simplifyStrokes;
+  final bool stylusPressureSensitivity;
   final ValueListenable<bool>? canPanViewportListenable;
   final Function({Offset? coordinates, double? radius})? filterEraser;
   final Function({List<Offset>? coordinates, double? radius})? filterEraserPath;
@@ -67,6 +68,7 @@ class PointerListener extends StatefulWidget {
     this.laserColor,
     this.drawWithStylusOnly = false,
     this.simplifyStrokes = true,
+    this.stylusPressureSensitivity = true,
     this.canPanViewportListenable,
     this.filterEraser,
     this.filterEraserPath,
@@ -758,9 +760,26 @@ class PointerListenerState extends State<PointerListener> {
     activeEditingTool = getEditingToolFromPointer(data);
     tool = getToolFromPointer(data);
 
-    double? width = (data.pressure == 0
-        ? widget.strokeWidth
-        : data.pressure * widget.strokeWidth!);
+    double? width = widget.strokeWidth;
+    final isStylus =
+        data.kind == PointerDeviceKind.stylus ||
+        data.kind == PointerDeviceKind.invertedStylus;
+    final min = data.pressureMin;
+    final max = data.pressureMax;
+    if (widget.stylusPressureSensitivity &&
+        isStylus &&
+        !isHighlighter(data) &&
+        !isLaser(data) &&
+        width != null &&
+        data.pressure.isFinite &&
+        min.isFinite &&
+        max.isFinite &&
+        max > min &&
+        (max - min).isFinite) {
+      // Keep light contact visible; full pressure uses the selected width.
+      final pressure = ((data.pressure - min) / (max - min)).clamp(0.1, 1.0);
+      width *= pressure;
+    }
 
     //A highlighter should not change its width
     if (isHighlighter(data)) width = widget.highlighterWidth;

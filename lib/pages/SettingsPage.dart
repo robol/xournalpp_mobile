@@ -14,6 +14,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _drawWithStylusOnly = false;
   bool _simplifyStrokes = true;
+  bool _stylusPressureSensitivity = true;
 
   @override
   void initState() {
@@ -42,6 +43,18 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           SwitchListTile(
             title: Text(
+              S.of(context).stylusPressureSensitivity,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              S.of(context).stylusPressureSensitivityDescription,
+              style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14),
+            ),
+            value: _stylusPressureSensitivity,
+            onChanged: _setStylusPressureSensitivity,
+          ),
+          SwitchListTile(
+            title: Text(
               S.of(context).simplifyStrokes,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -65,6 +78,8 @@ class _SettingsPageState extends State<SettingsPage> {
           prefs.getBool(PreferencesKeys.kDrawWithStylusOnly) ?? false;
       _simplifyStrokes =
           prefs.getBool(PreferencesKeys.kSimplifyStrokes) ?? true;
+      _stylusPressureSensitivity =
+          prefs.getBool(PreferencesKeys.kStylusPressureSensitivity) ?? true;
     });
   }
 
@@ -78,5 +93,11 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _simplifyStrokes = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PreferencesKeys.kSimplifyStrokes, value);
+  }
+
+  Future<void> _setStylusPressureSensitivity(bool value) async {
+    setState(() => _stylusPressureSensitivity = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PreferencesKeys.kStylusPressureSensitivity, value);
   }
 }

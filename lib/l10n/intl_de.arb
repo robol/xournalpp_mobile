@@ -6,6 +6,8 @@
   "shapeOutlineColor": "Umrissfarbe",
   "simplifyStrokes": "Stiftstriche vereinfachen",
   "simplifyStrokesDescription": "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
+  "stylusPressureSensitivity": "Druckempfindlichkeit des Eingabestifts",
+  "stylusPressureSensitivityDescription": "Die Breite neuer Stiftstriche anhand des Stiftdrucks anpassen, sofern verfügbar.",
   "newDocument": "Neues Dokument",
   "tools": "Werkzeuge",
   "toolboxNotImplementedYet": "Werkzeugkasten noch nicht implementiert.",

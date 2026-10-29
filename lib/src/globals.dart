@@ -10,4 +10,5 @@ class PreferencesKeys {
   static const String kEraserWidth = 'eraserWidth';
   static const String kDrawWithStylusOnly = 'drawWithStylusOnly';
   static const String kSimplifyStrokes = 'simplifyStrokes';
+  static const String kStylusPressureSensitivity = 'stylusPressureSensitivity';
 }

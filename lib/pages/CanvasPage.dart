@@ -187,6 +187,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   double eraserWidth = 20;
   bool drawWithStylusOnly = false;
   bool simplifyStrokes = true;
+  bool stylusPressureSensitivity = true;
 
   Map<PointerDeviceKind?, EditingTool> _toolData = {};
   ShapeSettings _shapeSettings = const ShapeSettings();
@@ -751,6 +752,7 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
                 laserColor: _laserColor,
                 drawWithStylusOnly: drawWithStylusOnly,
                 simplifyStrokes: simplifyStrokes,
+                stylusPressureSensitivity: stylusPressureSensitivity,
                 canPanViewportListenable: _canPanViewportListenable,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
                 onPan: _panPages,
@@ -2853,6 +2855,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
             drawWithStylusOnly;
         simplifyStrokes =
             prefs.getBool(PreferencesKeys.kSimplifyStrokes) ?? true;
+        stylusPressureSensitivity =
+            prefs.getBool(PreferencesKeys.kStylusPressureSensitivity) ?? true;
       });
       _scheduleInputModeRefresh();
     });

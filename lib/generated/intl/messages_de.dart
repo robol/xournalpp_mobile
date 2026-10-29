@@ -151,6 +151,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Quellcode"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stiftstärke:"),
+    "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
+      "Druckempfindlichkeit des Eingabestifts",
+    ),
+    "stylusPressureSensitivityDescription":
+        MessageLookupByLibrary.simpleMessage(
+          "Die Breite neuer Stiftstriche anhand des Stiftdrucks anpassen, sofern verfügbar.",
+        ),
     "successfullySaved": MessageLookupByLibrary.simpleMessage(
       "Erfolgreich gespeichert.",
     ),

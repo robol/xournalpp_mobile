@@ -105,6 +105,26 @@ class S {
     );
   }
 
+  /// `Stylus pressure sensitivity`
+  String get stylusPressureSensitivity {
+    return Intl.message(
+      'Stylus pressure sensitivity',
+      name: 'stylusPressureSensitivity',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Adjust new pen stroke widths using stylus pressure when available.`
+  String get stylusPressureSensitivityDescription {
+    return Intl.message(
+      'Adjust new pen stroke widths using stylus pressure when available.',
+      name: 'stylusPressureSensitivityDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `New Document`
   String get newDocument {
     return Intl.message(

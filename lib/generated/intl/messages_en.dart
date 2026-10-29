@@ -142,6 +142,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Source Code"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stroke width:"),
+    "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
+      "Stylus pressure sensitivity",
+    ),
+    "stylusPressureSensitivityDescription":
+        MessageLookupByLibrary.simpleMessage(
+          "Adjust new pen stroke widths using stylus pressure when available.",
+        ),
     "successfullySaved": MessageLookupByLibrary.simpleMessage(
       "Successfully saved.",
     ),

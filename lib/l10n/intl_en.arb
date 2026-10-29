@@ -6,6 +6,8 @@
   "shapeOutlineColor": "Outline color",
   "simplifyStrokes": "Simplify strokes",
   "simplifyStrokesDescription": "Reduce points in newly drawn strokes to save space.",
+  "stylusPressureSensitivity": "Stylus pressure sensitivity",
+  "stylusPressureSensitivityDescription": "Adjust new pen stroke widths using stylus pressure when available.",
   "newDocument": "New Document",
   "tools": "Tools",
   "toolboxNotImplementedYet": "Toolbox not implemented yet.",
