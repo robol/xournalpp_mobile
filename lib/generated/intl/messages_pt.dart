@@ -31,6 +31,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Sobre o Xournal++ Mobile",
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Adicionar página"),
+    "alsoDeleteFile": MessageLookupByLibrary.simpleMessage(
+      "Excluir também o arquivo do dispositivo (não pode ser desfeito)",
+    ),
     "apply": MessageLookupByLibrary.simpleMessage("Aplicar"),
     "areYouSureIHaveThePermissionAndAreYou":
         MessageLookupByLibrary.simpleMessage(
@@ -38,14 +41,16 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
-          "Tem certeza de que deseja deletar o arquivo selecionado? É irreversvel.",
+          "Remover este documento da lista de recentes? O arquivo permanecerá no dispositivo, a menos que você escolha excluí-lo.",
         ),
     "background": MessageLookupByLibrary.simpleMessage("Background"),
     "between1And": MessageLookupByLibrary.simpleMessage("Entre 1 e"),
     "cancel": MessageLookupByLibrary.simpleMessage("Cancelar"),
     "close": MessageLookupByLibrary.simpleMessage("Fechar"),
     "color": MessageLookupByLibrary.simpleMessage("Cor"),
-    "confirmDelete": MessageLookupByLibrary.simpleMessage("Confirmar deleção"),
+    "confirmDelete": MessageLookupByLibrary.simpleMessage(
+      "Esquecer documento recente",
+    ),
     "copyErrorMessage": MessageLookupByLibrary.simpleMessage(
       "Copiar mensagem de erro",
     ),
@@ -70,6 +75,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Erro abrindo arquivo",
     ),
+    "forgetRecent": MessageLookupByLibrary.simpleMessage("Esquecer"),
     "graph": MessageLookupByLibrary.simpleMessage("Gráfico"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Marcador"),
     "home": MessageLookupByLibrary.simpleMessage("Início"),

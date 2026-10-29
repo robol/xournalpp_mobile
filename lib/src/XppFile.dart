@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:flutter/material.dart';
@@ -172,15 +173,11 @@ class XppFile {
           fileExtension: 'xopp',
         );
         initialPage = await _lastOpenedPageForPath(rawFile.path);
-        final file = await fromXppPickedFile(
+        return await fromXppPickedFile(
           rawFile,
           (percentage) => null,
-          (missingContext, path) => showMissingFileDialog(context, path),
+          showMissingFileDialog,
         );
-        if (context.mounted) {
-          await file.prepareForOpening(context, currentPage: initialPage);
-        }
-        return file;
       });
 
       if (!context.mounted) return;
@@ -240,12 +237,34 @@ class XppFile {
     Function(double)? percentageCallback,
     FileNotAvailableCallback onUnavailable,
   ) async {
-    /// for potential progress indicator and a better UX we provide feedback about
-    /// the state of parsing. Huge documents may require a minute or two.
-    double percentCompleted = 0;
+    final file = await compute(
+      _parseNotebook,
+      rawFile,
+      debugLabel: 'parse xopp',
+    );
+    for (final page in file.pages ?? <XppPage>[]) {
+      final background = page.background;
+      if (background is XppBackgroundPdf) {
+        page.background = XppBackgroundPdf(
+          onUnavailable: onUnavailable,
+          filename: background.filename,
+          page: background.page,
+          domain: background.domain,
+        );
+      }
+    }
+    try {
+      percentageCallback?.call(1.0);
+    } catch (_) {}
+    return file;
+  }
 
-    if (percentageCallback == null) percentageCallback = (percentage) {};
+  static Future<XppPickedFile> _unusedPdfRecovery(
+    BuildContext context,
+    String? path,
+  ) => throw StateError('PDF recovery is unavailable during parsing');
 
+  static XppFile _parseNotebook(XppPickedFile rawFile) {
     /// extracting the document title
     final rawTitle = _decodePathForFileName(
       rawFile.fileName ?? rawFile.path ?? 'Untitled',
@@ -278,11 +297,9 @@ class XppFile {
     }
 
     List<XppPage> pages = [];
-    int pageIndex = 0;
     String? lastPdfBackgroundFilename;
     Iterable<XmlElement> pageElements = documentTree.findElements('page');
     pageElements.forEach((XmlElement pageElement) {
-      pageIndex++;
       XppPageSize pageSize = XppPageSize(
         width: double.parse(pageElement.getAttribute('width')!),
         height: double.parse(pageElement.getAttribute('height')!),
@@ -304,7 +321,7 @@ class XppFile {
                 lastPdfBackgroundFilename;
             lastPdfBackgroundFilename = filename;
             background = XppBackgroundPdf(
-              onUnavailable: onUnavailable,
+              onUnavailable: _unusedPdfRecovery,
               filename: filename,
               page: int.parse(backgroundElement.getAttribute('pageno')!),
             );
@@ -345,7 +362,6 @@ class XppFile {
         }
       }
       List<XppLayer> layers = [];
-      int layerIndex = 0;
       Iterable<XmlElement> layerElements = pageElement.findElements('layer');
       layerElements.forEach((XmlElement layer) {
         Map<int, XppContent?> content = {};
@@ -497,14 +513,6 @@ class XppFile {
                     .toList(),
           ),
         );
-        layerIndex++;
-        percentCompleted =
-            ((pageIndex - 1) + layerIndex / layerElements.length) /
-            pageElements.length;
-        //print(percentCompleted);
-        try {
-          percentageCallback!(percentCompleted);
-        } catch (e) {}
       });
       pages.add(
         XppPage(background: background, layers: layers, pageSize: pageSize),

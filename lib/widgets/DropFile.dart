@@ -31,13 +31,11 @@ class _DropFileState extends State<DropFile> {
       final bytes = await _fileDropController.getFileData(droppedFile);
       if (!mounted) return;
       final file = await runWithLoadingFileDialog(context, () async {
-        final notebook = await XppFile.fromXppPickedFile(
+        return XppFile.fromXppPickedFile(
           XppPickedFile(bytes, path: filename, fileExtension: 'xopp'),
           (percentage) {},
           showMissingFileDialog,
         );
-        if (mounted) await notebook.prepareForOpening(context);
-        return notebook;
       });
       if (!mounted) return;
       Navigator.of(

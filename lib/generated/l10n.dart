@@ -585,20 +585,35 @@ class S {
     return Intl.message('Save as...', name: 'saveAs', desc: '', args: []);
   }
 
-  /// `Confirm delete`
+  /// `Also delete the file from the device (cannot be undone)`
+  String get alsoDeleteFile {
+    return Intl.message(
+      'Also delete the file from the device (cannot be undone)',
+      name: 'alsoDeleteFile',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Forget`
+  String get forgetRecent {
+    return Intl.message('Forget', name: 'forgetRecent', desc: '', args: []);
+  }
+
+  /// `Forget recent document`
   String get confirmDelete {
     return Intl.message(
-      'Confirm delete',
+      'Forget recent document',
       name: 'confirmDelete',
       desc: '',
       args: [],
     );
   }
 
-  /// `Are you sure to delete the selected file? This cannot be undone.`
+  /// `Remove this document from the recent list? The file will remain on your device unless you choose to delete it.`
   String get areYouSureToDeleteTheSelectedFileThisCannot {
     return Intl.message(
-      'Are you sure to delete the selected file? This cannot be undone.',
+      'Remove this document from the recent list? The file will remain on your device unless you choose to delete it.',
       name: 'areYouSureToDeleteTheSelectedFileThisCannot',
       desc: '',
       args: [],
@@ -695,7 +710,7 @@ class S {
     );
   }
 
-  /// `A Xournal++ compatible editor`
+  /// `A Xournal++ compatible editor.`
   String get workspaceSubtitle {
     return Intl.message(
       'A Xournal++ compatible editor.',

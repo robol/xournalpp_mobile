@@ -22,6 +22,8 @@ Future<void> deleteFile(String path) {
   throw UnsupportedError('Deleting local file paths is not supported here.');
 }
 
+bool canDeleteFile(String path) => false;
+
 Future<Uint8List?> readCacheFile(String key) async => _cache[key];
 
 Future<String> writeCacheFile(String key, Uint8List bytes) async {

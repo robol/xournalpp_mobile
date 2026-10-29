@@ -177,9 +177,7 @@ class _MainDrawerState extends State<MainDrawer> {
         type: XppFilePickType.custom,
         fileExtension: 'pdf',
       );
-      final file = await XppFile.importPdf(pdf: pdf);
-      if (context.mounted) await file.prepareForOpening(context);
-      return file;
+      return XppFile.importPdf(pdf: pdf);
     });
 
     if (!context.mounted) return;

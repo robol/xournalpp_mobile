@@ -264,6 +264,43 @@ void main() {
   }
 
   testWidgets(
+    'editor remains available while the initial PDF raster is pending',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final cacheRead = Completer<Uint8List?>();
+      final service = PdfBackgroundRenderService(
+        sourceReader: (_) async => Uint8List.fromList([1]),
+        cacheReader: (_) => cacheRead.future,
+      );
+      final file = XppFile(
+        pages: [
+          XppPage(
+            pageSize: XppPageSize.a4,
+            background: _TestPdfBackground(
+              service,
+              1,
+              (_, __) async => throw StateError('unexpected recovery'),
+            ),
+            layers: [XppLayer.empty()],
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(CanvasPage(file: file, pdfRenderService: service)),
+      );
+      await tester.pump();
+      expect(find.byType(CanvasPage), findsOneWidget);
+      expect(find.byType(PDfBackgroundWidget), findsWidgets);
+      cacheRead.complete(kTransparentImage);
+      await tester.pumpAndSettle();
+      expect(find.byType(Image), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await service.dispose();
+    },
+  );
+
+  testWidgets(
     'prepared URI snapshot is reused by the editor without recovery or rereading',
     (tester) async {
       SharedPreferences.setMockInitialValues({});

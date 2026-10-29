@@ -45,7 +45,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.longPress(find.byType(DocumentCard).first);
       await tester.pumpAndSettle();
-      expect(find.text('Confirm delete'), findsOneWidget);
+      expect(find.text('Forget recent document'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);

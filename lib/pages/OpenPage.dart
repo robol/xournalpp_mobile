@@ -134,9 +134,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         type: XppFilePickType.custom,
         fileExtension: 'pdf',
       );
-      final file = await XppFile.importPdf(pdf: pdf);
-      if (context.mounted) await file.prepareForOpening(context);
-      return file;
+      return XppFile.importPdf(pdf: pdf);
     }); // TODO `.pdf`
     if (!context.mounted) return;
     Navigator.of(
@@ -372,7 +370,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         );
         filePath = pickedFile.path;
       }
-      if (context.mounted) await file.prepareForOpening(context);
       if (_aborted || !context.mounted) {
         if (_aborted) lastIntentData = null;
         return;
@@ -445,15 +442,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         try {
           final initialPage = _currentPageFromRecentFile(fileInfo);
           final file = await runWithLoadingFileDialog(context, () async {
-            final file = await XppFile.fromXppPickedFile(
+            return XppFile.fromXppPickedFile(
               await XppPickedFile.fromInternalPath(path: fileInfo['path']),
               (percent) {},
               showMissingFileDialog,
             );
-            if (context.mounted) {
-              await file.prepareForOpening(context, currentPage: initialPage);
-            }
-            return file;
           });
           if (!context.mounted) return;
           Navigator.of(context).push(
@@ -504,49 +497,56 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return int.tryParse(page?.toString() ?? '') ?? 0;
   }
 
-  showDeleteDialog(path) {
+  showDeleteDialog(String path) {
+    var deleteFile = false;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(S.of(context).confirmDelete),
-        content: Text(
-          S.of(context).areYouSureToDeleteTheSelectedFileThisCannot,
-        ),
-        actions: [
-          TextButton(
-            onPressed: Navigator.of(context).pop,
-            child: Text(S.of(context).cancel),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(S.of(context).confirmDelete),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(S.of(context).areYouSureToDeleteTheSelectedFileThisCannot),
+                if (XppPickedFile.canDelete(path: path))
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(S.of(context).alsoDeleteFile),
+                    value: deleteFile,
+                    onChanged: (value) =>
+                        setDialogState(() => deleteFile = value ?? false),
+                  ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await XppPickedFile.delete(path: path);
-              } catch (error) {
+          actions: [
+            TextButton(
+              onPressed: Navigator.of(context).pop,
+              child: Text(S.of(context).cancel),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  if (deleteFile) await XppPickedFile.delete(path: path);
+                  await RecentFiles.forget(path);
+                } catch (error) {
+                  if (!context.mounted) return;
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${S.of(context).errorOpeningFile} $error'),
+                    ),
+                  );
+                  return;
+                }
                 if (!context.mounted) return;
                 Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${S.of(context).errorOpeningFile} $error'),
-                  ),
-                );
-                return;
-              }
-              if (!context.mounted) return;
-              setState(() {
-                recentFiles.removeWhere((element) => element['path'] == path);
-              });
-
-              Navigator.of(context).pop();
-              SharedPreferences.getInstance().then((prefs) {
-                prefs.setString(
-                  PreferencesKeys.kRecentFiles,
-                  jsonEncode(recentFiles.toList()),
-                );
-              });
-            },
-            child: Text(S.of(context).delete),
-          ),
-        ],
+              },
+              child: Text(S.of(context).forgetRecent),
+            ),
+          ],
+        ),
       ),
     );
   }

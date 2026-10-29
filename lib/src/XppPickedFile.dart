@@ -95,6 +95,8 @@ class XppPickedFile {
 
   static Future<void> delete({required String path}) => deleteFile(path);
 
+  static bool canDelete({required String path}) => canDeleteFile(path);
+
   static String? _basename(String? path) {
     if (path == null || path.isEmpty) return null;
     return _decodePathForDisplay(path).split(RegExp(r'[/\\]')).last;

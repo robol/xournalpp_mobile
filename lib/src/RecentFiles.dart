@@ -9,6 +9,21 @@ class RecentFiles {
   static final changes = ValueNotifier<int>(0);
   static Future<void>? _pending;
 
+  static Future<void> forget(String path) => _enqueue(() async {
+    final prefs = await SharedPreferences.getInstance();
+    final files =
+        jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles) ?? '[]')
+            as List;
+    files.removeWhere((entry) => entry['path'] == path);
+    if (!await prefs.setString(
+      PreferencesKeys.kRecentFiles,
+      jsonEncode(files),
+    )) {
+      throw StateError('Could not update recent documents.');
+    }
+    changes.value++;
+  });
+
   static Future<void> remember({
     required String path,
     required String name,
@@ -43,6 +58,10 @@ class RecentFiles {
       changes.value++;
     }
 
+    return _enqueue(write);
+  }
+
+  static Future<void> _enqueue(Future<void> Function() write) {
     final update =
         _pending?.then((_) => write(), onError: (Object _) => write()) ??
         write();

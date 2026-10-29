@@ -31,6 +31,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Über Xournal++ Mobile",
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Seite einfügen"),
+    "alsoDeleteFile": MessageLookupByLibrary.simpleMessage(
+      "Datei auch vom Gerät löschen (kann nicht rückgängig gemacht werden)",
+    ),
     "apply": MessageLookupByLibrary.simpleMessage("Anwenden"),
     "areYouSureIHaveThePermissionAndAreYou":
         MessageLookupByLibrary.simpleMessage(
@@ -38,14 +41,16 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
-          "Bist du dir sicher, dass du die Datei löschen möchtest? Das kann nicht rückgängig gemacht werden..",
+          "Dieses Dokument aus der Liste entfernen? Die Datei bleibt auf dem Gerät, sofern du sie nicht auch löschst.",
         ),
     "background": MessageLookupByLibrary.simpleMessage("Hintergrund"),
     "between1And": MessageLookupByLibrary.simpleMessage("Zwischen 1 und"),
     "cancel": MessageLookupByLibrary.simpleMessage("Abbrechen"),
     "close": MessageLookupByLibrary.simpleMessage("Schließen"),
     "color": MessageLookupByLibrary.simpleMessage("Farbe"),
-    "confirmDelete": MessageLookupByLibrary.simpleMessage("Lösche bestätigen"),
+    "confirmDelete": MessageLookupByLibrary.simpleMessage(
+      "Zuletzt verwendetes Dokument entfernen",
+    ),
     "copyErrorMessage": MessageLookupByLibrary.simpleMessage(
       "Fehlermeldung kopieren",
     ),
@@ -70,6 +75,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Fehler beim Öffnen der Datei",
     ),
+    "forgetRecent": MessageLookupByLibrary.simpleMessage("Entfernen"),
     "graph": MessageLookupByLibrary.simpleMessage("Zeichnen"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Textmarker"),
     "home": MessageLookupByLibrary.simpleMessage("Startseite"),

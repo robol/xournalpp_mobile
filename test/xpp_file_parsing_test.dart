@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 XppPickedFile notebook(String layerXml, {String? fileName = 'notes.xopp'}) {
@@ -56,5 +58,43 @@ void main() {
   test('accepts an extensionless display name', () async {
     final file = await parseNotebook(notebook('', fileName: 'notes'));
     expect(file.title, 'notes');
+  });
+
+  testWidgets('PDF inheritance and recovery callback survive parsing', (
+    tester,
+  ) async {
+    const xml = '''<xournal>
+      <page width="200" height="300"><background type="pdf" filename="missing.pdf" pageno="1"/><layer/></page>
+      <page width="200" height="300"><background type="pdf" pageno="2"/><layer/></page>
+    </xournal>''';
+    final raw = XppPickedFile(
+      Uint8List.fromList(GZipEncoder().encode(utf8.encode(xml))),
+    );
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (c) {
+            context = c;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    final progress = <double>[];
+    String? recoveredPath;
+    final file = await tester.runAsync(
+      () => XppFile.fromXppPickedFile(raw, progress.add, (_, path) async {
+        recoveredPath = path;
+        return raw;
+      }),
+    );
+    final first = file!.pages![0].background as XppBackgroundPdf;
+    final second = file.pages![1].background as XppBackgroundPdf;
+    expect(second.filename, first.filename);
+    expect(second.page, 2);
+    expect(await second.onUnavailable(context, second.filename), same(raw));
+    expect(recoveredPath, 'missing.pdf');
+    expect(progress, [1.0]);
   });
 }

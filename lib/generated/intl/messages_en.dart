@@ -31,6 +31,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "About Xournal++ Mobile",
     ),
     "addPage": MessageLookupByLibrary.simpleMessage("Add page"),
+    "alsoDeleteFile": MessageLookupByLibrary.simpleMessage(
+      "Also delete the file from the device (cannot be undone)",
+    ),
     "apply": MessageLookupByLibrary.simpleMessage("Apply"),
     "areYouSureIHaveThePermissionAndAreYou":
         MessageLookupByLibrary.simpleMessage(
@@ -38,14 +41,16 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "areYouSureToDeleteTheSelectedFileThisCannot":
         MessageLookupByLibrary.simpleMessage(
-          "Are you sure to delete the selected file? This cannot be undone.",
+          "Remove this document from the recent list? The file will remain on your device unless you choose to delete it.",
         ),
     "background": MessageLookupByLibrary.simpleMessage("Background"),
     "between1And": MessageLookupByLibrary.simpleMessage("Between 1 and"),
     "cancel": MessageLookupByLibrary.simpleMessage("Cancel"),
     "close": MessageLookupByLibrary.simpleMessage("Close"),
     "color": MessageLookupByLibrary.simpleMessage("Color"),
-    "confirmDelete": MessageLookupByLibrary.simpleMessage("Confirm delete"),
+    "confirmDelete": MessageLookupByLibrary.simpleMessage(
+      "Forget recent document",
+    ),
     "copyErrorMessage": MessageLookupByLibrary.simpleMessage(
       "Copy error message",
     ),
@@ -70,6 +75,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Error opening file",
     ),
+    "forgetRecent": MessageLookupByLibrary.simpleMessage("Forget"),
     "forkedBy": MessageLookupByLibrary.simpleMessage(
       "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
     ),

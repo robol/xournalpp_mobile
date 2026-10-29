@@ -58,6 +58,11 @@ Future<bool> persistDocumentAccess(String path, {bool writable = false}) async {
 
 Future<void> deleteFile(String path) => File(path).delete();
 
+bool canDeleteFile(String path) =>
+    _androidDocumentUriForPath(path) == null &&
+    !path.contains('://') &&
+    File(path).isAbsolute;
+
 Future<Uint8List?> readCacheFile(String key) async {
   final file = await _cacheFile(key);
   if (!await file.exists()) return null;
