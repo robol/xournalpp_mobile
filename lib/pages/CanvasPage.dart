@@ -1409,11 +1409,16 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   }
 
   Future<bool> _showTitleDialog() async {
+    final now = DateTime.now();
+    final suggestedTitle =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
     return await showDialog<bool>(
           context: context,
           builder: (context) {
             TextEditingController titleController = TextEditingController(
-              text: _file!.title,
+              text: _file!.title ?? suggestedTitle,
             );
             return AlertDialog(
               title: Text(S.of(context).setDocumentTitle),

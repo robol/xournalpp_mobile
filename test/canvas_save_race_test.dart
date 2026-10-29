@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,7 +31,67 @@ class _BlockingRecentStore extends InMemorySharedPreferencesStore {
   }
 }
 
+class _SavePicker extends FilePickerPlatform {
+  String? name;
+
+  @override
+  Future<Uri?> saveFile({
+    required String fileName,
+    required Uint8List bytes,
+    String mimeType = 'application/octet-stream',
+    String? dialogTitle,
+    String? initialDirectory,
+    Function(FilePickerStatus)? onFileSaving,
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async {
+    name = fileName;
+    return null;
+  }
+}
+
 void main() {
+  testWidgets('new notebook suggests a dated title', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final original = FilePickerPlatform.instance;
+    final picker = _SavePicker();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = original);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(file: XppFile.empty()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final before = DateTime.now();
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    canvas.saveFile();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final after = DateTime.now();
+    String nameFor(DateTime date) =>
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+    final title = tester
+        .widget<TextField>(find.byType(TextField))
+        .controller!
+        .text;
+    expect(title, anyOf(nameFor(before), nameFor(after)));
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(picker.name, isNull);
+  });
+
   testWidgets('edits made during save remain unsaved', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = (await tester.runAsync(() async => _BlockingRecentStore()))!;
