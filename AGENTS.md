@@ -121,3 +121,7 @@ For dependency changes, run `flutter pub get` and commit `pubspec.lock`. For pla
 - Check `git status` before and after work. Preserve unrelated user changes and untracked files.
 - Do not commit build products such as `.dart_tool/`, `build/`, or platform `ephemeral/` directories.
 - When behavior is historically delicate, consult `git log -- <path>` and the nearby tests before simplifying it. Recent history is especially relevant for `CanvasPage`, `PointerListener`, `XppPageStack`, `PdfBackgroundRenderService`, `PdfExporter`, `OpenPage`, and the Android activity.
+
+## Releases and tagging
+
+Each release should have a commit named "Release x.y.z: one-line description of the main changes"; the commit should be tagged as vx.y.z, and the Android build version incremented in pubspec.yaml.

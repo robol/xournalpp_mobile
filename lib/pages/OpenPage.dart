@@ -150,7 +150,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           _animationController.animateTo(opened ? 1 : 0),
       drawer: MainDrawer(),
       appBar: AppBar(
-        title: const Text('Xournal++'),
+        title: const Text('Xournal++ Mobile'),
         leading: Builder(
           builder: (context) => IconButton(
             tooltip: S.of(context).openNavigation,
