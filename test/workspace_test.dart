@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,7 +25,81 @@ class _OtherStorage implements NotebookStorage {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _LoadingStorage implements NotebookStorage {
+  final Completer<Uint8List> download = Completer<Uint8List>();
+  @override
+  String get id => 'loading storage';
+  @override
+  Future<List<StoredNotebook>> list() async => [
+    StoredNotebook(
+      backendId: id,
+      id: 'file',
+      name: 'Downloading',
+      modified: DateTime.utc(2026, 10, 30),
+    ),
+  ];
+  @override
+  Future<Uint8List> readNotebook(StoredNotebook notebook) => download.future;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
+  testWidgets('remote file browser uses multiple columns on a wide screen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({});
+    final backend = _LoadingStorage();
+    notebookStorageBackends.add(backend);
+    addTearDown(() => notebookStorageBackends.remove(backend));
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('loading storage'));
+    await tester.pumpAndSettle();
+    final grid = tester.widget<GridView>(find.byType(GridView));
+    expect(
+      (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+          .crossAxisCount,
+      greaterThan(1),
+    );
+  });
+  testWidgets(
+    'remote open closes the mobile grid and shows loading until an error',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      SharedPreferences.setMockInitialValues({});
+      final backend = _LoadingStorage();
+      notebookStorageBackends.add(backend);
+      addTearDown(() => notebookStorageBackends.remove(backend));
+      await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('loading storage'));
+      await tester.pumpAndSettle();
+      final grid = tester.widget<GridView>(find.byType(GridView));
+      expect(
+        (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+            .crossAxisCount,
+        1,
+      );
+      expect(find.textContaining('Last modified:'), findsOneWidget);
+      await tester.tap(find.text('Downloading'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Downloading'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      backend.download.completeError(StateError('download failed'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.textContaining('download failed'), findsOneWidget);
+    },
+  );
   testWidgets('Google Drive browser navigates folders by Drive ID', (
     tester,
   ) async {

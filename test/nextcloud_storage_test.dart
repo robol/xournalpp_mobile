@@ -11,6 +11,30 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 
 void main() {
   test(
+    'reads successful WebDAV modification dates and tolerates missing dates',
+    () async {
+      final client = MockClient((request) async {
+        expect(request.body, contains('getlastmodified'));
+        return http.Response('''<d:multistatus xmlns:d="DAV:">
+      <d:response><d:href>/remote.php/dav/files/user/Notes/dated.xopp</d:href><d:propstat><d:prop><d:resourcetype/><d:getlastmodified>Fri, 30 Oct 2026 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+      <d:response><d:href>/remote.php/dav/files/user/Notes/unknown.xopp</d:href><d:propstat><d:prop><d:resourcetype/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:getlastmodified>Fri, 30 Oct 2026 12:34:56 GMT</d:getlastmodified></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response>
+      </d:multistatus>''', 207);
+      });
+      final storage = NextcloudStorage(
+        NextcloudCredentials(
+          server: NextcloudConnection.serverUri('https://cloud.example'),
+          username: 'user',
+          password: 'secret',
+        ),
+        ['Notes'],
+        client: client,
+      );
+      final entries = (await storage.listFolder([])).notebooks;
+      expect(entries.first.modified, DateTime.utc(2026, 10, 30, 12, 34, 56));
+      expect(entries.last.modified, isNull);
+    },
+  );
+  test(
     'lists folders and opens and saves nested notebooks in their folder',
     () async {
       final objects = <String, Uint8List>{};

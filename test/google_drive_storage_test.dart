@@ -103,6 +103,7 @@ void main() {
               'id': 'note-id',
               'name': 'Notes.xopp',
               'mimeType': 'application/octet-stream',
+              'modifiedTime': '2026-10-30T12:34:56Z',
             },
             {
               'id': 'pdf-id',
@@ -124,6 +125,10 @@ void main() {
     expect(result.folders.single.id, 'sub-id');
     expect(result.notebooks.single.id, 'note-id');
     expect(result.notebooks.single.name, 'Notes');
+    expect(
+      result.notebooks.single.modified,
+      DateTime.utc(2026, 10, 30, 12, 34, 56),
+    );
   });
 
   test('saves a PDF and manifest before publishing and reopens them', () async {

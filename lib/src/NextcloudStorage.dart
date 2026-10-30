@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/NextcloudConnection.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
@@ -243,7 +244,7 @@ class NextcloudStorage implements NotebookStorage {
       directory,
       headers: {'Depth': '1', 'Content-Type': 'application/xml'},
       body: utf8.encode(
-        '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>',
+        '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getlastmodified/></d:prop></d:propfind>',
       ),
     );
     _check(response, 'Could not list notebooks', [207]);
@@ -276,11 +277,42 @@ class NextcloudStorage implements NotebookStorage {
         continue;
       }
       if (!filename.toLowerCase().endsWith('.xopp')) continue;
+      DateTime? modified;
+      for (final propstat in item.findAllElements(
+        'propstat',
+        namespaceUri: 'DAV:',
+      )) {
+        final statuses = propstat.findAllElements(
+          'status',
+          namespaceUri: 'DAV:',
+        );
+        if (!statuses.any(
+          (status) => RegExp(r'\s200\s').hasMatch(status.innerText),
+        ))
+          continue;
+        final values = propstat.findAllElements(
+          'getlastmodified',
+          namespaceUri: 'DAV:',
+        );
+        if (values.isEmpty) continue;
+        final value = values.first.innerText.trim();
+        if (!value.endsWith(' GMT')) continue;
+        try {
+          modified = DateFormat(
+            'EEE, dd MMM yyyy HH:mm:ss',
+            'en_US',
+          ).parseStrict(value.substring(0, value.length - 4), true);
+        } on FormatException {
+          /* An unavailable or malformed date should not hide a notebook. */
+        }
+        break;
+      }
       results.add(
         StoredNotebook(
           backendId: id,
           id: [...folder, filename].join('/'),
           name: filename.substring(0, filename.length - 5),
+          modified: modified,
         ),
       );
     }

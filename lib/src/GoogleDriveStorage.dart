@@ -57,7 +57,7 @@ class GoogleDriveStorage implements NotebookStorage {
     do {
       final uri = Uri.https('www.googleapis.com', '/drive/v3/files', {
         'q': "'${_queryLiteral(parent)}' in parents and trashed = false",
-        'fields': 'nextPageToken,files(id,name,mimeType,parents)',
+        'fields': 'nextPageToken,files(id,name,mimeType,parents,modifiedTime)',
         'pageSize': '1000',
         if (pageToken != null) 'pageToken': pageToken,
       });
@@ -88,6 +88,7 @@ class GoogleDriveStorage implements NotebookStorage {
             backendId: id,
             id: fileId,
             name: name.substring(0, name.length - 5),
+            modified: DateTime.tryParse(file['modifiedTime']?.toString() ?? ''),
           ),
         );
       }

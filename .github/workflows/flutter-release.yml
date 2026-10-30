@@ -84,7 +84,7 @@ jobs:
           app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           build-type: ${{ matrix.build-type }}
-          build-args: >-
+          build-args: |-
             --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
@@ -99,7 +99,7 @@ jobs:
           app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           build-type: ${{ matrix.build-type }}
-          build-args: >-
+          build-args: |-
             --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
@@ -118,7 +118,7 @@ jobs:
           app-version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
           tag: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           build-type: ${{ matrix.build-type }}
-          build-args: >-
+          build-args: |-
             --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}

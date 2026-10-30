@@ -10,10 +10,12 @@ class StoredNotebook {
     required this.backendId,
     required this.id,
     required this.name,
+    this.modified,
   });
   final String backendId;
   final String id;
   final String name;
+  final DateTime? modified;
 }
 
 /// A PDF reference in the notebook and a way to obtain its original bytes.

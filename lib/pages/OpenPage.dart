@@ -680,12 +680,13 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         builder: (context, setDialogState) => AlertDialog(
           title: Text(S.of(context).savedNotebooks),
           content: SizedBox(
-            width: 440,
+            width: 800,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButton<NotebookStorage>(
                   value: selected,
+                  isExpanded: true,
                   items: notebookStorageBackends
                       .map(
                         (backend) => DropdownMenuItem(
@@ -698,6 +699,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                 : backend is GoogleDriveStorage
                                 ? 'Google Drive'
                                 : backend.id,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       )
@@ -766,96 +769,148 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                             folders.isEmpty &&
                             folder.isEmpty)
                           return Text(S.of(context).noSavedNotebooks);
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          itemCount:
-                              entries.length +
-                              folders.length +
-                              (folder.isEmpty ? 0 : 1),
-                          itemBuilder: (context, index) {
-                            if (folder.isNotEmpty) {
-                              if (index == 0)
-                                return ListTile(
-                                  leading: const Icon(Icons.arrow_upward),
-                                  title: Text(
-                                    S.of(context).nextcloudParentFolder,
+                        final itemCount =
+                            entries.length +
+                            folders.length +
+                            (folder.isEmpty ? 0 : 1);
+                        Widget buildItem(BuildContext context, int index) {
+                          if (folder.isNotEmpty) {
+                            if (index == 0)
+                              return ListTile(
+                                leading: const Icon(Icons.arrow_upward),
+                                title: Text(
+                                  S.of(context).nextcloudParentFolder,
+                                ),
+                                onTap: () => setDialogState(
+                                  () => folder = folder.sublist(
+                                    0,
+                                    folder.length - 1,
                                   ),
-                                  onTap: () => setDialogState(
-                                    () => folder = folder.sublist(
-                                      0,
-                                      folder.length - 1,
+                                ),
+                              );
+                            index--;
+                          }
+                          if (index < folders.length) {
+                            final item = folders[index];
+                            return ListTile(
+                              leading: const Icon(Icons.folder_outlined),
+                              title: Text(
+                                item.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => setDialogState(
+                                () => folder = [...folder, item.id],
+                              ),
+                            );
+                          }
+                          final entry = entries[index - folders.length];
+                          return ListTile(
+                            leading: selected == localNotebookStorage
+                                ? null
+                                : const Icon(Icons.description_outlined),
+                            title: Text(
+                              entry.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: entry.modified == null
+                                ? null
+                                : Text(
+                                    _formatModifiedForDisplay(
+                                      context,
+                                      entry.modified!.toIso8601String(),
+                                    ),
+                                  ),
+                            trailing: selected != localNotebookStorage
+                                ? null
+                                : IconButton(
+                                    tooltip: S.of(context).removeSavedNotebook,
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                    onPressed: () async {
+                                      try {
+                                        await selected.forget(entry);
+                                      } catch (error) {
+                                        if (context.mounted)
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(error.toString()),
+                                            ),
+                                          );
+                                      }
+                                    },
+                                  ),
+                            onTap: () async {
+                              final backend = selected;
+                              if (!dialogContext.mounted ||
+                                  !this.context.mounted)
+                                return;
+                              Navigator.of(dialogContext).pop();
+                              try {
+                                final file = await runWithLoadingFileDialog(
+                                  this.context,
+                                  () => XppFile.openStoredNotebook(
+                                    backend,
+                                    entry,
+                                    showMissingFileDialog,
+                                  ),
+                                );
+                                if (!this.context.mounted) return;
+                                await Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CanvasPage(
+                                      file: file,
+                                      filePath: entry.id,
                                     ),
                                   ),
                                 );
-                              index--;
-                            }
-                            if (index < folders.length) {
-                              final item = folders[index];
-                              return ListTile(
-                                leading: const Icon(Icons.folder_outlined),
-                                title: Text(item.name),
-                                onTap: () => setDialogState(
-                                  () => folder = [...folder, item.id],
-                                ),
-                              );
-                            }
-                            final entry = entries[index - folders.length];
-                            return ListTile(
-                              title: Text(entry.name),
-                              trailing: selected != localNotebookStorage
-                                  ? null
-                                  : IconButton(
-                                      tooltip: S
-                                          .of(context)
-                                          .removeSavedNotebook,
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                      ),
-                                      onPressed: () async {
-                                        try {
-                                          await selected.forget(entry);
-                                        } catch (error) {
-                                          if (context.mounted)
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(error.toString()),
-                                              ),
-                                            );
-                                        }
-                                      },
-                                    ),
-                              onTap: () async {
-                                try {
-                                  final file = await XppFile.openStoredNotebook(
-                                    selected,
-                                    entry,
-                                    showMissingFileDialog,
-                                  );
-                                  if (!dialogContext.mounted ||
-                                      !this.context.mounted)
-                                    return;
-                                  Navigator.of(dialogContext).pop();
-                                  await Navigator.of(this.context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => CanvasPage(
-                                        file: file,
-                                        filePath: entry.id,
+                              } catch (error) {
+                                if (this.context.mounted)
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        '${S.of(this.context).errorOpeningFile}$error',
                                       ),
                                     ),
                                   );
-                                } catch (error) {
-                                  if (context.mounted)
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '${S.of(context).errorOpeningFile}$error',
-                                        ),
-                                      ),
-                                    );
-                                }
-                              },
+                              }
+                            },
+                          );
+                        }
+
+                        if (selected == localNotebookStorage) {
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: itemCount,
+                            itemBuilder: buildItem,
+                          );
+                        }
+                        return LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns = constraints.maxWidth < 500
+                                ? 1
+                                : (constraints.maxWidth / 250).floor().clamp(
+                                    2,
+                                    4,
+                                  );
+                            final scale =
+                                MediaQuery.textScalerOf(context).scale(14) / 14;
+                            return GridView.builder(
+                              shrinkWrap: true,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: columns,
+                                    mainAxisExtent:
+                                        90 + 36 * (scale - 1).clamp(0, 3),
+                                  ),
+                              itemCount: itemCount,
+                              itemBuilder: buildItem,
                             );
                           },
                         );
