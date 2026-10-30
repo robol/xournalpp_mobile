@@ -291,17 +291,14 @@ class _CanvasPageState extends State<CanvasPage>
   Future<void> _rememberOpenedFile() async {
     final path = filePath;
     final file = _file;
-    if (path == null ||
-        path.isEmpty ||
-        file == null ||
-        (file.storage != null && file.storage!.id != localNotebookStorage.id))
-      return;
+    if (path == null || path.isEmpty || file == null) return;
     try {
       await RecentFiles.remember(
         path: path,
         name: file.title ?? Uri.tryParse(path)?.pathSegments.lastOrNull ?? path,
         preview: file.previewImage,
         currentPage: currentPage,
+        backendId: file.storage?.id,
       );
     } catch (error) {
       // History storage is optional; failure must not prevent editing.
@@ -311,13 +308,13 @@ class _CanvasPageState extends State<CanvasPage>
 
   void _rememberCurrentPage() {
     final path = filePath;
-    if (path == null ||
-        path.isEmpty ||
-        (_file?.storage != null &&
-            _file!.storage!.id != localNotebookStorage.id))
-      return;
+    if (path == null || path.isEmpty) return;
     unawaited(
-      RecentFiles.updatePage(path, currentPage).catchError((Object error) {
+      RecentFiles.updatePage(
+        path,
+        currentPage,
+        backendId: _file?.storage?.id,
+      ).catchError((Object error) {
         debugPrint('Could not remember document position: $error');
       }),
     );
@@ -2950,14 +2947,14 @@ class _CanvasPageState extends State<CanvasPage>
       _file!.storageNotebook = saved;
       filePath = savedPath;
 
-      if (storage.id == localNotebookStorage.id)
-        await RecentFiles.remember(
-          path: savedPath,
-          name: _file!.title!,
-          preview: _file!.previewImage,
-          modified: DateTime.now(),
-          currentPage: currentPage,
-        );
+      await RecentFiles.remember(
+        path: savedPath,
+        name: _file!.title!,
+        preview: _file!.previewImage,
+        modified: DateTime.now(),
+        currentPage: currentPage,
+        backendId: storage.id,
+      );
 
       if (_revision == savedRevision) {
         await _removeDraft();

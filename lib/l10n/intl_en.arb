@@ -1,4 +1,5 @@
 {
+  "recentBackendUnavailable": "Storage is unavailable. Reconnect the original account and folder.",
   "nextcloudNotConnected": "Not connected",
   "nextcloudDisconnect": "Disconnect",
   "nextcloudAddress": "Nextcloud server address",

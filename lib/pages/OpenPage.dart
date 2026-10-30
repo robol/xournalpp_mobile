@@ -15,6 +15,7 @@ import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NextcloudManager.dart';
+import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
@@ -553,11 +554,30 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       path: _decodeFileInfoForDisplay(fileInfo['path']),
       modified: _formatModifiedForDisplay(context, fileInfo['modified']),
       preview: fileInfo['preview']?.toString(),
-      onLongPress: () => showDeleteDialog(fileInfo['path']),
+      onLongPress: () =>
+          showDeleteDialog(fileInfo['path'], backendId: fileInfo['backendId']),
       onOpen: () async {
         try {
           final initialPage = _currentPageFromRecentFile(fileInfo);
           final file = await runWithLoadingFileDialog(context, () async {
+            final backendId = fileInfo['backendId'] as String?;
+            if (backendId != null && backendId != localNotebookStorage.id) {
+              await NextcloudManager.restore();
+              final backend = notebookStorageBackends
+                  .where((storage) => storage.id == backendId)
+                  .firstOrNull;
+              if (backend == null)
+                throw StateError(S.of(context).recentBackendUnavailable);
+              return XppFile.openStoredNotebook(
+                backend,
+                StoredNotebook(
+                  backendId: backendId,
+                  id: fileInfo['path'],
+                  name: fileInfo['name'],
+                ),
+                showMissingFileDialog,
+              );
+            }
             return XppFile.fromXppPickedFile(
               await XppPickedFile.fromInternalPath(path: fileInfo['path']),
               (percent) {},
@@ -630,6 +650,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
   Future<void> _showSavedNotebooks({NotebookStorage? initialBackend}) async {
     NotebookStorage selected = initialBackend ?? localNotebookStorage;
+    var folder = <String>[];
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -658,15 +679,25 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                       .toList(),
                   onChanged: (backend) {
                     if (backend != null)
-                      setDialogState(() => selected = backend);
+                      setDialogState(() {
+                        selected = backend;
+                        folder = [];
+                      });
                   },
                 ),
                 Flexible(
                   child: ValueListenableBuilder<int>(
                     valueListenable: LocalNotebookStorage.changes,
-                    builder: (context, _, __) => FutureBuilder<List<StoredNotebook>>(
-                      key: ValueKey(selected.id),
-                      future: selected.list(),
+                    builder: (context, _, __) => FutureBuilder<NextcloudFolderListing>(
+                      key: ValueKey('${selected.id}:${jsonEncode(folder)}'),
+                      future: selected is NextcloudStorage
+                          ? (selected as NextcloudStorage).listFolder(folder)
+                          : selected.list().then(
+                              (items) => NextcloudFolderListing(
+                                folders: const [],
+                                notebooks: items.reversed.toList(),
+                              ),
+                            ),
                       builder: (context, snapshot) {
                         if (snapshot.hasError)
                           return Text(
@@ -676,14 +707,46 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
-                        final entries = snapshot.data!.reversed.toList();
-                        if (entries.isEmpty)
+                        final entries = snapshot.data!.notebooks;
+                        final folders = snapshot.data!.folders;
+                        if (entries.isEmpty &&
+                            folders.isEmpty &&
+                            folder.isEmpty)
                           return Text(S.of(context).noSavedNotebooks);
                         return ListView.builder(
                           shrinkWrap: true,
-                          itemCount: entries.length,
+                          itemCount:
+                              entries.length +
+                              folders.length +
+                              (folder.isEmpty ? 0 : 1),
                           itemBuilder: (context, index) {
-                            final entry = entries[index];
+                            if (folder.isNotEmpty) {
+                              if (index == 0)
+                                return ListTile(
+                                  leading: const Icon(Icons.arrow_upward),
+                                  title: Text(
+                                    S.of(context).nextcloudParentFolder,
+                                  ),
+                                  onTap: () => setDialogState(
+                                    () => folder = folder.sublist(
+                                      0,
+                                      folder.length - 1,
+                                    ),
+                                  ),
+                                );
+                              index--;
+                            }
+                            if (index < folders.length) {
+                              final name = folders[index];
+                              return ListTile(
+                                leading: const Icon(Icons.folder_outlined),
+                                title: Text(name),
+                                onTap: () => setDialogState(
+                                  () => folder = [...folder, name],
+                                ),
+                              );
+                            }
+                            final entry = entries[index - folders.length];
                             return ListTile(
                               title: Text(entry.name),
                               trailing: selected != localNotebookStorage
@@ -788,7 +851,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return int.tryParse(page?.toString() ?? '') ?? 0;
   }
 
-  showDeleteDialog(String path) {
+  showDeleteDialog(String path, {String? backendId}) {
     var deleteFile = false;
     showDialog(
       context: context,
@@ -800,7 +863,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(S.of(context).areYouSureToDeleteTheSelectedFileThisCannot),
-                if (XppPickedFile.canDelete(path: path))
+                if ((backendId == null ||
+                        backendId == localNotebookStorage.id) &&
+                    XppPickedFile.canDelete(path: path))
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(S.of(context).alsoDeleteFile),
@@ -820,7 +885,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               onPressed: () async {
                 try {
                   if (deleteFile) await XppPickedFile.delete(path: path);
-                  await RecentFiles.forget(path);
+                  await RecentFiles.forget(path, backendId: backendId);
                 } catch (error) {
                   if (!context.mounted) return;
                   Navigator.of(context).pop();

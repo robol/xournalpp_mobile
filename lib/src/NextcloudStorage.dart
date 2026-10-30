@@ -8,7 +8,7 @@ import 'package:xml/xml.dart';
 import 'package:xournalpp/src/NextcloudConnection.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 
-/// Flat WebDAV storage. Notebook references encode the server-side filename.
+/// WebDAV storage rooted at the configured folder.
 class NextcloudStorage implements NotebookStorage {
   NextcloudStorage(this.credentials, this.folder, {http.Client? client})
     : _client = client ?? http.Client();
@@ -23,7 +23,35 @@ class NextcloudStorage implements NotebookStorage {
   Uri get _directory => credentials.server.resolve(
     'remote.php/dav/files/${Uri.encodeComponent(credentials.username)}/${folder.map(Uri.encodeComponent).join('/')}${folder.isEmpty ? '' : '/'}',
   );
-  Uri _url(String name) {
+  Uri _folderUrl(List<String> parts) {
+    for (final part in parts) {
+      if (part.isEmpty ||
+          part == '.' ||
+          part == '..' ||
+          part.contains('/') ||
+          part.contains('\\')) {
+        throw const FormatException('Invalid WebDAV folder name');
+      }
+    }
+    return parts.isEmpty
+        ? _directory
+        : Uri.parse(
+            '${_directory.toString()}${parts.map(Uri.encodeComponent).join('/')}/',
+          );
+  }
+
+  List<String> _notebookParts(String notebookId) {
+    final parts = notebookId.split('/');
+    if (parts.any(
+      (part) =>
+          part.isEmpty || part == '.' || part == '..' || part.contains('\\'),
+    )) {
+      throw const FormatException('Invalid notebook identifier');
+    }
+    return parts;
+  }
+
+  Uri _url(String name, {List<String> folder = const []}) {
     if (name.isEmpty ||
         name == '.' ||
         name == '..' ||
@@ -31,7 +59,7 @@ class NextcloudStorage implements NotebookStorage {
         name.contains('\\')) {
       throw const FormatException('Invalid WebDAV file name');
     }
-    return _directory.resolve(Uri.encodeComponent(name));
+    return _folderUrl(folder).resolve(Uri.encodeComponent(name));
   }
 
   String get _authorization =>
@@ -67,9 +95,14 @@ class NextcloudStorage implements NotebookStorage {
   }) async {
     if (existing != null && existing.backendId != id)
       throw ArgumentError('Wrong storage backend');
-    final filename =
-        existing?.id ??
-        (name.toLowerCase().endsWith('.xopp') ? name : '$name.xopp');
+    final parts = existing == null ? <String>[] : _notebookParts(existing.id);
+    final parent = parts.isEmpty
+        ? <String>[]
+        : parts.sublist(0, parts.length - 1);
+    final filename = parts.isEmpty
+        ? (name.toLowerCase().endsWith('.xopp') ? name : '$name.xopp')
+        : parts.last;
+    final notebookId = [...parent, filename].join('/');
     if (filename.isEmpty ||
         filename.contains('/') ||
         filename.contains('\\') ||
@@ -82,13 +115,16 @@ class NextcloudStorage implements NotebookStorage {
       final resourceName = '.xournalpp-pdf-${sha256.convert(content)}.pdf';
       final upload = await _request(
         'PUT',
-        _url(resourceName),
+        _url(resourceName, folder: parent),
         headers: {'Content-Type': 'application/pdf', 'If-None-Match': '*'},
         body: content,
       );
       _check(upload, 'Could not save background PDF', [200, 201, 204, 412]);
       if (upload.statusCode == 412) {
-        final existingPdf = await _request('GET', _url(resourceName));
+        final existingPdf = await _request(
+          'GET',
+          _url(resourceName, folder: parent),
+        );
         _check(existingPdf, 'Could not verify background PDF', [200]);
         if (sha256.convert(existingPdf.bodyBytes) != sha256.convert(content)) {
           throw const FormatException(
@@ -106,13 +142,16 @@ class NextcloudStorage implements NotebookStorage {
     final manifestName = '.xournalpp-map-${sha256.convert(manifest)}.json';
     final manifestUpload = await _request(
       'PUT',
-      _url(manifestName),
+      _url(manifestName, folder: parent),
       headers: {'Content-Type': 'application/json', 'If-None-Match': '*'},
       body: manifest,
     );
     _check(manifestUpload, 'Could not save PDF mapping', [200, 201, 204, 412]);
     if (manifestUpload.statusCode == 412) {
-      final existingManifest = await _request('GET', _url(manifestName));
+      final existingManifest = await _request(
+        'GET',
+        _url(manifestName, folder: parent),
+      );
       _check(existingManifest, 'Could not verify PDF mapping', [200]);
       if (sha256.convert(existingManifest.bodyBytes) !=
           sha256.convert(manifest)) {
@@ -122,13 +161,17 @@ class NextcloudStorage implements NotebookStorage {
     xml.rootElement.setAttribute('xournalpp-mobile-pdf-map', manifestName);
     final updated = const GZipEncoder().encode(utf8.encode(xml.toXmlString()));
     final temporary = '.xournalpp-upload-${sha256.convert(updated)}.tmp';
-    final upload = await _request('PUT', _url(temporary), body: updated);
+    final upload = await _request(
+      'PUT',
+      _url(temporary, folder: parent),
+      body: updated,
+    );
     _check(upload, 'Could not upload notebook', [200, 201, 204]);
     final move = await _request(
       'MOVE',
-      _url(temporary),
+      _url(temporary, folder: parent),
       headers: {
-        'Destination': _url(filename).toString(),
+        'Destination': _url(filename, folder: parent).toString(),
         'Overwrite': existing == null ? 'F' : 'T',
       },
     );
@@ -136,14 +179,16 @@ class NextcloudStorage implements NotebookStorage {
       throw NextcloudNameConflict(filename);
     }
     _check(move, 'Could not publish notebook', [201, 204]);
-    _manifests[filename] = mappings;
-    return StoredNotebook(backendId: id, id: filename, name: name);
+    _manifests[notebookId] = mappings;
+    return StoredNotebook(backendId: id, id: notebookId, name: name);
   }
 
   @override
   Future<Uint8List> readNotebook(StoredNotebook notebook) async {
     if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
-    final response = await _request('GET', _url(notebook.id));
+    final parts = _notebookParts(notebook.id);
+    final parent = parts.sublist(0, parts.length - 1);
+    final response = await _request('GET', _url(parts.last, folder: parent));
     _check(response, 'Could not read notebook', [200]);
     final bytes = response.bodyBytes;
     final xml = XmlDocument.parse(
@@ -153,7 +198,7 @@ class NextcloudStorage implements NotebookStorage {
     if (name != null) {
       if (!RegExp(r'^\.xournalpp-map-[0-9a-f]{64}\.json$').hasMatch(name))
         throw const FormatException('Invalid PDF mapping');
-      final response = await _request('GET', _url(name));
+      final response = await _request('GET', _url(name, folder: parent));
       _check(response, 'Could not read PDF mapping', [200]);
       if (sha256.convert(response.bodyBytes).toString() !=
           name.substring(15, 79))
@@ -176,7 +221,11 @@ class NextcloudStorage implements NotebookStorage {
     if (name == null ||
         !RegExp(r'^\.xournalpp-pdf-[0-9a-f]{64}\.pdf$').hasMatch(name))
       throw StateError('Background PDF is unavailable');
-    final response = await _request('GET', _url(name));
+    final parts = _notebookParts(notebook.id);
+    final response = await _request(
+      'GET',
+      _url(name, folder: parts.sublist(0, parts.length - 1)),
+    );
     _check(response, 'Could not read background PDF', [200]);
     if (sha256.convert(response.bodyBytes).toString() != name.substring(15, 79))
       throw const FormatException('PDF integrity check failed');
@@ -184,27 +233,30 @@ class NextcloudStorage implements NotebookStorage {
   }
 
   @override
-  Future<List<StoredNotebook>> list() async {
+  Future<List<StoredNotebook>> list() async =>
+      (await listFolder(const [])).notebooks;
+
+  Future<NextcloudFolderListing> listFolder(List<String> folder) async {
+    final directory = _folderUrl(folder);
     final response = await _request(
       'PROPFIND',
-      _directory,
+      directory,
       headers: {'Depth': '1', 'Content-Type': 'application/xml'},
       body: utf8.encode(
         '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>',
       ),
     );
     _check(response, 'Could not list notebooks', [207]);
-    final root = _directory.pathSegments.where((s) => s.isNotEmpty).toList();
+    final root = directory.pathSegments.where((s) => s.isNotEmpty).toList();
     final results = <StoredNotebook>[];
+    final folders = <String>[];
     for (final item
         in XmlDocument.parse(response.body).descendants
             .whereType<XmlElement>()
             .where((e) => e.name.local == 'response')) {
       final hrefs = item.findAllElements('href', namespaceUri: 'DAV:');
-      if (hrefs.isEmpty ||
-          item.findAllElements('collection', namespaceUri: 'DAV:').isNotEmpty)
-        continue;
-      final uri = _directory.resolve(hrefs.first.innerText);
+      if (hrefs.isEmpty) continue;
+      final uri = directory.resolve(hrefs.first.innerText);
       if (uri.scheme != credentials.server.scheme ||
           uri.host != credentials.server.host ||
           uri.port != credentials.server.port)
@@ -214,21 +266,43 @@ class NextcloudStorage implements NotebookStorage {
           !root.asMap().entries.every((e) => parts[e.key] == e.value))
         continue;
       final filename = parts.last;
+      if (filename == '.' ||
+          filename == '..' ||
+          filename.contains('/') ||
+          filename.contains('\\'))
+        continue;
+      if (item.findAllElements('collection', namespaceUri: 'DAV:').isNotEmpty) {
+        folders.add(filename);
+        continue;
+      }
       if (!filename.toLowerCase().endsWith('.xopp')) continue;
       results.add(
         StoredNotebook(
           backendId: id,
-          id: filename,
+          id: [...folder, filename].join('/'),
           name: filename.substring(0, filename.length - 5),
         ),
       );
     }
-    return results;
+    folders.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    results.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return NextcloudFolderListing(folders: folders, notebooks: results);
   }
 
   @override
   Future<void> forget(StoredNotebook notebook) async =>
       throw UnsupportedError('Remote notebooks cannot be forgotten');
+}
+
+class NextcloudFolderListing {
+  const NextcloudFolderListing({
+    required this.folders,
+    required this.notebooks,
+  });
+  final List<String> folders;
+  final List<StoredNotebook> notebooks;
 }
 
 class NextcloudNameConflict implements Exception {

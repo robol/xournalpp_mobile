@@ -158,6 +158,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "pdf": MessageLookupByLibrary.simpleMessage("PDF"),
     "pen": MessageLookupByLibrary.simpleMessage("Caneta"),
     "quota": MessageLookupByLibrary.simpleMessage("Cota"),
+    "recentBackendUnavailable": MessageLookupByLibrary.simpleMessage(
+      "O armazenamento não está disponível. Reconecte a conta e a pasta originais.",
+    ),
     "recentFiles": MessageLookupByLibrary.simpleMessage("Arquivos recentes"),
     "recoveryDiscard": MessageLookupByLibrary.simpleMessage(
       "Descartar rascunho",

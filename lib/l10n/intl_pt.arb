@@ -1,4 +1,5 @@
 {
+  "recentBackendUnavailable": "O armazenamento não está disponível. Reconecte a conta e a pasta originais.",
   "nextcloudNotConnected": "Não conectado",
   "nextcloudDisconnect": "Desconectar",
   "nextcloudAddress": "Endereço do servidor Nextcloud",

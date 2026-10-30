@@ -2,11 +2,15 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NextcloudConnection.dart';
+import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
 class _OtherStorage implements NotebookStorage {
@@ -19,6 +23,48 @@ class _OtherStorage implements NotebookStorage {
 }
 
 void main() {
+  testWidgets('Nextcloud browser navigates into and out of folders', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final client = MockClient((request) async {
+      final nested = request.url.path.contains('/Class/');
+      final href = nested
+          ? '<d:response><d:href>/remote.php/dav/files/user/Notes/Class/note.xopp</d:href><d:propstat><d:prop><d:resourcetype/></d:prop></d:propstat></d:response>'
+          : '<d:response><d:href>/remote.php/dav/files/user/Notes/Class/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response>';
+      return http.Response(
+        '<d:multistatus xmlns:d="DAV:">$href</d:multistatus>',
+        207,
+      );
+    });
+    final backend = NextcloudStorage(
+      NextcloudCredentials(
+        server: NextcloudConnection.serverUri('https://cloud.example'),
+        username: 'user',
+        password: 'secret',
+      ),
+      ['Notes'],
+      client: client,
+    );
+    notebookStorageBackends.add(backend);
+    addTearDown(() {
+      notebookStorageBackends.remove(backend);
+      client.close();
+    });
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nextcloud'));
+    await tester.pumpAndSettle();
+    expect(find.text('Class'), findsOneWidget);
+    await tester.tap(find.text('Class'));
+    await tester.pumpAndSettle();
+    expect(find.text('note'), findsOneWidget);
+    await tester.tap(find.text('Parent folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Class'), findsOneWidget);
+  });
   testWidgets('open chooses a backend when more than one is available', (
     tester,
   ) async {

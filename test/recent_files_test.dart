@@ -4,17 +4,137 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:xournalpp/generated/l10n.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
+class _RecentBackend implements NotebookStorage {
+  _RecentBackend(this.bytes);
+  final Uint8List bytes;
+  int reads = 0;
+  @override
+  String get id => 'test-account';
+  @override
+  Future<Uint8List> readNotebook(StoredNotebook notebook) async {
+    reads++;
+    return bytes;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
+  test(
+    'recent entries are scoped by backend and retain independent positions',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      await RecentFiles.remember(
+        path: 'same.xopp',
+        name: 'Local',
+        currentPage: 1,
+      );
+      await RecentFiles.remember(
+        path: 'same.xopp',
+        name: 'Cloud',
+        currentPage: 2,
+        backendId: 'account-a',
+      );
+      await RecentFiles.remember(
+        path: 'same.xopp',
+        name: 'Other cloud',
+        currentPage: 3,
+        backendId: 'account-b',
+      );
+      await RecentFiles.updatePage('same.xopp', 4, backendId: 'account-a');
+      final prefs = await SharedPreferences.getInstance();
+      final entries =
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+      expect(entries, hasLength(3));
+      expect(
+        entries.singleWhere(
+          (e) => e['backendId'] == 'account-a',
+        )['currentPage'],
+        4,
+      );
+      await RecentFiles.forget('same.xopp', backendId: 'account-a');
+      final remaining =
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+      expect(remaining, hasLength(2));
+      expect(remaining.any((e) => e['backendId'] == 'account-b'), isTrue);
+    },
+  );
+
+  testWidgets('recent cloud notebook reopens with its backend', (tester) async {
+    final original = XppFile.empty(title: 'Cloud notebook')
+      ..previewImage = kTransparentImage;
+    final backend = _RecentBackend(original.toUint8List()!);
+    notebookStorageBackends.add(backend);
+    addTearDown(() => notebookStorageBackends.remove(backend));
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.kRecentFiles: jsonEncode([
+        {
+          'path': 'notes.xopp',
+          'name': 'Cloud notebook',
+          'backendId': backend.id,
+          'currentPage': 0,
+        },
+      ]),
+    });
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cloud notebook'));
+    await tester.pump();
+    for (var i = 0; i < 30 && find.byType(CanvasPage).evaluate().isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+    expect(backend.reads, 1);
+    expect(find.byType(CanvasPage), findsOneWidget);
+  });
+  testWidgets('opening a cloud notebook adds it to recents', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final file = XppFile.empty(title: 'Cloud notebook')
+      ..previewImage = kTransparentImage;
+    final backend = _RecentBackend(file.toUint8List()!);
+    file.storage = backend;
+    file.storageNotebook = StoredNotebook(
+      backendId: backend.id,
+      id: 'cloud.xopp',
+      name: 'Cloud notebook',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(file: file, filePath: 'cloud.xopp'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    final entries =
+        jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!) as List;
+    expect(entries.single['backendId'], backend.id);
+    expect(entries.single['path'], 'cloud.xopp');
+  });
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(

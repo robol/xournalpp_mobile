@@ -159,6 +159,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "pdf": MessageLookupByLibrary.simpleMessage("PDF"),
     "pen": MessageLookupByLibrary.simpleMessage("Stift"),
     "quota": MessageLookupByLibrary.simpleMessage("Speicher"),
+    "recentBackendUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Der Speicher ist nicht verfügbar. Verbinden Sie das ursprüngliche Konto und den Ordner erneut.",
+    ),
     "recentFiles": MessageLookupByLibrary.simpleMessage(
       "Zuletzt verwendete Dokumente",
     ),

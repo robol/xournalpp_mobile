@@ -11,6 +11,78 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 
 void main() {
   test(
+    'lists folders and opens and saves nested notebooks in their folder',
+    () async {
+      final objects = <String, Uint8List>{};
+      final requests = <String>[];
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        requests.add('${request.method} $path');
+        if (request.method == 'PROPFIND') {
+          return http.Response(
+            '''<d:multistatus xmlns:d="DAV:"><d:response><d:href>/next/remote.php/dav/files/user/Notes/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response><d:response><d:href>/next/remote.php/dav/files/user/Notes/Class%20A/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop></d:propstat></d:response><d:response><d:href>/next/remote.php/dav/files/user/Notes/Class%20A/lesson.xopp</d:href><d:propstat><d:prop><d:resourcetype/></d:prop></d:propstat></d:response></d:multistatus>''',
+            207,
+          );
+        }
+        if (request.method == 'PUT') {
+          objects[path] = request.bodyBytes;
+          return http.Response('', 201);
+        }
+        if (request.method == 'MOVE') {
+          objects[Uri.parse(request.headers['Destination']!).path] = objects
+              .remove(path)!;
+          return http.Response('', 201);
+        }
+        if (request.method == 'GET')
+          return objects.containsKey(path)
+              ? http.Response.bytes(objects[path]!, 200)
+              : http.Response('', 404);
+        return http.Response('', 500);
+      });
+      final credentials = NextcloudCredentials(
+        server: NextcloudConnection.serverUri('https://cloud.example/next'),
+        username: 'user',
+        password: 'secret',
+      );
+      final storage = NextcloudStorage(credentials, ['Notes'], client: client);
+      final listing = await storage.listFolder([]);
+      expect(listing.folders, ['Class A']);
+      expect(listing.notebooks, isEmpty);
+      final nested = StoredNotebook(
+        backendId: storage.id,
+        id: 'Class A/lesson.xopp',
+        name: 'lesson',
+      );
+      final bytes = Uint8List.fromList(
+        const GZipEncoder().encode(utf8.encode('<xournal/>')),
+      );
+      final result = (await storage.save(
+        bytes: bytes,
+        name: 'lesson',
+        existing: nested,
+        pdfs: [
+          NotebookPdfResource(
+            reference: 'source.pdf',
+            read: () async => Uint8List.fromList([1, 2]),
+          ),
+        ],
+      ))!;
+      expect(result.id, 'Class A/lesson.xopp');
+      final reopened = NextcloudStorage(credentials, ['Notes'], client: client);
+      await reopened.readNotebook(result);
+      expect(await reopened.readPdf(result, 'source.pdf'), [1, 2]);
+      expect(
+        requests.any(
+          (path) => path.startsWith(
+            'PUT /next/remote.php/dav/files/user/Notes/Class%20A/.xournalpp-pdf-',
+          ),
+        ),
+        isTrue,
+      );
+      await expectLater(storage.listFolder(['..']), throwsFormatException);
+    },
+  );
+  test(
     'saves and reopens a notebook with PDF companions without paths',
     () async {
       final objects = <String, Uint8List>{};

@@ -55,6 +55,16 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Storage is unavailable. Reconnect the original account and folder.`
+  String get recentBackendUnavailable {
+    return Intl.message(
+      'Storage is unavailable. Reconnect the original account and folder.',
+      name: 'recentBackendUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Not connected`
   String get nextcloudNotConnected {
     return Intl.message(
