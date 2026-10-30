@@ -20,7 +20,10 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'en';
 
-  static String m0(date) => "Last modified: ${date}";
+  static String m0(name) =>
+      "An unsaved draft of ${name} was found. Recover it?";
+
+  static String m1(date) => "Last modified: ${date}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -119,6 +122,19 @@ class MessageLookup extends MessageLookupByLibrary {
     "pen": MessageLookupByLibrary.simpleMessage("Pen"),
     "quota": MessageLookupByLibrary.simpleMessage("Storage"),
     "recentFiles": MessageLookupByLibrary.simpleMessage("Recent files"),
+    "recoveryDiscard": MessageLookupByLibrary.simpleMessage("Discard draft"),
+    "recoveryLater": MessageLookupByLibrary.simpleMessage("Later"),
+    "recoveryLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not check for recovery drafts.",
+    ),
+    "recoveryMessage": m0,
+    "recoveryOpen": MessageLookupByLibrary.simpleMessage("Recover"),
+    "recoverySaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not save a recovery draft. Save your work manually.",
+    ),
+    "recoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Recover unsaved work?",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Ruled"),
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Save as..."),
@@ -184,7 +200,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
       "Your workspace is ready",
     ),
-    "workspaceModified": m0,
+    "workspaceModified": m1,
     "workspaceOpen": MessageLookupByLibrary.simpleMessage("Open Document"),
     "workspaceRecents": MessageLookupByLibrary.simpleMessage(
       "Recent Notebooks & Documents",

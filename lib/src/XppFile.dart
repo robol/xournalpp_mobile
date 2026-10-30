@@ -616,7 +616,7 @@ class XppFile {
   Future<Uint8List> toUint8ListAsync() {
     final snapshot = XppFile(
       previewImage: previewImage == null
-          ? null
+          ? kTransparentImage
           : Uint8List.fromList(previewImage!),
       pages: pages?.map((page) {
         final background = page.background;

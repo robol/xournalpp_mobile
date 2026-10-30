@@ -55,6 +55,66 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Could not check for recovery drafts.`
+  String get recoveryLoadFailed {
+    return Intl.message(
+      'Could not check for recovery drafts.',
+      name: 'recoveryLoadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not save a recovery draft. Save your work manually.`
+  String get recoverySaveFailed {
+    return Intl.message(
+      'Could not save a recovery draft. Save your work manually.',
+      name: 'recoverySaveFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recover unsaved work?`
+  String get recoveryTitle {
+    return Intl.message(
+      'Recover unsaved work?',
+      name: 'recoveryTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `An unsaved draft of {name} was found. Recover it?`
+  String recoveryMessage(String name) {
+    return Intl.message(
+      'An unsaved draft of $name was found. Recover it?',
+      name: 'recoveryMessage',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Later`
+  String get recoveryLater {
+    return Intl.message('Later', name: 'recoveryLater', desc: '', args: []);
+  }
+
+  /// `Discard draft`
+  String get recoveryDiscard {
+    return Intl.message(
+      'Discard draft',
+      name: 'recoveryDiscard',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Recover`
+  String get recoveryOpen {
+    return Intl.message('Recover', name: 'recoveryOpen', desc: '', args: []);
+  }
+
   /// `Shapes`
   String get shapes {
     return Intl.message('Shapes', name: 'shapes', desc: '', args: []);
