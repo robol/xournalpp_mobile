@@ -19,6 +19,8 @@ import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
 class _RecentBackend implements NotebookStorage {
+  @override
+  String? get iconAsset => null;
   _RecentBackend(this.bytes);
   final Uint8List bytes;
   int reads = 0;

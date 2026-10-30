@@ -10,6 +10,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
+import 'package:xournalpp/widgets/StorageProviderLabel.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
@@ -573,6 +574,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         final id when id.startsWith('gdrive:') => 'Google Drive',
         final id => id,
       },
+      providerIcon: storageIconForBackendId(fileInfo['backendId'] as String?),
       onLongPress: () =>
           showDeleteDialog(fileInfo['path'], backendId: fileInfo['backendId']),
       onOpen: () async {
@@ -654,8 +656,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               .map(
                 (backend) => SimpleDialogOption(
                   onPressed: () => Navigator.pop(dialogContext, backend),
-                  child: Text(
-                    backend == localNotebookStorage
+                  child: StorageProviderLabel(
+                    iconAsset: backend.iconAsset,
+                    label: backend == localNotebookStorage
                         ? S.of(dialogContext).localStorage
                         : backend.id.startsWith('nextcloud:')
                         ? 'Nextcloud'
@@ -697,16 +700,15 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                       .map(
                         (backend) => DropdownMenuItem(
                           value: backend,
-                          child: Text(
-                            backend == localNotebookStorage
+                          child: StorageProviderLabel(
+                            iconAsset: backend.iconAsset,
+                            label: backend == localNotebookStorage
                                 ? S.of(context).localStorage
                                 : backend.id.startsWith('nextcloud:')
                                 ? 'Nextcloud'
                                 : backend is GoogleDriveStorage
                                 ? 'Google Drive'
                                 : backend.id,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       )

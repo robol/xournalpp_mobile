@@ -30,6 +30,7 @@ import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/StorageProviderLabel.dart';
 import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
@@ -1569,8 +1570,9 @@ class _CanvasPageState extends State<CanvasPage>
                               .map(
                                 (backend) => DropdownMenuItem(
                                   value: backend,
-                                  child: Text(
-                                    backend.id == localNotebookStorage.id
+                                  child: StorageProviderLabel(
+                                    iconAsset: backend.iconAsset,
+                                    label: backend.id == localNotebookStorage.id
                                         ? S.of(context).localStorage
                                         : backend is NextcloudStorage
                                         ? 'Nextcloud'
@@ -2837,8 +2839,9 @@ class _CanvasPageState extends State<CanvasPage>
                 .map(
                   (backend) => SimpleDialogOption(
                     onPressed: () => Navigator.pop(dialogContext, backend),
-                    child: Text(
-                      backend.id == localNotebookStorage.id
+                    child: StorageProviderLabel(
+                      iconAsset: backend.iconAsset,
+                      label: backend.id == localNotebookStorage.id
                           ? S.of(dialogContext).localStorage
                           : backend is NextcloudStorage
                           ? 'Nextcloud'

@@ -11,6 +11,8 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 
 /// WebDAV storage rooted at the configured folder.
 class NextcloudStorage implements NotebookStorage {
+  @override
+  String? get iconAsset => 'assets/storage/nextcloud.png';
   NextcloudStorage(this.credentials, this.folder, {http.Client? client})
     : _client = client ?? http.Client();
   final NextcloudCredentials credentials;

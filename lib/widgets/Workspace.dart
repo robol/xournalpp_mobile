@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:xournalpp/generated/l10n.dart';
+import 'package:xournalpp/widgets/StorageProviderLabel.dart';
 
 class WorkspaceActions extends StatelessWidget {
   final VoidCallback onNew, onOpen, onImport;
@@ -115,6 +116,7 @@ class DocumentCard extends StatelessWidget {
   final String name, path, modified;
   final String? preview;
   final String? provider;
+  final String? providerIcon;
   final VoidCallback onOpen, onLongPress;
   const DocumentCard({
     super.key,
@@ -123,6 +125,7 @@ class DocumentCard extends StatelessWidget {
     required this.modified,
     this.preview,
     this.provider,
+    this.providerIcon,
     required this.onOpen,
     required this.onLongPress,
   });
@@ -180,10 +183,10 @@ class DocumentCard extends StatelessWidget {
                 if (provider != null) ...[
                   const SizedBox(width: 6),
                   Flexible(
-                    child: Text(
-                      provider!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: StorageProviderLabel(
+                      label: provider!,
+                      iconAsset: providerIcon,
+                      iconSize: 16,
                       style: TextStyle(
                         fontSize: 10,
                         color: Theme.of(context).colorScheme.primary,

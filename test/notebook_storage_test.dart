@@ -11,6 +11,8 @@ import 'package:xournalpp/src/XppFile.dart';
 
 class MemoryStorage implements NotebookStorage {
   @override
+  String? get iconAsset => null;
+  @override
   String get id => 'memory';
   Uint8List? notebook;
   final pdfs = <String, Uint8List>{};

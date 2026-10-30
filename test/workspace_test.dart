@@ -18,6 +18,8 @@ import 'package:xournalpp/widgets/Workspace.dart';
 
 class _OtherStorage implements NotebookStorage {
   @override
+  String? get iconAsset => null;
+  @override
   String get id => 'test storage';
   @override
   Future<List<StoredNotebook>> list() async => [];
@@ -26,6 +28,8 @@ class _OtherStorage implements NotebookStorage {
 }
 
 class _LoadingStorage implements NotebookStorage {
+  @override
+  String? get iconAsset => null;
   final Completer<Uint8List> download = Completer<Uint8List>();
   @override
   String get id => 'loading storage';
@@ -62,6 +66,18 @@ void main() {
     expect(
       tester.widget<DocumentCard>(find.byType(DocumentCard).at(0)).provider,
       'Google Drive',
+    );
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(0)).providerIcon,
+      'assets/storage/google-drive.png',
+    );
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(1)).providerIcon,
+      'assets/storage/nextcloud.png',
+    );
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(2)).providerIcon,
+      'assets/storage/local.png',
     );
     expect(
       tester.widget<DocumentCard>(find.byType(DocumentCard).at(1)).provider,
@@ -171,6 +187,16 @@ void main() {
     await tester.pumpAndSettle();
     tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
     await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/storage/google-drive.png',
+      ),
+      findsWidgets,
+    );
     await tester.tap(find.text('Google Drive'));
     await tester.pumpAndSettle();
     expect(find.text('Class'), findsOneWidget);

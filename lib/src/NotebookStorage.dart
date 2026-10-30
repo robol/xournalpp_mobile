@@ -32,6 +32,9 @@ class NotebookPdfResource {
 /// Null means the user cancelled destination selection; errors must be thrown.
 abstract interface class NotebookStorage {
   String get id;
+
+  /// Optional bundled asset identifying this provider.
+  String? get iconAsset;
   Future<StoredNotebook?> save({
     required Uint8List bytes,
     required String name,
@@ -50,6 +53,8 @@ class LocalNotebookStorage implements NotebookStorage {
   static Future<void>? _pending;
   @override
   String get id => 'local';
+  @override
+  String? get iconAsset => 'assets/storage/local.png';
 
   @override
   Future<StoredNotebook?> save({
@@ -144,3 +149,14 @@ final localNotebookStorage = LocalNotebookStorage();
 
 /// Providers offered when choosing where to save a notebook.
 final List<NotebookStorage> notebookStorageBackends = [localNotebookStorage];
+
+/// Keeps icons for known providers visible even when their account is offline.
+String? storageIconForBackendId(String? id) {
+  if (id == null || id == 'local') return localNotebookStorage.iconAsset;
+  if (id.startsWith('nextcloud:')) return 'assets/storage/nextcloud.png';
+  if (id.startsWith('gdrive:')) return 'assets/storage/google-drive.png';
+  return notebookStorageBackends
+      .where((backend) => backend.id == id)
+      .firstOrNull
+      ?.iconAsset;
+}

@@ -88,6 +88,16 @@ void main() {
     expect(title, anyOf(nameFor(before), nameFor(after)));
     expect(find.text('Storage location'), findsOneWidget);
     expect(find.text('Local storage'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/storage/local.png',
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Cancel'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

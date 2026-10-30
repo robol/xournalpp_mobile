@@ -9,6 +9,8 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 
 /// Drive storage uses opaque Drive file IDs and a caller-supplied OAuth token.
 class GoogleDriveStorage implements NotebookStorage {
+  @override
+  String? get iconAsset => 'assets/storage/google-drive.png';
   GoogleDriveStorage({
     required this.accountId,
     required this.folderId,
