@@ -3,7 +3,7 @@ description: A port of the main features of Xournal++ to various Flutter platfor
 
 publish_to: none
 
-version: 4.2.22+63
+version: 4.2.23+64
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -39,6 +39,7 @@ dependencies:
   http: ^1.6.0
   flutter_secure_storage: ^11.2.0
   crypto: ^3.0.8
+  google_sign_in: ^7.2.0
 dev_dependencies:
   flutter_test:
     sdk:

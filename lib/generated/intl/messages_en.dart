@@ -82,6 +82,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "forkedBy": MessageLookupByLibrary.simpleMessage(
       "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
     ),
+    "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
+      "Connect Google Drive",
+    ),
+    "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Connected"),
     "graph": MessageLookupByLibrary.simpleMessage("Graph"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Highlighter"),
     "home": MessageLookupByLibrary.simpleMessage("Home"),

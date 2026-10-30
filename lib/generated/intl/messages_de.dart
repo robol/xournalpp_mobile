@@ -79,6 +79,10 @@ class MessageLookup extends MessageLookupByLibrary {
       "Fehler beim Öffnen der Datei",
     ),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Entfernen"),
+    "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
+      "Google Drive verbinden",
+    ),
+    "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Verbunden"),
     "graph": MessageLookupByLibrary.simpleMessage("Zeichnen"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Textmarker"),
     "home": MessageLookupByLibrary.simpleMessage("Startseite"),

@@ -11,6 +11,7 @@ import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NextcloudConnection.dart';
 import 'package:xournalpp/src/NextcloudStorage.dart';
+import 'package:xournalpp/src/GoogleDriveStorage.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
 class _OtherStorage implements NotebookStorage {
@@ -23,6 +24,59 @@ class _OtherStorage implements NotebookStorage {
 }
 
 void main() {
+  testWidgets('Google Drive browser navigates folders by Drive ID', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final client = MockClient((request) async {
+      final query = request.url.queryParameters['q'] ?? '';
+      final nested = query.contains("'child-id'");
+      return http.Response(
+        jsonEncode({
+          'files': nested
+              ? [
+                  {
+                    'id': 'note-id',
+                    'name': 'note.xopp',
+                    'mimeType': 'application/octet-stream',
+                  },
+                ]
+              : [
+                  {
+                    'id': 'child-id',
+                    'name': 'Class',
+                    'mimeType': 'application/vnd.google-apps.folder',
+                  },
+                ],
+        }),
+        200,
+      );
+    });
+    final backend = GoogleDriveStorage(
+      accountId: 'test-account',
+      folderId: 'root-id',
+      accessToken: () async => 'token',
+      client: client,
+    );
+    notebookStorageBackends.add(backend);
+    addTearDown(() {
+      notebookStorageBackends.remove(backend);
+      client.close();
+    });
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Google Drive'));
+    await tester.pumpAndSettle();
+    expect(find.text('Class'), findsOneWidget);
+    await tester.tap(find.text('Class'));
+    await tester.pumpAndSettle();
+    expect(find.text('note'), findsOneWidget);
+    await tester.tap(find.text('Parent folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Class'), findsOneWidget);
+  });
   testWidgets('Nextcloud browser navigates into and out of folders', (
     tester,
   ) async {

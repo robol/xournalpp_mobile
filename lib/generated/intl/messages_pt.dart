@@ -79,6 +79,10 @@ class MessageLookup extends MessageLookupByLibrary {
       "Erro abrindo arquivo",
     ),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Esquecer"),
+    "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
+      "Conectar ao Google Drive",
+    ),
+    "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Conectado"),
     "graph": MessageLookupByLibrary.simpleMessage("Gráfico"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Marcador"),
     "home": MessageLookupByLibrary.simpleMessage("Início"),

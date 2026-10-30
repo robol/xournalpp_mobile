@@ -16,11 +16,19 @@ import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NextcloudManager.dart';
 import 'package:xournalpp/src/NextcloudStorage.dart';
+import 'package:xournalpp/src/GoogleDriveManager.dart';
+import 'package:xournalpp/src/GoogleDriveStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
+
+class _StorageListing {
+  const _StorageListing(this.folders, this.notebooks);
+  final List<({String id, String name})> folders;
+  final List<StoredNotebook> notebooks;
+}
 
 class OpenPage extends StatefulWidget {
   final dynamic initialExternalIntent;
@@ -67,6 +75,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     unawaited(
       NextcloudManager.restore().catchError((Object error) {
         debugPrint('Could not restore Nextcloud: $error');
+      }),
+    );
+    unawaited(
+      GoogleDriveManager.restore().catchError((Object error) {
+        debugPrint('Could not restore Google Drive: $error');
       }),
     );
     _loadRecentFiles();
@@ -562,7 +575,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           final file = await runWithLoadingFileDialog(context, () async {
             final backendId = fileInfo['backendId'] as String?;
             if (backendId != null && backendId != localNotebookStorage.id) {
-              await NextcloudManager.restore();
+              if (backendId.startsWith('nextcloud:'))
+                await NextcloudManager.restore();
+              if (backendId.startsWith('gdrive:'))
+                await GoogleDriveManager.restore();
               final backend = notebookStorageBackends
                   .where((storage) => storage.id == backendId)
                   .firstOrNull;
@@ -616,6 +632,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       );
       return;
     }
+    try {
+      await GoogleDriveManager.restore();
+    } catch (error) {
+      debugPrint('Could not restore Google Drive: $error');
+    }
     if (!mounted) return;
     NotebookStorage? selected = localNotebookStorage;
     if (notebookStorageBackends.length > 1) {
@@ -632,6 +653,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                         ? S.of(dialogContext).localStorage
                         : backend.id.startsWith('nextcloud:')
                         ? 'Nextcloud'
+                        : backend is GoogleDriveStorage
+                        ? 'Google Drive'
                         : backend.id,
                   ),
                 ),
@@ -672,6 +695,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                 ? S.of(context).localStorage
                                 : backend.id.startsWith('nextcloud:')
                                 ? 'Nextcloud'
+                                : backend is GoogleDriveStorage
+                                ? 'Google Drive'
                                 : backend.id,
                           ),
                         ),
@@ -688,14 +713,42 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                 Flexible(
                   child: ValueListenableBuilder<int>(
                     valueListenable: LocalNotebookStorage.changes,
-                    builder: (context, _, __) => FutureBuilder<NextcloudFolderListing>(
+                    builder: (context, _, __) => FutureBuilder<_StorageListing>(
                       key: ValueKey('${selected.id}:${jsonEncode(folder)}'),
                       future: selected is NextcloudStorage
-                          ? (selected as NextcloudStorage).listFolder(folder)
+                          ? (selected as NextcloudStorage)
+                                .listFolder(folder)
+                                .then(
+                                  (result) => _StorageListing(
+                                    result.folders
+                                        .map((name) => (id: name, name: name))
+                                        .toList(),
+                                    result.notebooks,
+                                  ),
+                                )
+                          : selected is GoogleDriveStorage
+                          ? (selected as GoogleDriveStorage)
+                                .listFolder(
+                                  folder.isEmpty
+                                      ? (selected as GoogleDriveStorage)
+                                            .folderId
+                                      : folder.last,
+                                )
+                                .then(
+                                  (result) => _StorageListing(
+                                    result.folders
+                                        .map(
+                                          (item) =>
+                                              (id: item.id, name: item.name),
+                                        )
+                                        .toList(),
+                                    result.notebooks,
+                                  ),
+                                )
                           : selected.list().then(
-                              (items) => NextcloudFolderListing(
-                                folders: const [],
-                                notebooks: items.reversed.toList(),
+                              (items) => _StorageListing(
+                                const [],
+                                items.reversed.toList(),
                               ),
                             ),
                       builder: (context, snapshot) {
@@ -737,12 +790,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                               index--;
                             }
                             if (index < folders.length) {
-                              final name = folders[index];
+                              final item = folders[index];
                               return ListTile(
                                 leading: const Icon(Icons.folder_outlined),
-                                title: Text(name),
+                                title: Text(item.name),
                                 onTap: () => setDialogState(
-                                  () => folder = [...folder, name],
+                                  () => folder = [...folder, item.id],
                                 ),
                               );
                             }

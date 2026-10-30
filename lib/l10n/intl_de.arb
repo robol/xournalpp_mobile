@@ -1,4 +1,6 @@
 {
+  "googleDriveConnected": "Verbunden",
+  "googleDriveConnect": "Google Drive verbinden",
   "recentBackendUnavailable": "Der Speicher ist nicht verfügbar. Verbinden Sie das ursprüngliche Konto und den Ordner erneut.",
   "nextcloudNotConnected": "Nicht verbunden",
   "nextcloudDisconnect": "Verbindung trennen",

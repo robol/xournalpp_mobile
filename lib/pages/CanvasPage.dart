@@ -10,6 +10,7 @@ import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NextcloudStorage.dart';
+import 'package:xournalpp/src/GoogleDriveStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -1573,6 +1574,8 @@ class _CanvasPageState extends State<CanvasPage>
                                         ? S.of(context).localStorage
                                         : backend is NextcloudStorage
                                         ? 'Nextcloud'
+                                        : backend is GoogleDriveStorage
+                                        ? 'Google Drive'
                                         : backend.id,
                                   ),
                                 ),
@@ -2839,6 +2842,8 @@ class _CanvasPageState extends State<CanvasPage>
                           ? S.of(dialogContext).localStorage
                           : backend is NextcloudStorage
                           ? 'Nextcloud'
+                          : backend is GoogleDriveStorage
+                          ? 'Google Drive'
                           : backend.id,
                     ),
                   ),
@@ -2902,14 +2907,23 @@ class _CanvasPageState extends State<CanvasPage>
         saved = existing == null
             ? await pending
             : await pending.timeout(_saveOverwriteTimeout);
-      } on NextcloudNameConflict catch (conflict) {
+      } catch (conflict) {
+        if (conflict is! NextcloudNameConflict &&
+            conflict is! GoogleDriveNameConflict)
+          rethrow;
+        final filename = conflict is NextcloudNameConflict
+            ? conflict.filename
+            : (conflict as GoogleDriveNameConflict).filename;
+        final existingId = conflict is NextcloudNameConflict
+            ? conflict.filename
+            : (conflict as GoogleDriveNameConflict).fileId;
         if (!mounted) return false;
         final replace = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text(S.of(context).nextcloudReplaceTitle),
             content: Text(
-              '${S.of(context).nextcloudReplaceMessage}\n${conflict.filename}',
+              '${S.of(context).nextcloudReplaceMessage}\n$filename',
             ),
             actions: [
               TextButton(
@@ -2927,7 +2941,7 @@ class _CanvasPageState extends State<CanvasPage>
           saved = await performSave(
             StoredNotebook(
               backendId: storage.id,
-              id: conflict.filename,
+              id: existingId,
               name: _file!.title!,
             ),
           );

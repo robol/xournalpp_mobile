@@ -55,6 +55,26 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Connected`
+  String get googleDriveConnected {
+    return Intl.message(
+      'Connected',
+      name: 'googleDriveConnected',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connect Google Drive`
+  String get googleDriveConnect {
+    return Intl.message(
+      'Connect Google Drive',
+      name: 'googleDriveConnect',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Storage is unavailable. Reconnect the original account and folder.`
   String get recentBackendUnavailable {
     return Intl.message(
