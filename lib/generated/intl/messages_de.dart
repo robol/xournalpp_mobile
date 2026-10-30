@@ -92,6 +92,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "lined": MessageLookupByLibrary.simpleMessage("Liniert"),
     "loadingFile": MessageLookupByLibrary.simpleMessage("Lade Datei..."),
+    "localStorage": MessageLookupByLibrary.simpleMessage("Lokaler Speicher"),
     "mb": MessageLookupByLibrary.simpleMessage("MB"),
     "mobileEditionUnofficial": MessageLookupByLibrary.simpleMessage(
       "offizielle Mobil-App",
@@ -110,6 +111,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "noRecentFiles": MessageLookupByLibrary.simpleMessage(
       "Keine zuletzt verwendeten Dateien.",
+    ),
+    "noSavedNotebooks": MessageLookupByLibrary.simpleMessage(
+      "Noch keine gespeicherten Notizbücher.",
     ),
     "notImplemented": MessageLookupByLibrary.simpleMessage(
       " (nicht implementiert)",
@@ -144,9 +148,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "recoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Ungespeicherte Arbeit wiederherstellen?",
     ),
+    "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
+      "Aus gespeicherten Notizbüchern entfernen",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Liniert mit Rand"),
     "save": MessageLookupByLibrary.simpleMessage("Speichern"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Speichern unter..."),
+    "savedNotebooks": MessageLookupByLibrary.simpleMessage(
+      "Gespeicherte Notizbücher",
+    ),
     "savingFile": MessageLookupByLibrary.simpleMessage("Speichere Datei..."),
     "selectColor": MessageLookupByLibrary.simpleMessage("Farbe wählen"),
     "selectNotImplemented": MessageLookupByLibrary.simpleMessage(
@@ -170,6 +180,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Quellcode"),
+    "storageBackend": MessageLookupByLibrary.simpleMessage("Speicherort"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stiftstärke:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Druckempfindlichkeit des Eingabestifts",

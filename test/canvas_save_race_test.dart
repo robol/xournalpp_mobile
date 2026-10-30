@@ -86,6 +86,8 @@ void main() {
         .controller!
         .text;
     expect(title, anyOf(nameFor(before), nameFor(after)));
+    expect(find.text('Storage location'), findsOneWidget);
+    expect(find.text('Local storage'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

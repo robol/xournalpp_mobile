@@ -94,6 +94,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "loadingFile": MessageLookupByLibrary.simpleMessage(
       "Carregando arquivo...",
     ),
+    "localStorage": MessageLookupByLibrary.simpleMessage("Armazenamento local"),
     "mb": MessageLookupByLibrary.simpleMessage("MB"),
     "mobileEditionUnofficial": MessageLookupByLibrary.simpleMessage(
       "Aplicativo móvel oficial",
@@ -110,6 +111,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "noRecentFiles": MessageLookupByLibrary.simpleMessage(
       "Nenhum arquivo recente.",
+    ),
+    "noSavedNotebooks": MessageLookupByLibrary.simpleMessage(
+      "Ainda não há cadernos salvos.",
     ),
     "notImplemented": MessageLookupByLibrary.simpleMessage(
       " (Não implementado)",
@@ -143,9 +147,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "recoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Recuperar trabalho não salvo?",
     ),
+    "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
+      "Remover dos cadernos salvos",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Com linhas e margem"),
     "save": MessageLookupByLibrary.simpleMessage("Salvar"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Salvar como..."),
+    "savedNotebooks": MessageLookupByLibrary.simpleMessage("Cadernos salvos"),
     "savingFile": MessageLookupByLibrary.simpleMessage("Salvando arquivo..."),
     "selectColor": MessageLookupByLibrary.simpleMessage("Selecionar cor"),
     "selectNotImplemented": MessageLookupByLibrary.simpleMessage(
@@ -171,6 +179,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Reduzir pontos em novos traços para poupar espaço.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Código Fonte"),
+    "storageBackend": MessageLookupByLibrary.simpleMessage(
+      "Local de armazenamento",
+    ),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Grossura da linha:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Sensibilidade à pressão da caneta",

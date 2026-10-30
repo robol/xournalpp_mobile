@@ -95,6 +95,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "lined": MessageLookupByLibrary.simpleMessage("Lined"),
     "loadingFile": MessageLookupByLibrary.simpleMessage("Loading file..."),
+    "localStorage": MessageLookupByLibrary.simpleMessage("Local storage"),
     "mb": MessageLookupByLibrary.simpleMessage("MB"),
     "mobileEditionUnofficial": MessageLookupByLibrary.simpleMessage(
       "official mobile app",
@@ -108,6 +109,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "newTitle": MessageLookupByLibrary.simpleMessage("New title"),
     "noFileSelected": MessageLookupByLibrary.simpleMessage("No file selected"),
     "noRecentFiles": MessageLookupByLibrary.simpleMessage("No recent files."),
+    "noSavedNotebooks": MessageLookupByLibrary.simpleMessage(
+      "No saved notebooks yet.",
+    ),
     "notImplemented": MessageLookupByLibrary.simpleMessage(
       " (not implemented)",
     ),
@@ -135,9 +139,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "recoveryTitle": MessageLookupByLibrary.simpleMessage(
       "Recover unsaved work?",
     ),
+    "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
+      "Remove from saved notebooks",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Ruled"),
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Save as..."),
+    "savedNotebooks": MessageLookupByLibrary.simpleMessage("Saved notebooks"),
     "savingFile": MessageLookupByLibrary.simpleMessage("Saving file..."),
     "selectColor": MessageLookupByLibrary.simpleMessage("Select color"),
     "selectNotImplemented": MessageLookupByLibrary.simpleMessage(
@@ -159,6 +167,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Reduce points in newly drawn strokes to save space.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Source Code"),
+    "storageBackend": MessageLookupByLibrary.simpleMessage("Storage location"),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stroke width:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Stylus pressure sensitivity",

@@ -8,6 +8,7 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -289,7 +290,11 @@ class _CanvasPageState extends State<CanvasPage>
   Future<void> _rememberOpenedFile() async {
     final path = filePath;
     final file = _file;
-    if (path == null || path.isEmpty || file == null) return;
+    if (path == null ||
+        path.isEmpty ||
+        file == null ||
+        (file.storage != null && file.storage!.id != localNotebookStorage.id))
+      return;
     try {
       await RecentFiles.remember(
         path: path,
@@ -305,7 +310,11 @@ class _CanvasPageState extends State<CanvasPage>
 
   void _rememberCurrentPage() {
     final path = filePath;
-    if (path == null || path.isEmpty) return;
+    if (path == null ||
+        path.isEmpty ||
+        (_file?.storage != null &&
+            _file!.storage!.id != localNotebookStorage.id))
+      return;
     unawaited(
       RecentFiles.updatePage(path, currentPage).catchError((Object error) {
         debugPrint('Could not remember document position: $error');
@@ -559,7 +568,7 @@ class _CanvasPageState extends State<CanvasPage>
   void _setMetadata() {
     _file = widget.file;
     _pageGeometry = null;
-    filePath = widget.filePath;
+    filePath = widget.filePath ?? widget.file?.storageNotebook?.id;
     currentPage = widget.initialPage
         .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
         .toInt();
@@ -1520,7 +1529,10 @@ class _CanvasPageState extends State<CanvasPage>
     }
   }
 
-  Future<bool> _showTitleDialog() async {
+  Future<bool> _showTitleDialog({
+    ValueChanged<NotebookStorage>? onStorageChanged,
+    NotebookStorage? selectedStorage,
+  }) async {
     final now = DateTime.now();
     final suggestedTitle =
         '${now.year.toString().padLeft(4, '0')}-'
@@ -1532,35 +1544,68 @@ class _CanvasPageState extends State<CanvasPage>
             TextEditingController titleController = TextEditingController(
               text: _file!.title ?? suggestedTitle,
             );
-            return AlertDialog(
-              title: Text(S.of(context).setDocumentTitle),
-              content: Padding(
-                padding: const EdgeInsets.only(left: 8, right: 8),
-                child: TextField(
-                  autofocus: true,
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: S.of(context).newTitle,
+            return StatefulBuilder(
+              builder: (context, setDialogState) => AlertDialog(
+                title: Text(S.of(context).setDocumentTitle),
+                content: Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        autofocus: true,
+                        controller: titleController,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: S.of(context).newTitle,
+                        ),
+                      ),
+                      if (onStorageChanged != null)
+                        DropdownButtonFormField<NotebookStorage>(
+                          initialValue: selectedStorage,
+                          decoration: InputDecoration(
+                            labelText: S.of(context).storageBackend,
+                          ),
+                          items: notebookStorageBackends
+                              .map(
+                                (backend) => DropdownMenuItem(
+                                  value: backend,
+                                  child: Text(
+                                    backend.id == localNotebookStorage.id
+                                        ? S.of(context).localStorage
+                                        : backend.id,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null)
+                              setDialogState(() {
+                                selectedStorage = value;
+                                onStorageChanged(value);
+                              });
+                          },
+                        ),
+                    ],
                   ),
                 ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(S.of(context).cancel),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _file!.title = titleController.text;
+                        _markDirty();
+                      });
+                      Navigator.of(context).pop(true);
+                    },
+                    child: Text(S.of(context).apply),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(S.of(context).cancel),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _file!.title = titleController.text;
-                      _markDirty();
-                    });
-                    Navigator.of(context).pop(true);
-                  },
-                  child: Text(S.of(context).apply),
-                ),
-              ],
             );
           },
         ) ??
@@ -2707,15 +2752,7 @@ class _CanvasPageState extends State<CanvasPage>
     final pdfBytes = await exportPdfDocument(
       _file!,
       pdfResolver: (background) async {
-        final filename = background.filename;
-        if (filename != null && filename.isNotEmpty) {
-          try {
-            return await XppPickedFile.fromInternalPath(path: filename);
-          } catch (_) {
-            // Fall through to the missing-file callback below.
-          }
-        }
-        return background.onUnavailable(context, filename);
+        return _file!.readBackgroundPdf(context, background);
       },
     );
     final title = _file?.title ?? S.of(context).newFile;
@@ -2772,8 +2809,12 @@ class _CanvasPageState extends State<CanvasPage>
       ),
     );
     try {
+      var storage = _file!.storage ?? localNotebookStorage;
       if (_file!.title == null) {
-        final titleApplied = await _showTitleDialog();
+        final titleApplied = await _showTitleDialog(
+          selectedStorage: storage,
+          onStorageChanged: (value) => storage = value,
+        );
         if (!titleApplied || _file!.title == null) {
           if (mounted) {
             savingSnackBar.close();
@@ -2784,21 +2825,76 @@ class _CanvasPageState extends State<CanvasPage>
           }
           return false;
         }
+      } else if (saveAs || filePath == null) {
+        final selected = await showDialog<NotebookStorage>(
+          context: context,
+          builder: (dialogContext) => SimpleDialog(
+            title: Text(S.of(dialogContext).storageBackend),
+            children: notebookStorageBackends
+                .map(
+                  (backend) => SimpleDialogOption(
+                    onPressed: () => Navigator.pop(dialogContext, backend),
+                    child: Text(
+                      backend.id == localNotebookStorage.id
+                          ? S.of(dialogContext).localStorage
+                          : backend.id,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        );
+        if (selected == null || !mounted) {
+          if (mounted) {
+            savingSnackBar.close();
+            scaffoldMessenger.removeCurrentSnackBar();
+            setState(() => savingFile = false);
+          }
+          return false;
+        }
+        storage = selected;
       }
-      String path = _file!.title! + '.xopp';
       _file!.previewImage = kIsWeb
           ? kTransparentImage
           : await _currentPagePng();
       final savedRevision = _revision;
+      final backgrounds = <String, XppBackgroundPdf>{};
+      for (final page in _file!.pages ?? <XppPage>[]) {
+        final background = page.background;
+        if (background is XppBackgroundPdf && background.filename != null) {
+          backgrounds.putIfAbsent(background.filename!, () => background);
+        }
+      }
       final bytes = await _file!.toUint8ListAsync();
       if (!mounted) return false;
-      final file = XppPickedFile(bytes, fileExtension: 'xopp', path: path);
-      final savedPath = !saveAs && filePath != null
-          ? await file
-                .saveToPath(path: filePath!)
-                .timeout(_saveOverwriteTimeout)
-          : await file.exportToStorage();
-      if (savedPath == null) {
+      final pendingSave = storage.save(
+        bytes: bytes,
+        name: _file!.title!,
+        existing: !saveAs && filePath != null
+            ? StoredNotebook(
+                backendId: storage.id,
+                id: filePath!,
+                name: _file!.title!,
+              )
+            : null,
+        pdfs: backgrounds.entries
+            .map(
+              (entry) => NotebookPdfResource(
+                reference: entry.key,
+                read: () async {
+                  return (await _file!.readBackgroundPdf(
+                    context,
+                    entry.value,
+                  )).bytes;
+                },
+              ),
+            )
+            .toList(),
+      );
+      final saved = !saveAs && filePath != null
+          ? await pendingSave.timeout(_saveOverwriteTimeout)
+          : await pendingSave;
+      if (saved == null) {
         if (mounted) {
           savingSnackBar.close();
           scaffoldMessenger.removeCurrentSnackBar();
@@ -2808,15 +2904,19 @@ class _CanvasPageState extends State<CanvasPage>
         }
         return false;
       }
+      final savedPath = saved.id;
+      _file!.storage = storage;
+      _file!.storageNotebook = saved;
       filePath = savedPath;
 
-      await RecentFiles.remember(
-        path: savedPath,
-        name: _file!.title!,
-        preview: _file!.previewImage,
-        modified: DateTime.now(),
-        currentPage: currentPage,
-      );
+      if (storage.id == localNotebookStorage.id)
+        await RecentFiles.remember(
+          path: savedPath,
+          name: _file!.title!,
+          preview: _file!.previewImage,
+          modified: DateTime.now(),
+          currentPage: currentPage,
+        );
 
       if (_revision == savedRevision) {
         await _removeDraft();

@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart' show compute;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:flutter/material.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xml/xml.dart';
@@ -28,6 +29,50 @@ import 'XppPage.dart';
 
 class XppFile {
   XppFile({this.title, this.pages, this.previewImage});
+
+  NotebookStorage? storage;
+  StoredNotebook? storageNotebook;
+
+  static Future<XppFile> openStoredNotebook(
+    NotebookStorage storage,
+    StoredNotebook notebook,
+    FileNotAvailableCallback onUnavailable,
+  ) async {
+    if (notebook.backendId != storage.id)
+      throw ArgumentError('Notebook belongs to a different storage backend');
+    final bytes = await storage.readNotebook(notebook);
+    final file = await fromXppPickedFile(
+      XppPickedFile(bytes, fileName: notebook.name, fileExtension: 'xopp'),
+      null,
+      onUnavailable,
+    );
+    file.storage = storage;
+    file.storageNotebook = notebook;
+    return file;
+  }
+
+  Future<XppPickedFile> readBackgroundPdf(
+    BuildContext context,
+    XppBackgroundPdf background,
+  ) async {
+    final filename = background.filename;
+    if (storage != null && storageNotebook != null && filename != null) {
+      try {
+        final bytes = await storage!.readPdf(storageNotebook!, filename);
+        return XppPickedFile(bytes, fileName: filename, fileExtension: 'pdf');
+      } catch (_) {
+        if (!context.mounted) rethrow;
+        return background.onUnavailable(context, filename);
+      }
+    }
+    if (filename != null && filename.isNotEmpty) {
+      try {
+        return await XppPickedFile.fromInternalPath(path: filename);
+      } catch (_) {}
+    }
+    if (!context.mounted) throw StateError('PDF recovery owner was disposed.');
+    return background.onUnavailable(context, filename);
+  }
 
   // Successful snapshots live with this notebook, not the global renderer.
   // Reopening a notebook resolves fresh bytes. Failed lookups remain retryable.
@@ -61,9 +106,10 @@ class XppFile {
       late final Future<PdfBackgroundRenderSource> pending;
       pending = service
           .sourceForPath(
-            background.filename,
-            fallback: () =>
-                background.onUnavailable(context, background.filename),
+            storage != null ? null : background.filename,
+            fallback: () => storage == null
+                ? background.onUnavailable(context, background.filename)
+                : readBackgroundPdf(context, background),
             isCurrent: () => context.mounted,
           )
           .catchError((Object error, StackTrace stack) {

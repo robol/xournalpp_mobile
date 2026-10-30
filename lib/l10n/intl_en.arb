@@ -1,4 +1,9 @@
 {
+  "storageBackend": "Storage location",
+  "localStorage": "Local storage",
+  "savedNotebooks": "Saved notebooks",
+  "noSavedNotebooks": "No saved notebooks yet.",
+  "removeSavedNotebook": "Remove from saved notebooks",
   "recoveryLoadFailed": "Could not check for recovery drafts.",
   "recoverySaveFailed": "Could not save a recovery draft. Save your work manually.",
   "recoveryTitle": "Recover unsaved work?",

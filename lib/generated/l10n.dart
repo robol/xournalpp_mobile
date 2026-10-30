@@ -55,6 +55,56 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Storage location`
+  String get storageBackend {
+    return Intl.message(
+      'Storage location',
+      name: 'storageBackend',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Local storage`
+  String get localStorage {
+    return Intl.message(
+      'Local storage',
+      name: 'localStorage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Saved notebooks`
+  String get savedNotebooks {
+    return Intl.message(
+      'Saved notebooks',
+      name: 'savedNotebooks',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No saved notebooks yet.`
+  String get noSavedNotebooks {
+    return Intl.message(
+      'No saved notebooks yet.',
+      name: 'noSavedNotebooks',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Remove from saved notebooks`
+  String get removeSavedNotebook {
+    return Intl.message(
+      'Remove from saved notebooks',
+      name: 'removeSavedNotebook',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Could not check for recovery drafts.`
   String get recoveryLoadFailed {
     return Intl.message(

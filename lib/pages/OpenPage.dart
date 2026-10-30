@@ -13,6 +13,7 @@ import 'package:xournalpp/widgets/Workspace.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
@@ -234,6 +235,13 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       drawer: MainDrawer(),
       appBar: AppBar(
         title: const Text('Xournal++ Mobile'),
+        actions: [
+          IconButton(
+            tooltip: S.of(context).savedNotebooks,
+            icon: const Icon(Icons.folder_outlined),
+            onPressed: _showSavedNotebooks,
+          ),
+        ],
         leading: Builder(
           builder: (context) => IconButton(
             tooltip: S.of(context).openNavigation,
@@ -570,6 +578,92 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           );
         }
       },
+    );
+  }
+
+  Future<void> _showSavedNotebooks() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.of(context).savedNotebooks),
+        content: SizedBox(
+          width: 440,
+          child: ValueListenableBuilder<int>(
+            valueListenable: LocalNotebookStorage.changes,
+            builder: (context, _, __) => FutureBuilder<List<StoredNotebook>>(
+              future: localNotebookStorage.list(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError)
+                  return Text(
+                    '${S.of(context).errorOpeningFile}${snapshot.error}',
+                  );
+                if (!snapshot.hasData)
+                  return const Center(child: CircularProgressIndicator());
+                final entries = snapshot.data!.reversed.toList();
+                if (entries.isEmpty)
+                  return Text(S.of(context).noSavedNotebooks);
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    return ListTile(
+                      title: Text(entry.name),
+                      trailing: IconButton(
+                        tooltip: S.of(context).removeSavedNotebook,
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: () async {
+                          try {
+                            await localNotebookStorage.forget(entry);
+                          } catch (error) {
+                            if (context.mounted)
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(error.toString())),
+                              );
+                          }
+                        },
+                      ),
+                      onTap: () async {
+                        try {
+                          final file = await XppFile.openStoredNotebook(
+                            localNotebookStorage,
+                            entry,
+                            showMissingFileDialog,
+                          );
+                          if (!dialogContext.mounted || !this.context.mounted)
+                            return;
+                          Navigator.of(dialogContext).pop();
+                          await Navigator.of(this.context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  CanvasPage(file: file, filePath: entry.id),
+                            ),
+                          );
+                        } catch (error) {
+                          if (context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${S.of(context).errorOpeningFile}$error',
+                                ),
+                              ),
+                            );
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(S.of(context).close),
+          ),
+        ],
+      ),
     );
   }
 

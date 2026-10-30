@@ -1,4 +1,9 @@
 {
+  "storageBackend": "Local de armazenamento",
+  "localStorage": "Armazenamento local",
+  "savedNotebooks": "Cadernos salvos",
+  "noSavedNotebooks": "Ainda não há cadernos salvos.",
+  "removeSavedNotebook": "Remover dos cadernos salvos",
   "recoveryLoadFailed": "Não foi possível verificar os rascunhos de recuperação.",
   "recoverySaveFailed": "Não foi possível salvar o rascunho de recuperação. Salve seu trabalho manualmente.",
   "recoveryTitle": "Recuperar trabalho não salvo?",

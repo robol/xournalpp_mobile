@@ -1,4 +1,9 @@
 {
+  "storageBackend": "Speicherort",
+  "localStorage": "Lokaler Speicher",
+  "savedNotebooks": "Gespeicherte Notizbücher",
+  "noSavedNotebooks": "Noch keine gespeicherten Notizbücher.",
+  "removeSavedNotebook": "Aus gespeicherten Notizbüchern entfernen",
   "recoveryLoadFailed": "Wiederherstellungsentwürfe konnten nicht überprüft werden.",
   "recoverySaveFailed": "Der Wiederherstellungsentwurf konnte nicht gespeichert werden. Bitte speichern Sie Ihre Arbeit manuell.",
   "recoveryTitle": "Ungespeicherte Arbeit wiederherstellen?",
