@@ -1,12 +1,69 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
+import 'package:xournalpp/widgets/EditingToolbar.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
 import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 
 void main() {
+  testWidgets('toolbar icon follows the shape chosen in settings', (
+    tester,
+  ) async {
+    var settings = const ShapeSettings();
+    final devices = <PointerDeviceKind?, EditingTool>{null: EditingTool.SHAPE};
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => EditingToolBar(
+              compact: true,
+              deviceMap: devices,
+              getColor: (_) => Colors.black,
+              onNewDeviceMap: (_) {},
+              shapeSettings: settings,
+              onShapeSettingsChanged: (value) =>
+                  setState(() => settings = value),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(
+      tester.widget<ShapeIcon>(find.byType(ShapeIcon)).kind,
+      ShapeKind.line,
+    );
+    await tester.tap(find.byTooltip('Shapes'));
+    await tester.pumpAndSettle();
+    if (find.text('Circle').evaluate().isEmpty) {
+      await tester.tap(find.byTooltip('Shapes'));
+      await tester.pumpAndSettle();
+    }
+    for (final entry in <String, ShapeKind>{
+      'Circle': ShapeKind.circle,
+      'Square': ShapeKind.square,
+      'Ellipse': ShapeKind.ellipse,
+      'Rectangle': ShapeKind.rectangle,
+      'Line': ShapeKind.line,
+    }.entries) {
+      await tester.tap(find.text(entry.key));
+      await tester.pump();
+      expect(
+        tester.widget<ShapeIcon>(find.byType(ShapeIcon)).kind,
+        entry.value,
+      );
+    }
+  });
   testWidgets('pinch cancels a shape without committing it', (tester) async {
     var commits = 0;
     await tester.pumpWidget(

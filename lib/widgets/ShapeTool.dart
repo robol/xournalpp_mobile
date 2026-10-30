@@ -7,6 +7,52 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 
 enum ShapeKind { line, circle, square, ellipse, rectangle }
 
+class ShapeIcon extends StatelessWidget {
+  const ShapeIcon({super.key, required this.kind});
+
+  final ShapeKind kind;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: const Size(24, 24),
+    painter: _ShapeIconPainter(
+      kind,
+      IconTheme.of(context).color ?? Colors.black,
+    ),
+  );
+}
+
+class _ShapeIconPainter extends CustomPainter {
+  const _ShapeIconPainter(this.kind, this.color);
+  final ShapeKind kind;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    final bounds = switch (kind) {
+      ShapeKind.circle || ShapeKind.square => const Rect.fromLTWH(4, 4, 16, 16),
+      _ => const Rect.fromLTWH(3, 7, 18, 10),
+    };
+    switch (kind) {
+      case ShapeKind.line:
+        canvas.drawLine(const Offset(4, 19), const Offset(20, 5), paint);
+      case ShapeKind.circle || ShapeKind.ellipse:
+        canvas.drawOval(bounds, paint);
+      case ShapeKind.square || ShapeKind.rectangle:
+        canvas.drawRect(bounds, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ShapeIconPainter oldDelegate) =>
+      kind != oldDelegate.kind || color != oldDelegate.color;
+}
+
 class ShapeSettings {
   const ShapeSettings({
     this.kind = ShapeKind.line,

@@ -93,7 +93,7 @@ class EditingToolBarState extends State<EditingToolBar> {
           ),
           getInkwellButton(
             EditingTool.SHAPE,
-            Icon(Icons.category_outlined),
+            ShapeIcon(kind: widget.shapeSettings.kind),
             usePrimaryColor: true,
           ),
           // TODO: Currently not implemented

@@ -12,6 +12,7 @@ import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
@@ -126,7 +127,7 @@ void main() {
     expect(
       find.descendant(
         of: toolbar,
-        matching: find.byIcon(Icons.category_outlined),
+        matching: find.byType(ShapeIcon),
       ),
       findsOneWidget,
     );
@@ -170,7 +171,7 @@ void main() {
     expect(
       find.descendant(
         of: toolbar,
-        matching: find.byIcon(Icons.category_outlined),
+        matching: find.byType(ShapeIcon),
       ),
       findsOneWidget,
     );
