@@ -46,6 +46,8 @@ flutter build apk
 
 Android builds require the Android SDK and a compatible JDK. Other targets require their platform-specific Flutter build dependencies.
 
+On Linux, building the Nextcloud credential-storage plugin also requires `libsecret-1-dev`; using Nextcloud requires a running desktop keyring service.
+
 ## Development and tests
 
 Run the analyzer and test suite with:

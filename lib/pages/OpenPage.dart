@@ -14,6 +14,7 @@ import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NextcloudManager.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
@@ -62,6 +63,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     });
 
     RecentFiles.changes.addListener(_loadRecentFiles);
+    unawaited(
+      NextcloudManager.restore().catchError((Object error) {
+        debugPrint('Could not restore Nextcloud: $error');
+      }),
+    );
     _loadRecentFiles();
     super.initState();
   }
@@ -294,8 +300,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                             const SizedBox(height: 28),
                             WorkspaceActions(
                               onNew: _newNotebook,
-                              onOpen: () =>
-                                  XppFile.openAndEdit(context: context),
+                              onOpen: _openNotebook,
                               onImport: _importPdf,
                             ),
                             if (kIsWeb) DropFile(),
@@ -581,88 +586,177 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _showSavedNotebooks() async {
+  Future<void> _openNotebook() async {
+    try {
+      await NextcloudManager.restore();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    NotebookStorage? selected = localNotebookStorage;
+    if (notebookStorageBackends.length > 1) {
+      selected = await showDialog<NotebookStorage>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: Text(S.of(dialogContext).storageBackend),
+          children: notebookStorageBackends
+              .map(
+                (backend) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(dialogContext, backend),
+                  child: Text(
+                    backend == localNotebookStorage
+                        ? S.of(dialogContext).localStorage
+                        : backend.id.startsWith('nextcloud:')
+                        ? 'Nextcloud'
+                        : backend.id,
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+    if (!mounted || selected == null) return;
+    if (selected == localNotebookStorage) {
+      XppFile.openAndEdit(context: context);
+    } else {
+      await _showSavedNotebooks(initialBackend: selected);
+    }
+  }
+
+  Future<void> _showSavedNotebooks({NotebookStorage? initialBackend}) async {
+    NotebookStorage selected = initialBackend ?? localNotebookStorage;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(S.of(context).savedNotebooks),
-        content: SizedBox(
-          width: 440,
-          child: ValueListenableBuilder<int>(
-            valueListenable: LocalNotebookStorage.changes,
-            builder: (context, _, __) => FutureBuilder<List<StoredNotebook>>(
-              future: localNotebookStorage.list(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError)
-                  return Text(
-                    '${S.of(context).errorOpeningFile}${snapshot.error}',
-                  );
-                if (!snapshot.hasData)
-                  return const Center(child: CircularProgressIndicator());
-                final entries = snapshot.data!.reversed.toList();
-                if (entries.isEmpty)
-                  return Text(S.of(context).noSavedNotebooks);
-                return ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: entries.length,
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return ListTile(
-                      title: Text(entry.name),
-                      trailing: IconButton(
-                        tooltip: S.of(context).removeSavedNotebook,
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () async {
-                          try {
-                            await localNotebookStorage.forget(entry);
-                          } catch (error) {
-                            if (context.mounted)
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(error.toString())),
-                              );
-                          }
-                        },
-                      ),
-                      onTap: () async {
-                        try {
-                          final file = await XppFile.openStoredNotebook(
-                            localNotebookStorage,
-                            entry,
-                            showMissingFileDialog,
-                          );
-                          if (!dialogContext.mounted || !this.context.mounted)
-                            return;
-                          Navigator.of(dialogContext).pop();
-                          await Navigator.of(this.context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  CanvasPage(file: file, filePath: entry.id),
-                            ),
-                          );
-                        } catch (error) {
-                          if (context.mounted)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${S.of(context).errorOpeningFile}$error',
-                                ),
-                              ),
-                            );
-                        }
-                      },
-                    );
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(S.of(context).savedNotebooks),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<NotebookStorage>(
+                  value: selected,
+                  items: notebookStorageBackends
+                      .map(
+                        (backend) => DropdownMenuItem(
+                          value: backend,
+                          child: Text(
+                            backend == localNotebookStorage
+                                ? S.of(context).localStorage
+                                : backend.id.startsWith('nextcloud:')
+                                ? 'Nextcloud'
+                                : backend.id,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (backend) {
+                    if (backend != null)
+                      setDialogState(() => selected = backend);
                   },
-                );
-              },
+                ),
+                Flexible(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: LocalNotebookStorage.changes,
+                    builder: (context, _, __) => FutureBuilder<List<StoredNotebook>>(
+                      key: ValueKey(selected.id),
+                      future: selected.list(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError)
+                          return Text(
+                            '${S.of(context).errorOpeningFile}${snapshot.error}',
+                          );
+                        if (!snapshot.hasData)
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        final entries = snapshot.data!.reversed.toList();
+                        if (entries.isEmpty)
+                          return Text(S.of(context).noSavedNotebooks);
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            return ListTile(
+                              title: Text(entry.name),
+                              trailing: selected != localNotebookStorage
+                                  ? null
+                                  : IconButton(
+                                      tooltip: S
+                                          .of(context)
+                                          .removeSavedNotebook,
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                      ),
+                                      onPressed: () async {
+                                        try {
+                                          await selected.forget(entry);
+                                        } catch (error) {
+                                          if (context.mounted)
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(error.toString()),
+                                              ),
+                                            );
+                                        }
+                                      },
+                                    ),
+                              onTap: () async {
+                                try {
+                                  final file = await XppFile.openStoredNotebook(
+                                    selected,
+                                    entry,
+                                    showMissingFileDialog,
+                                  );
+                                  if (!dialogContext.mounted ||
+                                      !this.context.mounted)
+                                    return;
+                                  Navigator.of(dialogContext).pop();
+                                  await Navigator.of(this.context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => CanvasPage(
+                                        file: file,
+                                        filePath: entry.id,
+                                      ),
+                                    ),
+                                  );
+                                } catch (error) {
+                                  if (context.mounted)
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '${S.of(context).errorOpeningFile}$error',
+                                        ),
+                                      ),
+                                    );
+                                }
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(S.of(context).close),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(S.of(context).close),
-          ),
-        ],
       ),
     );
   }

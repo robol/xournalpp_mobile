@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:xournalpp/src/NextcloudManager.dart';
+import 'package:xournalpp/pages/NextcloudSettingsPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/src/globals.dart';
@@ -29,6 +32,41 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          if (!kIsWeb)
+            ValueListenableBuilder<int>(
+              valueListenable: NextcloudManager.changes,
+              builder: (context, _, __) => ListTile(
+                leading: const Icon(Icons.cloud_outlined),
+                title: const Text('Nextcloud'),
+                subtitle: Text(
+                  NextcloudManager.current == null
+                      ? S.of(context).nextcloudNotConnected
+                      : '${NextcloudManager.current!.credentials.server} /${NextcloudManager.current!.folder.join('/')}',
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NextcloudSettingsPage(),
+                  ),
+                ),
+                trailing: NextcloudManager.current == null
+                    ? null
+                    : IconButton(
+                        tooltip: S.of(context).nextcloudDisconnect,
+                        icon: const Icon(Icons.link_off),
+                        onPressed: () async {
+                          try {
+                            await NextcloudManager.disconnect();
+                          } catch (error) {
+                            if (context.mounted)
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(error.toString())),
+                              );
+                          }
+                        },
+                      ),
+              ),
+            ),
           SwitchListTile(
             title: const Text(
               'Draw with stylus only',

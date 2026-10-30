@@ -9,6 +9,7 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -1573,6 +1574,8 @@ class _CanvasPageState extends State<CanvasPage>
                                   child: Text(
                                     backend.id == localNotebookStorage.id
                                         ? S.of(context).localStorage
+                                        : backend is NextcloudStorage
+                                        ? 'Nextcloud'
                                         : backend.id,
                                   ),
                                 ),
@@ -2837,6 +2840,8 @@ class _CanvasPageState extends State<CanvasPage>
                     child: Text(
                       backend.id == localNotebookStorage.id
                           ? S.of(dialogContext).localStorage
+                          : backend is NextcloudStorage
+                          ? 'Nextcloud'
                           : backend.id,
                     ),
                   ),
@@ -2867,33 +2872,69 @@ class _CanvasPageState extends State<CanvasPage>
       }
       final bytes = await _file!.toUint8ListAsync();
       if (!mounted) return false;
-      final pendingSave = storage.save(
-        bytes: bytes,
-        name: _file!.title!,
-        existing: !saveAs && filePath != null
+      final resources = backgrounds.entries
+          .map(
+            (entry) => NotebookPdfResource(
+              reference: entry.key,
+              read: () async {
+                return (await _file!.readBackgroundPdf(
+                  context,
+                  entry.value,
+                )).bytes;
+              },
+            ),
+          )
+          .toList();
+      Future<StoredNotebook?> performSave(StoredNotebook? existing) =>
+          storage.save(
+            bytes: bytes,
+            name: _file!.title!,
+            existing: existing,
+            pdfs: resources,
+          );
+      StoredNotebook? saved;
+      try {
+        final existing = !saveAs && filePath != null
             ? StoredNotebook(
                 backendId: storage.id,
                 id: filePath!,
                 name: _file!.title!,
               )
-            : null,
-        pdfs: backgrounds.entries
-            .map(
-              (entry) => NotebookPdfResource(
-                reference: entry.key,
-                read: () async {
-                  return (await _file!.readBackgroundPdf(
-                    context,
-                    entry.value,
-                  )).bytes;
-                },
+            : null;
+        final pending = performSave(existing);
+        saved = existing == null
+            ? await pending
+            : await pending.timeout(_saveOverwriteTimeout);
+      } on NextcloudNameConflict catch (conflict) {
+        if (!mounted) return false;
+        final replace = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(S.of(context).nextcloudReplaceTitle),
+            content: Text(
+              '${S.of(context).nextcloudReplaceMessage}\n${conflict.filename}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(S.of(context).cancel),
               ),
-            )
-            .toList(),
-      );
-      final saved = !saveAs && filePath != null
-          ? await pendingSave.timeout(_saveOverwriteTimeout)
-          : await pendingSave;
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(S.of(context).nextcloudReplace),
+              ),
+            ],
+          ),
+        );
+        if (replace == true)
+          saved = await performSave(
+            StoredNotebook(
+              backendId: storage.id,
+              id: conflict.filename,
+              name: _file!.title!,
+            ),
+          );
+      }
       if (saved == null) {
         if (mounted) {
           savingSnackBar.close();

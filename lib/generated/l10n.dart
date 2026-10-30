@@ -55,6 +55,116 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Not connected`
+  String get nextcloudNotConnected {
+    return Intl.message(
+      'Not connected',
+      name: 'nextcloudNotConnected',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Disconnect`
+  String get nextcloudDisconnect {
+    return Intl.message(
+      'Disconnect',
+      name: 'nextcloudDisconnect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Nextcloud server address`
+  String get nextcloudAddress {
+    return Intl.message(
+      'Nextcloud server address',
+      name: 'nextcloudAddress',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connect`
+  String get nextcloudConnect {
+    return Intl.message(
+      'Connect',
+      name: 'nextcloudConnect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cancel login`
+  String get nextcloudCancelLogin {
+    return Intl.message(
+      'Cancel login',
+      name: 'nextcloudCancelLogin',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Choose a folder`
+  String get nextcloudChooseFolder {
+    return Intl.message(
+      'Choose a folder',
+      name: 'nextcloudChooseFolder',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Parent folder`
+  String get nextcloudParentFolder {
+    return Intl.message(
+      'Parent folder',
+      name: 'nextcloudParentFolder',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Use this folder`
+  String get nextcloudUseFolder {
+    return Intl.message(
+      'Use this folder',
+      name: 'nextcloudUseFolder',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Replace notebook?`
+  String get nextcloudReplaceTitle {
+    return Intl.message(
+      'Replace notebook?',
+      name: 'nextcloudReplaceTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `A notebook with this name already exists. Replace it?`
+  String get nextcloudReplaceMessage {
+    return Intl.message(
+      'A notebook with this name already exists. Replace it?',
+      name: 'nextcloudReplaceMessage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Replace`
+  String get nextcloudReplace {
+    return Intl.message(
+      'Replace',
+      name: 'nextcloudReplace',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Storage location`
   String get storageBackend {
     return Intl.message(

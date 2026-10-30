@@ -3,7 +3,7 @@ description: A port of the main features of Xournal++ to various Flutter platfor
 
 publish_to: none
 
-version: 4.2.20+61
+version: 4.2.21+62
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -36,6 +36,9 @@ dependencies:
   pdfrx: ^2.4.5
   pdfium_flutter: ^0.4.0
   image: ^4.8.0
+  http: ^1.6.0
+  flutter_secure_storage: ^11.2.0
+  crypto: ^3.0.8
 dev_dependencies:
   flutter_test:
     sdk:

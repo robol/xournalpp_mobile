@@ -107,6 +107,33 @@ class MessageLookup extends MessageLookupByLibrary {
     "newNotebook": MessageLookupByLibrary.simpleMessage("New notebook"),
     "newPageIndex": MessageLookupByLibrary.simpleMessage("New page index"),
     "newTitle": MessageLookupByLibrary.simpleMessage("New title"),
+    "nextcloudAddress": MessageLookupByLibrary.simpleMessage(
+      "Nextcloud server address",
+    ),
+    "nextcloudCancelLogin": MessageLookupByLibrary.simpleMessage(
+      "Cancel login",
+    ),
+    "nextcloudChooseFolder": MessageLookupByLibrary.simpleMessage(
+      "Choose a folder",
+    ),
+    "nextcloudConnect": MessageLookupByLibrary.simpleMessage("Connect"),
+    "nextcloudDisconnect": MessageLookupByLibrary.simpleMessage("Disconnect"),
+    "nextcloudNotConnected": MessageLookupByLibrary.simpleMessage(
+      "Not connected",
+    ),
+    "nextcloudParentFolder": MessageLookupByLibrary.simpleMessage(
+      "Parent folder",
+    ),
+    "nextcloudReplace": MessageLookupByLibrary.simpleMessage("Replace"),
+    "nextcloudReplaceMessage": MessageLookupByLibrary.simpleMessage(
+      "A notebook with this name already exists. Replace it?",
+    ),
+    "nextcloudReplaceTitle": MessageLookupByLibrary.simpleMessage(
+      "Replace notebook?",
+    ),
+    "nextcloudUseFolder": MessageLookupByLibrary.simpleMessage(
+      "Use this folder",
+    ),
     "noFileSelected": MessageLookupByLibrary.simpleMessage("No file selected"),
     "noRecentFiles": MessageLookupByLibrary.simpleMessage("No recent files."),
     "noSavedNotebooks": MessageLookupByLibrary.simpleMessage(

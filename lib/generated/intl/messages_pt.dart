@@ -106,6 +106,33 @@ class MessageLookup extends MessageLookupByLibrary {
     "newNotebook": MessageLookupByLibrary.simpleMessage("Novo caderno"),
     "newPageIndex": MessageLookupByLibrary.simpleMessage("Nova página índice"),
     "newTitle": MessageLookupByLibrary.simpleMessage("Novo título"),
+    "nextcloudAddress": MessageLookupByLibrary.simpleMessage(
+      "Endereço do servidor Nextcloud",
+    ),
+    "nextcloudCancelLogin": MessageLookupByLibrary.simpleMessage(
+      "Cancelar login",
+    ),
+    "nextcloudChooseFolder": MessageLookupByLibrary.simpleMessage(
+      "Escolher uma pasta",
+    ),
+    "nextcloudConnect": MessageLookupByLibrary.simpleMessage("Conectar"),
+    "nextcloudDisconnect": MessageLookupByLibrary.simpleMessage("Desconectar"),
+    "nextcloudNotConnected": MessageLookupByLibrary.simpleMessage(
+      "Não conectado",
+    ),
+    "nextcloudParentFolder": MessageLookupByLibrary.simpleMessage(
+      "Pasta superior",
+    ),
+    "nextcloudReplace": MessageLookupByLibrary.simpleMessage("Substituir"),
+    "nextcloudReplaceMessage": MessageLookupByLibrary.simpleMessage(
+      "Já existe um caderno com este nome. Substituí-lo?",
+    ),
+    "nextcloudReplaceTitle": MessageLookupByLibrary.simpleMessage(
+      "Substituir caderno?",
+    ),
+    "nextcloudUseFolder": MessageLookupByLibrary.simpleMessage(
+      "Usar esta pasta",
+    ),
     "noFileSelected": MessageLookupByLibrary.simpleMessage(
       "Nenhum arquivo selecionado",
     ),

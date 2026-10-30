@@ -6,9 +6,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/main.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/globals.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/widgets/Workspace.dart';
 
+class _OtherStorage implements NotebookStorage {
+  @override
+  String get id => 'test storage';
+  @override
+  Future<List<StoredNotebook>> list() async => [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
+  testWidgets('open chooses a backend when more than one is available', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final backend = _OtherStorage();
+    notebookStorageBackends.add(backend);
+    addTearDown(() => notebookStorageBackends.remove(backend));
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    tester.widget<WorkspaceActions>(find.byType(WorkspaceActions)).onOpen();
+    await tester.pumpAndSettle();
+    expect(find.text('Storage location'), findsOneWidget);
+    expect(find.text('Local storage'), findsOneWidget);
+    expect(find.text('test storage'), findsOneWidget);
+    await tester.tap(find.text('test storage'));
+    await tester.pumpAndSettle();
+    expect(find.text('No saved notebooks yet.'), findsOneWidget);
+    expect(find.byType(CanvasPage), findsNothing);
+  });
   for (final width in [280.0, 390.0, 800.0, 1200.0]) {
     testWidgets('workspace gallery fits $width with large text', (
       tester,

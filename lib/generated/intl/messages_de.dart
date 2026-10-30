@@ -106,6 +106,35 @@ class MessageLookup extends MessageLookupByLibrary {
       "Neue Position der Seite",
     ),
     "newTitle": MessageLookupByLibrary.simpleMessage("Neuer Titel"),
+    "nextcloudAddress": MessageLookupByLibrary.simpleMessage(
+      "Nextcloud-Serveradresse",
+    ),
+    "nextcloudCancelLogin": MessageLookupByLibrary.simpleMessage(
+      "Anmeldung abbrechen",
+    ),
+    "nextcloudChooseFolder": MessageLookupByLibrary.simpleMessage(
+      "Ordner auswählen",
+    ),
+    "nextcloudConnect": MessageLookupByLibrary.simpleMessage("Verbinden"),
+    "nextcloudDisconnect": MessageLookupByLibrary.simpleMessage(
+      "Verbindung trennen",
+    ),
+    "nextcloudNotConnected": MessageLookupByLibrary.simpleMessage(
+      "Nicht verbunden",
+    ),
+    "nextcloudParentFolder": MessageLookupByLibrary.simpleMessage(
+      "Übergeordneter Ordner",
+    ),
+    "nextcloudReplace": MessageLookupByLibrary.simpleMessage("Ersetzen"),
+    "nextcloudReplaceMessage": MessageLookupByLibrary.simpleMessage(
+      "Ein Notizbuch mit diesem Namen existiert bereits. Ersetzen?",
+    ),
+    "nextcloudReplaceTitle": MessageLookupByLibrary.simpleMessage(
+      "Notizbuch ersetzen?",
+    ),
+    "nextcloudUseFolder": MessageLookupByLibrary.simpleMessage(
+      "Diesen Ordner verwenden",
+    ),
     "noFileSelected": MessageLookupByLibrary.simpleMessage(
       "Keine Datei gewählt",
     ),
