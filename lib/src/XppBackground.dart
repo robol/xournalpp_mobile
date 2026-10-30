@@ -741,6 +741,31 @@ class _RasterizedBackgroundKey {
 @visibleForTesting
 typedef RasterizedBackgroundKeyForTest = _RasterizedBackgroundKey;
 
+/// Default Xournal++ ruled-paper geometry, in page points.
+abstract final class XppRuledPaper {
+  static const double header = 80,
+      footer = 60,
+      spacing = 24,
+      width = 0.5,
+      margin = 72;
+
+  static Iterable<double> lines(double height) sync* {
+    for (var y = header; y <= height - footer; y += spacing) {
+      yield y;
+    }
+  }
+
+  static bool isLight(Color? color) {
+    final rgb = (color ?? Colors.white).toARGB32();
+    return ((rgb >> 16) & 255) + ((rgb >> 8) & 255) + (rgb & 255) > 0x180;
+  }
+
+  static Color lineColor(Color? color) =>
+      isLight(color) ? const Color(0xff40a0ff) : const Color(0xff434343);
+  static Color marginColor(Color? color) =>
+      isLight(color) ? const Color(0xffff0080) : const Color(0xff220080);
+}
+
 class _LinePainter extends CustomPainter {
   final Color? color;
 
@@ -748,16 +773,17 @@ class _LinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withValues(alpha: .3)
-      ..strokeWidth = 1;
-    // 1 because no line at the top
-    for (int i = 1; i < size.height / 24; i++) {
-      canvas.drawLine(
-        Offset(0, i * 24.toDouble()),
-        Offset(size.width, i * 24.toDouble()),
-        paint,
-      );
+      ..color = XppRuledPaper.lineColor(color)
+      ..strokeWidth = XppRuledPaper.width;
+    for (final y in XppRuledPaper.lines(size.height)) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
+    paint.color = XppRuledPaper.marginColor(color);
+    canvas.drawLine(
+      const Offset(XppRuledPaper.margin, 0),
+      Offset(XppRuledPaper.margin, size.height),
+      paint,
+    );
   }
 
   @override
@@ -771,15 +797,10 @@ class _RuledPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey[500]!.withValues(alpha: .3)
-      ..strokeWidth = 1;
-    // 1 because no line at the top
-    for (int i = 1; i < size.height / 24; i++) {
-      canvas.drawLine(
-        Offset(0, i * 24.toDouble()),
-        Offset(size.width, i * 24.toDouble()),
-        paint,
-      );
+      ..color = XppRuledPaper.lineColor(color)
+      ..strokeWidth = XppRuledPaper.width;
+    for (final y in XppRuledPaper.lines(size.height)) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
 

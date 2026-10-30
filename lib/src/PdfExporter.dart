@@ -1158,7 +1158,22 @@ String _backgroundCommands(XppPage page, _PdfBox mediaBox) {
 
   if (background is XppBackgroundSolidLined ||
       background is XppBackgroundSolidRuled) {
-    _appendHorizontalLines(buffer, mediaBox, step: 24);
+    buffer.writeln(
+      '${_rgb(XppRuledPaper.lineColor(color))} RG ${_n(XppRuledPaper.width)} w',
+    );
+    for (final y in XppRuledPaper.lines(mediaBox.height)) {
+      final pdfY = mediaBox.top - y;
+      buffer.writeln(
+        '${_n(mediaBox.left)} ${_n(pdfY)} m ${_n(mediaBox.right)} ${_n(pdfY)} l S',
+      );
+    }
+    if (background is XppBackgroundSolidLined) {
+      final x = mediaBox.left + XppRuledPaper.margin;
+      buffer.writeln('${_rgb(XppRuledPaper.marginColor(color))} RG');
+      buffer.writeln(
+        '${_n(x)} ${_n(mediaBox.bottom)} m ${_n(x)} ${_n(mediaBox.top)} l S',
+      );
+    }
   } else if (background is XppBackgroundSolidGraph) {
     final step = XppPageSize.pt2mm(5).toDouble();
     _appendHorizontalLines(buffer, mediaBox, step: step);
