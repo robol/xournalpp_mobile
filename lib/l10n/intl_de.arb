@@ -3,6 +3,8 @@
   "shapeLine": "Linie",
   "shapeCircle": "Kreis",
   "shapeSquare": "Quadrat",
+  "shapeEllipse": "Ellipse",
+  "shapeRectangle": "Rechteck",
   "shapeOutlineColor": "Umrissfarbe",
   "simplifyStrokes": "Stiftstriche vereinfachen",
   "simplifyStrokesDescription": "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",

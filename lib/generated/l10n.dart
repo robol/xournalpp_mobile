@@ -75,6 +75,21 @@ class S {
     return Intl.message('Square', name: 'shapeSquare', desc: '', args: []);
   }
 
+  /// `Ellipse`
+  String get shapeEllipse {
+    return Intl.message('Ellipse', name: 'shapeEllipse', desc: '', args: []);
+  }
+
+  /// `Rectangle`
+  String get shapeRectangle {
+    return Intl.message(
+      'Rectangle',
+      name: 'shapeRectangle',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Outline color`
   String get shapeOutlineColor {
     return Intl.message(

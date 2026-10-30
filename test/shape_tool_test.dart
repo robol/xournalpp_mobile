@@ -54,6 +54,41 @@ void main() {
     );
   });
 
+  test(
+    'rectangle and ellipse follow both drag dimensions in either direction',
+    () {
+      for (final kind in [ShapeKind.rectangle, ShapeKind.ellipse]) {
+        for (final endpoints in [
+          [const Offset(10, 20), const Offset(90, 60)],
+          [const Offset(90, 60), const Offset(10, 20)],
+        ]) {
+          final stroke = shapeStrokes(
+            endpoints[0],
+            endpoints[1],
+            ShapeSettings(kind: kind),
+          ).single;
+          final xs = stroke.points!.map((point) => point.x!).toList()..sort();
+          final ys = stroke.points!.map((point) => point.y!).toList()..sort();
+          expect(xs.first, closeTo(10, .001));
+          expect(xs.last, closeTo(90, .001));
+          expect(ys.first, closeTo(20, .001));
+          expect(ys.last, closeTo(60, .001));
+          expect(stroke.fill, isNull);
+          expect(stroke.points!.first.x, closeTo(stroke.points!.last.x!, .001));
+          expect(stroke.points!.first.y, closeTo(stroke.points!.last.y!, .001));
+        }
+        expect(
+          shapeStrokes(
+            Offset.zero,
+            const Offset(40, 1),
+            ShapeSettings(kind: kind),
+          ),
+          isEmpty,
+        );
+      }
+    },
+  );
+
   for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.stylus]) {
     testWidgets('shape drag commits and cancellation does not ($kind)', (
       tester,

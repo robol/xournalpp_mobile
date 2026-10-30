@@ -5,7 +5,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 
-enum ShapeKind { line, circle, square }
+enum ShapeKind { line, circle, square, ellipse, rectangle }
 
 class ShapeSettings {
   const ShapeSettings({
@@ -32,11 +32,16 @@ List<XppStroke> shapeStrokes(Offset start, Offset end, ShapeSettings settings) {
   if (settings.kind == ShapeKind.line) {
     offsets = [start, end];
   } else {
+    final constrained =
+        settings.kind == ShapeKind.circle || settings.kind == ShapeKind.square;
     final side = math.min(delta.dx.abs(), delta.dy.abs());
     if (side < 2) return [];
-    final other = start + Offset(delta.dx.sign * side, delta.dy.sign * side);
+    final other = constrained
+        ? start + Offset(delta.dx.sign * side, delta.dy.sign * side)
+        : end;
     final rect = Rect.fromPoints(start, other);
-    if (settings.kind == ShapeKind.square) {
+    if (settings.kind == ShapeKind.square ||
+        settings.kind == ShapeKind.rectangle) {
       offsets = [
         rect.topLeft,
         rect.topRight,
@@ -48,7 +53,10 @@ List<XppStroke> shapeStrokes(Offset start, Offset end, ShapeSettings settings) {
       offsets = List.generate(65, (i) {
         final angle = 2 * math.pi * i / 64;
         return rect.center +
-            Offset(math.cos(angle) * side / 2, math.sin(angle) * side / 2);
+            Offset(
+              math.cos(angle) * rect.width / 2,
+              math.sin(angle) * rect.height / 2,
+            );
       });
     }
   }
@@ -113,21 +121,23 @@ class _ShapeSettingsDialogState extends State<ShapeSettingsDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SegmentedButton<ShapeKind>(
-              segments: [
-                ButtonSegment(value: ShapeKind.line, label: Text(s.shapeLine)),
-                ButtonSegment(
-                  value: ShapeKind.circle,
-                  label: Text(s.shapeCircle),
-                ),
-                ButtonSegment(
-                  value: ShapeKind.square,
-                  label: Text(s.shapeSquare),
-                ),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final entry in <ShapeKind, String>{
+                  ShapeKind.line: s.shapeLine,
+                  ShapeKind.circle: s.shapeCircle,
+                  ShapeKind.square: s.shapeSquare,
+                  ShapeKind.ellipse: s.shapeEllipse,
+                  ShapeKind.rectangle: s.shapeRectangle,
+                }.entries)
+                  ChoiceChip(
+                    label: Text(entry.value),
+                    selected: settings.kind == entry.key,
+                    onSelected: (_) =>
+                        update(settings.copyWith(kind: entry.key)),
+                  ),
               ],
-              selected: {settings.kind},
-              onSelectionChanged: (value) =>
-                  update(settings.copyWith(kind: value.first)),
             ),
             Text(s.strokeWidth + settings.width.toStringAsFixed(1)),
             Slider(

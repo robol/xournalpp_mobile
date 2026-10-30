@@ -3,6 +3,8 @@
   "shapeLine": "Line",
   "shapeCircle": "Circle",
   "shapeSquare": "Square",
+  "shapeEllipse": "Ellipse",
+  "shapeRectangle": "Rectangle",
   "shapeOutlineColor": "Outline color",
   "simplifyStrokes": "Simplify strokes",
   "simplifyStrokesDescription": "Reduce points in newly drawn strokes to save space.",

@@ -3,6 +3,8 @@
   "shapeLine": "Linha",
   "shapeCircle": "Círculo",
   "shapeSquare": "Quadrado",
+  "shapeEllipse": "Elipse",
+  "shapeRectangle": "Retângulo",
   "shapeOutlineColor": "Cor do contorno",
   "simplifyStrokes": "Simplificar traços",
   "simplifyStrokesDescription": "Reduzir pontos em novos traços para poupar espaço.",
