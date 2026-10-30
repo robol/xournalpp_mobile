@@ -45,6 +45,33 @@ class _LoadingStorage implements NotebookStorage {
 }
 
 void main() {
+  testWidgets('recent documents show their storage provider', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.kRecentFiles: jsonEncode([
+        {'path': '/local.xopp', 'name': 'Local'},
+        {
+          'path': 'cloud.xopp',
+          'name': 'Cloud',
+          'backendId': 'nextcloud:account',
+        },
+        {'path': 'drive-id', 'name': 'Drive', 'backendId': 'gdrive:account'},
+      ]),
+    });
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(0)).provider,
+      'Google Drive',
+    );
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(1)).provider,
+      'Nextcloud',
+    );
+    expect(
+      tester.widget<DocumentCard>(find.byType(DocumentCard).at(2)).provider,
+      'Local storage',
+    );
+  });
   testWidgets('remote file browser uses multiple columns on a wide screen', (
     tester,
   ) async {
@@ -115,6 +142,7 @@ void main() {
                     'id': 'note-id',
                     'name': 'note.xopp',
                     'mimeType': 'application/octet-stream',
+                    'modifiedTime': '2026-10-30T12:34:56Z',
                   },
                 ]
               : [
@@ -149,6 +177,19 @@ void main() {
     await tester.tap(find.text('Class'));
     await tester.pumpAndSettle();
     expect(find.text('note'), findsOneWidget);
+    expect(
+      tester.widget<Icon>(find.byIcon(Icons.description_outlined)).size,
+      36,
+    );
+    expect(
+      tester.widget<Text>(find.text('note')).style!.fontSize,
+      greaterThan(
+        tester
+            .widget<Text>(find.textContaining('Last modified:'))
+            .style!
+            .fontSize!,
+      ),
+    );
     await tester.tap(find.text('Parent folder'));
     await tester.pumpAndSettle();
     expect(find.text('Class'), findsOneWidget);

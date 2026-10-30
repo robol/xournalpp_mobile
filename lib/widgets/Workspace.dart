@@ -114,6 +114,7 @@ class QuickActionCard extends StatelessWidget {
 class DocumentCard extends StatelessWidget {
   final String name, path, modified;
   final String? preview;
+  final String? provider;
   final VoidCallback onOpen, onLongPress;
   const DocumentCard({
     super.key,
@@ -121,6 +122,7 @@ class DocumentCard extends StatelessWidget {
     required this.path,
     required this.modified,
     this.preview,
+    this.provider,
     required this.onOpen,
     required this.onLongPress,
   });
@@ -175,6 +177,20 @@ class DocumentCard extends StatelessWidget {
                     letterSpacing: 1.5,
                   ),
                 ),
+                if (provider != null) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      provider!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Tooltip(
                   message: path,

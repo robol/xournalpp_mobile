@@ -567,6 +567,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       path: _decodeFileInfoForDisplay(fileInfo['path']),
       modified: _formatModifiedForDisplay(context, fileInfo['modified']),
       preview: fileInfo['preview']?.toString(),
+      provider: switch (fileInfo['backendId'] as String?) {
+        null || 'local' => S.of(context).localStorage,
+        final id when id.startsWith('nextcloud:') => 'Nextcloud',
+        final id when id.startsWith('gdrive:') => 'Google Drive',
+        final id => id,
+      },
       onLongPress: () =>
           showDeleteDialog(fileInfo['path'], backendId: fileInfo['backendId']),
       onOpen: () async {
@@ -793,11 +799,18 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                           if (index < folders.length) {
                             final item = folders[index];
                             return ListTile(
-                              leading: const Icon(Icons.folder_outlined),
+                              leading: const Icon(
+                                Icons.folder_outlined,
+                                size: 36,
+                              ),
                               title: Text(
                                 item.name,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               onTap: () => setDialogState(
                                 () => folder = [...folder, item.id],
@@ -808,11 +821,18 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                           return ListTile(
                             leading: selected == localNotebookStorage
                                 ? null
-                                : const Icon(Icons.description_outlined),
+                                : const Icon(
+                                    Icons.description_outlined,
+                                    size: 36,
+                                  ),
                             title: Text(
                               entry.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             subtitle: entry.modified == null
                                 ? null
@@ -821,6 +841,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                       context,
                                       entry.modified!.toIso8601String(),
                                     ),
+                                    style: const TextStyle(fontSize: 12),
                                   ),
                             trailing: selected != localNotebookStorage
                                 ? null
