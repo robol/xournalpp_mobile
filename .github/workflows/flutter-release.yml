@@ -88,6 +88,8 @@ jobs:
             --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
+            --dart-define=GOOGLE_DESKTOP_CLIENT_ID=${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+            --dart-define=GOOGLE_DESKTOP_CLIENT_SECRET=${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
 
       - name: Build and upload signed APK release artifact
         if: matrix.build-type == 'apk'

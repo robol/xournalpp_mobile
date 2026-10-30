@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/GoogleDriveStorage.dart';
+import 'package:xournalpp/src/GoogleDesktopAuth.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 
 /// Google SDK owns its platform credential store and access-token refresh.
@@ -18,11 +19,17 @@ class GoogleDriveManager {
   static final changes = ValueNotifier<int>(0);
   static Future<void>? _initialization;
   static GoogleSignInAccount? _account;
+  static DesktopGoogleAccount? _desktopAccount;
+  static final _desktopAuth = GoogleDesktopAuth();
+  static bool get _desktop =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux);
   static GoogleDriveStorage? get current =>
       notebookStorageBackends.whereType<GoogleDriveStorage>().firstOrNull;
   // Apple redirect schemes and desktop sign-in are not configured yet.
   static bool get supported =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+      !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || _desktop);
 
   static Future<void> _initialize() {
     if (!supported)
@@ -48,6 +55,10 @@ class GoogleDriveManager {
   }
 
   static Future<GoogleDriveStorage> connect() async {
+    if (_desktop) {
+      _desktopAccount = await _desktopAuth.connect();
+      return _desktopStorage(_desktopAccount!, 'root');
+    }
     await _initialize();
     final account = await GoogleSignIn.instance.authenticate();
     await account.authorizationClient.authorizeScopes([_scope]);
@@ -56,10 +67,24 @@ class GoogleDriveManager {
   }
 
   static GoogleDriveStorage forFolder(String folderId) {
+    if (_desktop) {
+      final account = _desktopAccount;
+      if (account == null) throw StateError('Google account is not connected.');
+      return _desktopStorage(account, folderId);
+    }
     final account = _account;
     if (account == null) throw StateError('Google account is not connected.');
     return _storage(account, folderId);
   }
+
+  static GoogleDriveStorage _desktopStorage(
+    DesktopGoogleAccount account,
+    String folderId,
+  ) => GoogleDriveStorage(
+    accountId: account.id,
+    folderId: folderId,
+    accessToken: () => _desktopAuth.accessToken(account),
+  );
 
   static GoogleDriveStorage _storage(
     GoogleSignInAccount account,
@@ -82,15 +107,16 @@ class GoogleDriveManager {
     GoogleDriveStorage storage,
     String folderName,
   ) async {
-    final account = _account;
-    if (account == null || account.id != storage.accountId)
+    final accountId = _desktop ? _desktopAccount?.id : _account?.id;
+    final email = _desktop ? _desktopAccount?.email : _account?.email;
+    if (accountId == null || accountId != storage.accountId)
       throw StateError('Google account is no longer connected.');
     final prefs = await SharedPreferences.getInstance();
     if (!await prefs.setString(
       _configKey,
       jsonEncode({
-        'accountId': account.id,
-        'email': account.email,
+        'accountId': accountId,
+        'email': email,
         'folderId': storage.folderId,
         'folderName': folderName,
       }),
@@ -108,6 +134,17 @@ class GoogleDriveManager {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_configKey);
     if (raw == null) return;
+    if (_desktop) {
+      final config = jsonDecode(raw) as Map<String, dynamic>;
+      final account = await _desktopAuth.restore(config['accountId'] as String);
+      if (account == null || current != null) return;
+      _desktopAccount = account;
+      notebookStorageBackends.add(
+        _desktopStorage(account, config['folderId'] as String),
+      );
+      changes.value++;
+      return;
+    }
     await _initialize();
     final result = GoogleSignIn.instance.attemptLightweightAuthentication();
     final account = result == null ? null : await result;
@@ -127,6 +164,17 @@ class GoogleDriveManager {
 
   static Future<void> disconnect() async {
     final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_configKey);
+    if (_desktop) {
+      final id =
+          _desktopAccount?.id ??
+          (raw == null
+              ? null
+              : (jsonDecode(raw) as Map<String, dynamic>)['accountId']
+                    as String?);
+      if (id != null) await _desktopAuth.disconnect(id);
+      _desktopAccount = null;
+    }
     await prefs.remove(_configKey);
     if (_initialization != null) await GoogleSignIn.instance.signOut();
     _account = null;

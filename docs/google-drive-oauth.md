@@ -1,6 +1,6 @@
 # Google Drive OAuth setup
 
-The current Google Drive sign-in integration supports Android. It uses Google Sign-In and requests `https://www.googleapis.com/auth/drive` to browse user-selected folders and notebooks. Google classifies this as a restricted scope; production distribution may require OAuth consent-screen verification and a security assessment. While the consent screen is in testing, add the intended users as test users.
+The Google Drive sign-in integration supports Android, Windows, and Linux. It uses Google Sign-In and requests `https://www.googleapis.com/auth/drive` to browse user-selected folders and notebooks. Google classifies this as a restricted scope; production distribution may require OAuth consent-screen verification and a security assessment. While the consent screen is in testing, add the intended users as test users.
 
 In Google Cloud, enable the Google Drive API and configure the OAuth consent screen. Create:
 
@@ -15,4 +15,8 @@ For a local Android build, provide the web client ID explicitly:
 flutter run --dart-define=GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID
 ```
 
-Without the client ID, Settings reports that Google OAuth configuration is missing. iOS and macOS require their own OAuth clients and registered reversed-client-ID URL schemes; Linux and Windows need a separate supported sign-in flow. Those platforms are not enabled by this change.
+Without the client ID, Settings reports that Google OAuth configuration is missing. Windows and Linux use a **Desktop app** OAuth client and the system browser with a temporary loopback callback and PKCE. Add `GOOGLE_DESKTOP_CLIENT_ID` as a GitHub Actions variable and `GOOGLE_DESKTOP_CLIENT_SECRET` as a GitHub Actions secret. The release workflow embeds both in desktop builds. The desktop client secret is recoverable from distributed binaries and is not a confidential credential. Do not reuse a server-side secret. Refresh tokens are stored in the operating system credential store; Linux requires an available Secret Service keyring.
+
+For a local desktop build, pass `--dart-define=GOOGLE_DESKTOP_CLIENT_ID=...` and `--dart-define=GOOGLE_DESKTOP_CLIENT_SECRET=...`. The Drive API and OAuth consent screen must be configured, and users must be added as test users while the consent screen is in testing.
+
+iOS and macOS are not enabled and require additional sign-in configuration.
