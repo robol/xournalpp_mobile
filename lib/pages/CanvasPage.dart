@@ -8,6 +8,7 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
+import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -137,18 +138,23 @@ class CanvasPage extends StatefulWidget {
     this.filePath,
     this.initialPage = 0,
     this.pdfRenderService,
+    this.recoveryDraftId,
+    this.recoveryOriginalPath,
   }) : super(key: key);
 
   final XppFile? file;
   final String? filePath;
   final int initialPage;
   final PdfBackgroundRenderService? pdfRenderService;
+  final String? recoveryDraftId;
+  final String? recoveryOriginalPath;
 
   @override
   _CanvasPageState createState() => _CanvasPageState();
 }
 
-class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
+class _CanvasPageState extends State<CanvasPage>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const String _exportPdfMenuItem = 'Export PDF...';
   static const String _sharePdfMenuItem = 'Share PDF...';
   static const Duration _saveOverwriteTimeout = Duration(seconds: 30);
@@ -239,6 +245,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   int _savedRevision = 0;
   Future<void>? _pendingErase;
   bool _erasing = false;
+  late final String _draftId;
+  Timer? _draftTimer;
+  Future<void> _draftWork = Future.value();
+  int _draftRevision = -1;
+  bool _hasRecoveryDraft = false;
 
   final Map<XppLayer, _EraserContentIndex> _eraserIndexes = {};
   final List<_UndoEntry> _undoStack = [];
@@ -254,6 +265,12 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
   void initState() {
     _setMetadata();
     super.initState();
+    _draftId = widget.recoveryDraftId ?? DraftRecovery.newId();
+    if (widget.recoveryDraftId != null) {
+      _revision = 1;
+      _hasRecoveryDraft = true;
+    }
+    WidgetsBinding.instance.addObserver(this);
     _zoomAnimationController = AnimationController(
       vsync: this,
       duration: _zoomAnimationDuration,
@@ -1396,6 +1413,64 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   void _markDirty() {
     _revision++;
+    if (!kIsWeb) {
+      _draftTimer ??= Timer(const Duration(seconds: 2), () {
+        _draftTimer = null;
+        _checkpointDraft();
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _draftTimer?.cancel();
+      _draftTimer = null;
+      _checkpointDraft();
+    }
+  }
+
+  void _checkpointDraft() {
+    if (kIsWeb || !_isDirty || _revision == _draftRevision || _file == null)
+      return;
+    _draftWork = _draftWork
+        .then((_) async {
+          await _pendingErase;
+          if (!_isDirty || _revision == _draftRevision || _file == null) return;
+          final revision = _revision;
+          final file = _file!;
+          final bytes = await file.toUint8ListAsync();
+          await DraftRecovery.save(
+            RecoveryDraft(
+              id: _draftId,
+              bytes: bytes,
+              page: currentPage,
+              title: file.title,
+              originalPath: filePath ?? widget.recoveryOriginalPath,
+            ),
+          );
+          _hasRecoveryDraft = true;
+          _draftRevision = revision;
+        })
+        .catchError((Object error) {
+          debugPrint('Could not save recovery draft: $error');
+          if (mounted) {
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              SnackBar(content: Text(S.of(context).recoverySaveFailed)),
+            );
+          }
+        });
+  }
+
+  Future<void> _removeDraft() async {
+    _draftTimer?.cancel();
+    _draftTimer = null;
+    await _draftWork;
+    if (_hasRecoveryDraft) await DraftRecovery.remove(_draftId);
+    _hasRecoveryDraft = false;
+    _draftRevision = -1;
   }
 
   Future<bool> _confirmLeave() async {
@@ -1432,7 +1507,13 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
       case _UnsavedChangesAction.save:
         return saveFile();
       case _UnsavedChangesAction.discard:
-        return true;
+        try {
+          await _removeDraft();
+          return true;
+        } catch (error) {
+          debugPrint('Could not remove recovery draft: $error');
+          return false;
+        }
       case _UnsavedChangesAction.cancel:
       case null:
         return false;
@@ -2737,6 +2818,11 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
         currentPage: currentPage,
       );
 
+      if (_revision == savedRevision) {
+        await _removeDraft();
+        if (_revision != savedRevision) _checkpointDraft();
+      }
+
       if (!mounted) return false;
       savingSnackBar.close();
       scaffoldMessenger.removeCurrentSnackBar();
@@ -2766,6 +2852,8 @@ class _CanvasPageState extends State<CanvasPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _draftTimer?.cancel();
     _backgroundRenderCommitTimer?.cancel();
     _viewportInteractionIdleTimer?.cancel();
     _deferPdfRasterUpdates.dispose();

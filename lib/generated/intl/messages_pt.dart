@@ -20,7 +20,10 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'pt';
 
-  static String m0(date) => "Última modificação: ${date}";
+  static String m0(name) =>
+      "Foi encontrado um rascunho não salvo de ${name}. Recuperá-lo?";
+
+  static String m1(date) => "Última modificação: ${date}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -125,6 +128,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "pen": MessageLookupByLibrary.simpleMessage("Caneta"),
     "quota": MessageLookupByLibrary.simpleMessage("Cota"),
     "recentFiles": MessageLookupByLibrary.simpleMessage("Arquivos recentes"),
+    "recoveryDiscard": MessageLookupByLibrary.simpleMessage(
+      "Descartar rascunho",
+    ),
+    "recoveryLater": MessageLookupByLibrary.simpleMessage("Depois"),
+    "recoveryLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Não foi possível verificar os rascunhos de recuperação.",
+    ),
+    "recoveryMessage": m0,
+    "recoveryOpen": MessageLookupByLibrary.simpleMessage("Recuperar"),
+    "recoverySaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Não foi possível salvar o rascunho de recuperação. Salve seu trabalho manualmente.",
+    ),
+    "recoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Recuperar trabalho não salvo?",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Com linhas e margem"),
     "save": MessageLookupByLibrary.simpleMessage("Salvar"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Salvar como..."),
@@ -193,7 +211,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
       "Seu espaço de trabalho está pronto",
     ),
-    "workspaceModified": m0,
+    "workspaceModified": m1,
     "workspaceOpen": MessageLookupByLibrary.simpleMessage("Abrir documento"),
     "workspaceRecents": MessageLookupByLibrary.simpleMessage(
       "Cadernos e documentos recentes",

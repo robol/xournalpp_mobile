@@ -13,6 +13,7 @@ import 'package:xournalpp/widgets/Workspace.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
+import 'package:xournalpp/src/DraftRecovery.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/DropFile.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
@@ -55,12 +56,103 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         unawaited(receivedShareNotification(widget.initialExternalIntent));
       } else {
         afterFirstLayout(context);
+        unawaited(_offerRecovery());
       }
     });
 
     RecentFiles.changes.addListener(_loadRecentFiles);
     _loadRecentFiles();
     super.initState();
+  }
+
+  Future<void> _offerRecovery() async {
+    if (kIsWeb) return;
+    List<RecoveryDraft> drafts;
+    try {
+      drafts = await DraftRecovery.list();
+    } catch (error) {
+      debugPrint('Could not list recovery drafts: $error');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(S.of(context).recoveryLoadFailed)),
+        );
+      }
+      return;
+    }
+    if (!mounted || drafts.isEmpty || ModalRoute.of(context)?.isCurrent != true)
+      return;
+    while (mounted && drafts.isNotEmpty) {
+      final draft = drafts.last;
+      final choice = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(S.of(dialogContext).recoveryTitle),
+          content: Text(
+            S
+                .of(dialogContext)
+                .recoveryMessage(
+                  draft.title ?? S.of(dialogContext).newDocument,
+                ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(S.of(dialogContext).recoveryLater),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(S.of(dialogContext).recoveryDiscard),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(S.of(dialogContext).recoveryOpen),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || choice == null) return;
+      if (!choice) {
+        try {
+          await DraftRecovery.remove(draft.id);
+          drafts.removeLast();
+        } catch (error) {
+          debugPrint('Could not discard recovery draft: $error');
+          return;
+        }
+        continue;
+      }
+      try {
+        final file = await XppFile.fromXppPickedFile(
+          XppPickedFile(
+            draft.bytes,
+            fileName: '${draft.title ?? 'Untitled'}.xopp',
+          ),
+          null,
+          showMissingFileDialog,
+        );
+        file.title = draft.title;
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => CanvasPage(
+              file: file,
+              initialPage: draft.page,
+              recoveryDraftId: draft.id,
+              recoveryOriginalPath: draft.originalPath,
+            ),
+          ),
+        );
+        if (!mounted) return;
+        drafts = await DraftRecovery.list();
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
+        );
+        return;
+      }
+    }
   }
 
   void _loadRecentFiles() {

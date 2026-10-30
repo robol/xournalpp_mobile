@@ -20,7 +20,10 @@ typedef String MessageIfAbsent(String messageStr, List<dynamic> args);
 class MessageLookup extends MessageLookupByLibrary {
   String get localeName => 'de';
 
-  static String m0(date) => "Zuletzt geändert: ${date}";
+  static String m0(name) =>
+      "Ein ungespeicherter Entwurf von ${name} wurde gefunden. Wiederherstellen?";
+
+  static String m1(date) => "Zuletzt geändert: ${date}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -126,6 +129,21 @@ class MessageLookup extends MessageLookupByLibrary {
     "recentFiles": MessageLookupByLibrary.simpleMessage(
       "Zuletzt verwendete Dokumente",
     ),
+    "recoveryDiscard": MessageLookupByLibrary.simpleMessage(
+      "Entwurf verwerfen",
+    ),
+    "recoveryLater": MessageLookupByLibrary.simpleMessage("Später"),
+    "recoveryLoadFailed": MessageLookupByLibrary.simpleMessage(
+      "Wiederherstellungsentwürfe konnten nicht überprüft werden.",
+    ),
+    "recoveryMessage": m0,
+    "recoveryOpen": MessageLookupByLibrary.simpleMessage("Wiederherstellen"),
+    "recoverySaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Der Wiederherstellungsentwurf konnte nicht gespeichert werden. Bitte speichern Sie Ihre Arbeit manuell.",
+    ),
+    "recoveryTitle": MessageLookupByLibrary.simpleMessage(
+      "Ungespeicherte Arbeit wiederherstellen?",
+    ),
     "ruled": MessageLookupByLibrary.simpleMessage("Liniert mit Rand"),
     "save": MessageLookupByLibrary.simpleMessage("Speichern"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Speichern unter..."),
@@ -194,7 +212,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "workspaceEmptyTitle": MessageLookupByLibrary.simpleMessage(
       "Dein Arbeitsbereich ist bereit",
     ),
-    "workspaceModified": m0,
+    "workspaceModified": m1,
     "workspaceOpen": MessageLookupByLibrary.simpleMessage("Dokument öffnen"),
     "workspaceRecents": MessageLookupByLibrary.simpleMessage(
       "Zuletzt verwendete Notizbücher & Dokumente",

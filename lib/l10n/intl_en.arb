@@ -1,4 +1,12 @@
 {
+  "recoveryLoadFailed": "Could not check for recovery drafts.",
+  "recoverySaveFailed": "Could not save a recovery draft. Save your work manually.",
+  "recoveryTitle": "Recover unsaved work?",
+  "recoveryMessage": "An unsaved draft of {name} was found. Recover it?",
+  "@recoveryMessage": {"placeholders": {"name": {"type": "String"}}},
+  "recoveryLater": "Later",
+  "recoveryDiscard": "Discard draft",
+  "recoveryOpen": "Recover",
   "shapes": "Shapes",
   "shapeLine": "Line",
   "shapeCircle": "Circle",
