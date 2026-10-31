@@ -66,13 +66,22 @@ jobs:
           DRIVE_WEB_CLIENT: ${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
           DRIVE_IOS_CLIENT: ${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
           DRIVE_MACOS_CLIENT: ${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
+          DRIVE_DESKTOP_CLIENT: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID || secrets.GOOGLE_DESKTOP_CLIENT_ID }}
+          DRIVE_DESKTOP_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+          BUILD_TYPE: ${{ matrix.build-type }}
         run: |
-          for client in "$DRIVE_WEB_CLIENT" "$DRIVE_IOS_CLIENT" "$DRIVE_MACOS_CLIENT"; do
+          for client in "$DRIVE_WEB_CLIENT" "$DRIVE_IOS_CLIENT" "$DRIVE_MACOS_CLIENT" "$DRIVE_DESKTOP_CLIENT"; do
             if [[ -n "$client" && ! "$client" =~ ^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]]; then
               echo "A Google OAuth client ID has an invalid format." >&2
               exit 1
             fi
           done
+          if [[ "$BUILD_TYPE" == linux || "$BUILD_TYPE" == debian || "$BUILD_TYPE" == windows ]]; then
+            if [[ -z "$DRIVE_DESKTOP_CLIENT" || -z "$DRIVE_DESKTOP_SECRET" ]]; then
+              echo "Set GOOGLE_DESKTOP_CLIENT_ID (variable or secret) and GOOGLE_DESKTOP_CLIENT_SECRET (secret) for desktop builds." >&2
+              exit 1
+            fi
+          fi
 
       - name: Build and upload release artifact
         if: matrix.build-type != 'apk' && matrix.build-type != 'aab'
@@ -88,7 +97,7 @@ jobs:
             --dart-define=GOOGLE_WEB_CLIENT_ID=${{ vars.GOOGLE_WEB_CLIENT_ID || secrets.GOOGLE_WEB_CLIENT_ID }}
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
-            --dart-define=GOOGLE_DESKTOP_CLIENT_ID=${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+            --dart-define=GOOGLE_DESKTOP_CLIENT_ID=${{ vars.GOOGLE_DESKTOP_CLIENT_ID || secrets.GOOGLE_DESKTOP_CLIENT_ID }}
             --dart-define=GOOGLE_DESKTOP_CLIENT_SECRET=${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
 
       - name: Build and upload signed APK release artifact
