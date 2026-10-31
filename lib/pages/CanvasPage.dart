@@ -36,6 +36,7 @@ import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
+import 'package:xournalpp/widgets/StrokeRasterPolicy.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
@@ -210,6 +211,7 @@ class _CanvasPageState extends State<CanvasPage>
   final Map<int, GlobalKey<PointerListenerState>> _pointerListenerKeys = {};
   final GlobalKey<EditingToolBarState> _editingToolbarKey = GlobalKey();
   final GlobalKey _pagesViewportKey = GlobalKey();
+  late final StrokeRasterPolicy _strokeRasterPolicy;
   final ScrollController _pagesScrollController = ScrollController();
   final ScrollController _pagesHorizontalScrollController = ScrollController();
   late final AnimationController _zoomAnimationController;
@@ -272,6 +274,18 @@ class _CanvasPageState extends State<CanvasPage>
   void initState() {
     _setMetadata();
     super.initState();
+    _strokeRasterPolicy =
+        StrokeRasterPolicy(
+            viewport: () {
+              final box = _pagesViewportKey.currentContext?.findRenderObject();
+              if (box is! RenderBox || !box.hasSize) return null;
+              return box.localToGlobal(Offset.zero) & box.size;
+            },
+          )
+          ..interactionActive = () =>
+              _draftActivePointers.isNotEmpty ||
+              _pinchZoomActive ||
+              _viewportPinchZooming;
     _draftId = widget.recoveryDraftId ?? DraftRecovery.newId();
     if (widget.recoveryDraftId != null) {
       _revision = 1;
@@ -327,50 +341,53 @@ class _CanvasPageState extends State<CanvasPage>
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      canRequestFocus: false,
-      onKeyEvent: (_, _) {
-        _recordDraftActivity();
-        return KeyEventResult.ignored;
-      },
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (event) {
-          _draftActivePointers.add(event.pointer);
+    return StrokeRasterScope(
+      policy: _strokeRasterPolicy,
+      child: Focus(
+        canRequestFocus: false,
+        onKeyEvent: (_, _) {
           _recordDraftActivity();
+          return KeyEventResult.ignored;
         },
-        onPointerMove: (_) => _recordDraftActivity(),
-        onPointerHover: (_) => _recordDraftActivity(),
-        onPointerSignal: (_) => _recordDraftActivity(),
-        onPointerUp: (event) {
-          _draftActivePointers.remove(event.pointer);
-          _recordDraftActivity();
-        },
-        onPointerCancel: (event) {
-          _draftActivePointers.remove(event.pointer);
-          _recordDraftActivity();
-        },
-        child: AbsorbPointer(
-          absorbing: _erasing,
-          child: Stack(
-            children: [
-              PdfSourceScope(
-                resolve: _resolvePdfSource,
-                child: LayoutBuilder(
-                  builder: (context, constraints) => _buildEditor(
-                    context,
-                    embedToolbar: constraints.maxWidth >= 1000,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (event) {
+            _draftActivePointers.add(event.pointer);
+            _recordDraftActivity();
+          },
+          onPointerMove: (_) => _recordDraftActivity(),
+          onPointerHover: (_) => _recordDraftActivity(),
+          onPointerSignal: (_) => _recordDraftActivity(),
+          onPointerUp: (event) {
+            _draftActivePointers.remove(event.pointer);
+            _recordDraftActivity();
+          },
+          onPointerCancel: (event) {
+            _draftActivePointers.remove(event.pointer);
+            _recordDraftActivity();
+          },
+          child: AbsorbPointer(
+            absorbing: _erasing,
+            child: Stack(
+              children: [
+                PdfSourceScope(
+                  resolve: _resolvePdfSource,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => _buildEditor(
+                      context,
+                      embedToolbar: constraints.maxWidth >= 1000,
+                    ),
                   ),
                 ),
-              ),
-              if (_erasing)
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: LinearProgressIndicator(),
-                ),
-            ],
+                if (_erasing)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1055,6 +1072,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _noteViewportInteraction() {
+    _strokeRasterPolicy.noteActivity();
     if (!_deferPdfRasterUpdates.value) {
       _invalidatePrefetch();
       _pdfBackgroundPrefetchPendingUntilIdle = true;
@@ -1153,7 +1171,10 @@ class _CanvasPageState extends State<CanvasPage>
     _currentPageUpdateScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _currentPageUpdateScheduled = false;
-      if (mounted) _updateCurrentPageFromScroll();
+      if (mounted) {
+        _updateCurrentPageFromScroll();
+        _strokeRasterPolicy.viewportChanged();
+      }
     });
   }
 
@@ -1454,6 +1475,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _recordDraftActivity() {
+    _strokeRasterPolicy.noteActivity();
     _draftActivityGeneration++;
     _draftTimer?.cancel();
     _draftTimer = null;
@@ -3086,6 +3108,7 @@ class _CanvasPageState extends State<CanvasPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _strokeRasterPolicy.dispose();
     _draftTimer?.cancel();
     _backgroundRenderCommitTimer?.cancel();
     _viewportInteractionIdleTimer?.cancel();

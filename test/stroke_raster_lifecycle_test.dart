@@ -8,6 +8,7 @@ import 'package:xournalpp/src/XppBackground.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
+import 'package:xournalpp/widgets/StrokeRasterPolicy.dart';
 
 XppPage _page() => XppPage(
   pageSize: XppPageSize(width: 40, height: 40),
@@ -51,6 +52,39 @@ void main() {
   tearDown(() {
     XppPageStack.debugRasterizePicture = null;
     XppPageStack.debugMaxActiveRasterBytes = null;
+  });
+
+  testWidgets('offscreen page is deferred and navigation promotes it', (
+    tester,
+  ) async {
+    var viewport = const Rect.fromLTWH(10000, 10000, 100, 100);
+    final policy = StrokeRasterPolicy(viewport: () => viewport);
+    var calls = 0;
+    final image = await _image(tester);
+    XppPageStack.debugRasterizePicture = (_, _, _) async {
+      calls++;
+      return image;
+    };
+    await tester.pumpWidget(
+      StrokeRasterScope(policy: policy, child: _app(_page(), 1)),
+    );
+    await _startRaster(tester);
+    expect(calls, 0);
+    viewport = const Rect.fromLTWH(0, 0, 1000, 1000);
+    await tester.runAsync(() async {
+      policy.viewportChanged();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+    for (var i = 0; i < 20 && calls == 0; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    await tester.pump();
+    expect(calls, 1);
+    await tester.pumpWidget(const SizedBox());
+    policy.dispose();
   });
 
   testWidgets('stroke raster survives remount but not content replacement', (

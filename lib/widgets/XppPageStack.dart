@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:xournalpp/src/RasterWorkQueue.dart';
+import 'package:xournalpp/widgets/StrokeRasterPolicy.dart';
 import 'package:xournalpp/src/ContentSpatialIndex.dart';
 import 'package:xournalpp/layer_contents/XppImage.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
@@ -614,12 +615,19 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   List<XppStroke> _cachedStrokeIdentities = const [];
   int _generation = 0;
   Timer? _rasterizeTimer;
+  StrokeRasterPolicy? _policy;
   bool _rasterizationInProgress = false;
   bool _rasterizeAfterCurrent = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final policy = StrokeRasterScope.of(context);
+    if (!identical(policy, _policy)) {
+      _policy?.removeWorkListener(_workQueue.prioritiesChanged);
+      _policy = policy;
+      _policy?.addWorkListener(_workQueue.prioritiesChanged);
+    }
     _rasterizeIfNeeded();
   }
 
@@ -677,7 +685,9 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       box.localToGlobal(widget.bounds.topLeft),
       box.localToGlobal(widget.bounds.bottomRight),
     );
-    return rect.overlaps(Offset.zero & MediaQuery.sizeOf(context));
+    return rect.overlaps(
+      _policy?.viewport() ?? (Offset.zero & MediaQuery.sizeOf(context)),
+    );
   }
 
   void _rasterizeIfNeeded() {
@@ -729,6 +739,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       _workQueue.schedule(
         isCurrent: () => mounted && generation == _generation,
         isVisible: _isVisible,
+        backgroundAllowed: () => _policy?.backgroundAllowed ?? true,
         run: () => _startRasterization(
           strokes,
           widget.pageSize,
@@ -880,6 +891,12 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
             if (!mounted || generation != _generation) {
               throw StateError('Obsolete stroke raster');
             }
+            if (!_isVisible() &&
+                (!(_policy?.backgroundAllowed ?? true) ||
+                    _workQueue.hasVisibleWork)) {
+              _rasterizeAfterCurrent = true;
+              throw StateError('Defer offscreen stroke raster');
+            }
             pointsRecorded = 0;
             recordingSlice.reset();
           }
@@ -944,6 +961,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   @override
   void dispose() {
     _generation++;
+    _policy?.removeWorkListener(_workQueue.prioritiesChanged);
     _rasterizeAfterCurrent = false;
     _rasterizeTimer?.cancel();
     _replaceImage(null);
