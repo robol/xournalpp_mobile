@@ -9,6 +9,7 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/widgets/CloudSaveFolderDialog.dart';
 import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/src/GoogleDriveStorage.dart';
 import 'package:xournalpp/src/DraftRecovery.dart';
@@ -2864,6 +2865,22 @@ class _CanvasPageState extends State<CanvasPage>
         }
         storage = selected;
       }
+      List<String>? destination;
+      if ((saveAs || filePath == null) &&
+          (storage is NextcloudStorage || storage is GoogleDriveStorage)) {
+        destination = await showDialog<List<String>>(
+          context: context,
+          builder: (_) => CloudSaveFolderDialog(storage: storage),
+        );
+        if (destination == null || !mounted) {
+          if (mounted) {
+            savingSnackBar.close();
+            scaffoldMessenger.removeCurrentSnackBar();
+            setState(() => savingFile = false);
+          }
+          return false;
+        }
+      }
       _file!.previewImage = kIsWeb
           ? kTransparentImage
           : await _currentPagePng();
@@ -2890,13 +2907,35 @@ class _CanvasPageState extends State<CanvasPage>
             ),
           )
           .toList();
-      Future<StoredNotebook?> performSave(StoredNotebook? existing) =>
-          storage.save(
+      Future<StoredNotebook?> performSave(StoredNotebook? existing) {
+        if (storage is NextcloudStorage) {
+          return (storage as NextcloudStorage).save(
             bytes: bytes,
             name: _file!.title!,
             existing: existing,
             pdfs: resources,
+            destinationFolder: destination ?? const [],
           );
+        }
+        if (storage is GoogleDriveStorage) {
+          return (storage as GoogleDriveStorage).save(
+            bytes: bytes,
+            name: _file!.title!,
+            existing: existing,
+            pdfs: resources,
+            destinationFolderId: destination == null || destination.isEmpty
+                ? null
+                : destination.last,
+          );
+        }
+        return storage.save(
+          bytes: bytes,
+          name: _file!.title!,
+          existing: existing,
+          pdfs: resources,
+        );
+      }
+
       StoredNotebook? saved;
       try {
         final existing = !saveAs && filePath != null
@@ -2918,7 +2957,7 @@ class _CanvasPageState extends State<CanvasPage>
             ? conflict.filename
             : (conflict as GoogleDriveNameConflict).filename;
         final existingId = conflict is NextcloudNameConflict
-            ? conflict.filename
+            ? conflict.notebookId
             : (conflict as GoogleDriveNameConflict).fileId;
         if (!mounted) return false;
         final replace = await showDialog<bool>(

@@ -92,7 +92,21 @@ void main() {
         ],
       ))!;
       expect(result.id, 'Class A/lesson.xopp');
+      final created = (await storage.save(
+        bytes: bytes,
+        name: 'new lesson',
+        destinationFolder: ['Class A'],
+        pdfs: [
+          NotebookPdfResource(
+            reference: 'new.pdf',
+            read: () async => Uint8List.fromList([3, 4]),
+          ),
+        ],
+      ))!;
+      expect(created.id, 'Class A/new lesson.xopp');
       final reopened = NextcloudStorage(credentials, ['Notes'], client: client);
+      await reopened.readNotebook(created);
+      expect(await reopened.readPdf(created, 'new.pdf'), [3, 4]);
       await reopened.readNotebook(result);
       expect(await reopened.readPdf(result, 'source.pdf'), [1, 2]);
       expect(

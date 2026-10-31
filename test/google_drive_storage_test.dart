@@ -45,6 +45,42 @@ void main() {
     },
   );
 
+  test('checks for name conflicts in the selected folder', () async {
+    final client = MockClient((request) async {
+      expect(
+        request.url.queryParameters['q'],
+        "'subfolder-id' in parents and trashed = false",
+      );
+      return http.Response(
+        jsonEncode({
+          'files': [
+            {
+              'id': 'existing-id',
+              'name': 'Notes.xopp',
+              'mimeType': 'application/octet-stream',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final storage = GoogleDriveStorage(
+      accountId: 'account',
+      folderId: 'root-id',
+      accessToken: () async => 'token',
+      client: client,
+    );
+    await expectLater(
+      storage.save(
+        bytes: Uint8List(0),
+        name: 'Notes',
+        pdfs: [],
+        destinationFolderId: 'subfolder-id',
+      ),
+      throwsA(isA<GoogleDriveNameConflict>()),
+    );
+  });
+
   test('failed PDF upload does not publish notebook', () async {
     var uploads = 0;
     final client = MockClient((request) async {

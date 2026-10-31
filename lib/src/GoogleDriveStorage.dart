@@ -183,10 +183,13 @@ class GoogleDriveStorage implements NotebookStorage {
     required String name,
     StoredNotebook? existing,
     required List<NotebookPdfResource> pdfs,
+    String? destinationFolderId,
   }) async {
     if (existing != null && existing.backendId != id)
       throw ArgumentError('Wrong storage backend');
-    final parent = existing == null ? folderId : await _parentOf(existing.id);
+    final parent = existing == null
+        ? (destinationFolderId ?? folderId)
+        : await _parentOf(existing.id);
     final filename = name.toLowerCase().endsWith('.xopp') ? name : '$name.xopp';
     final children = await _children(parent);
     final collisions = children

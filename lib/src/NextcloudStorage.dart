@@ -95,12 +95,13 @@ class NextcloudStorage implements NotebookStorage {
     required String name,
     StoredNotebook? existing,
     required List<NotebookPdfResource> pdfs,
+    List<String> destinationFolder = const [],
   }) async {
     if (existing != null && existing.backendId != id)
       throw ArgumentError('Wrong storage backend');
     final parts = existing == null ? <String>[] : _notebookParts(existing.id);
     final parent = parts.isEmpty
-        ? <String>[]
+        ? destinationFolder
         : parts.sublist(0, parts.length - 1);
     final filename = parts.isEmpty
         ? (name.toLowerCase().endsWith('.xopp') ? name : '$name.xopp')
@@ -179,7 +180,7 @@ class NextcloudStorage implements NotebookStorage {
       },
     );
     if (move.statusCode == 412 && existing == null) {
-      throw NextcloudNameConflict(filename);
+      throw NextcloudNameConflict(filename, notebookId);
     }
     _check(move, 'Could not publish notebook', [201, 204]);
     _manifests[notebookId] = mappings;
@@ -340,6 +341,8 @@ class NextcloudFolderListing {
 }
 
 class NextcloudNameConflict implements Exception {
-  const NextcloudNameConflict(this.filename);
+  const NextcloudNameConflict(this.filename, [String? notebookId])
+    : notebookId = notebookId ?? filename;
+  final String notebookId;
   final String filename;
 }
