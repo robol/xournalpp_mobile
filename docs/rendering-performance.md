@@ -1,5 +1,62 @@
 # Rendering performance validation
 
+## Dense pen mitigation (October 31, 2026)
+
+This follow-up supersedes the historical recording-slice/vector-fallback notes
+below. The experimental limit is 2,048 pen commands per native raster request,
+in addition to the existing 64-stroke and output-pixel limits. A single-point
+pen counts as one command. A render-only cursor resumes inside a stroke without
+changing points, pressure, serialization, or hit testing. Every pass records a
+previous-prefix image plus new commands, awaits its own `toImage`, publishes the
+prefix, then rejoins the existing priority queue. This is not a GPU fence.
+
+Incomplete prefixes are never put in the completed-run cache. Dense cold/tail
+vectors are withheld behind a determinate progress indicator; small vector
+groups remain available. A valid completed image survives scale changes until
+the first new prefix is ready. Destructive edits invalidate its display.
+PNG capture rejects a partial page rather than silently exporting missing ink.
+Input plus output admission is conservative, and errors/admission failures retry
+on a subsequent update, not in an automatic allocation retry loop. A working
+set that cannot fit may therefore remain pending; this is not a universal
+low-memory recovery solution.
+
+Timeline `stroke raster pass` events include command/prefix counts, dimensions,
+recording/native durations, active/cache/output byte estimates and obsolete
+generation cancellation. Image-handle byte estimates are not physical GPU
+memory measurements. Prefix copies add bandwidth and intermediate alpha
+rounding: synthetic comparisons allow at most 2/255 per RGBA channel at 1x and
+2x, covering tiny/variable widths, translucent overlap, dots, fills and adjacent
+highlighters. Visual device review is still required. Non-pen and filled paths
+remain ordered atomic operations and may be arbitrarily complex; this patch
+does not claim a universal draw/geometry bound.
+
+Automated checks cover separate native requests, no dense vector bypass,
+prefix reuse on append/remount, scale rebuilding, obsolete-result disposal,
+source XML invariants and the existing lifecycle/queue/viewport regressions.
+The synthetic 179-command fixture uses six requests at budget 32; this validates
+the mechanism, not a hardware-safe budget or performance improvement.
+
+Device acceptance remains outstanding. A moto g85 5G / Android 16 is connected;
+no app installation, document opening, or GPU profiling was performed. Build
+environment: Flutter 3.47.8, framework 737ba8f885, engine cf636b1dfb,
+Dart 3.13.7. Impeller settings, dependencies and release version are unchanged.
+
+For acceptance, build profile and release variants, preserve the owner's app
+data, and use unchanged notebook bytes. Capture effective renderer startup
+evidence rather than inferring Vulkan/OpenGLES from configuration. Open the
+notebook 20 times, visit all five pages each time, then spend 10 minutes scrolling,
+pinching, drawing, erasing, undoing and reopening. Include cold/warm caches and
+mixed content. Record first-ink/full-visible-ink latency, raster p95/p99 and slow
+frames, crash logs and process/graphics memory over repeated cycles. Compare
+against the unmodified Impeller revision where it completes. Sweep budgets only
+with measured latency/memory/stability trade-offs; 2,048 is not known-safe.
+No device speedup or crash resolution is claimed.
+
+Release validation for 4.2.36+77: `flutter analyze` passed with no issues;
+all 220 tests passed. Android profile compilation was started locally but
+had not completed when release preparation began; device acceptance above
+remains outstanding. The release retains the existing Impeller configuration.
+
 The initial implementation had no connected Android device. Widget tests verify
 correctness and structural limits, not Android frame times. Do not interpret
 those tests as evidence of a measured speedup on a device. The follow-up audit

@@ -29,6 +29,14 @@ class XppPageStack extends StatefulWidget {
   @visibleForTesting
   static int? debugMaxActiveRasterBytes;
 
+  static const int penCommandsPerPass = 2048;
+  @visibleForTesting
+  static int? debugPenCommandsPerPass;
+  @visibleForTesting
+  static void Function(int commands, int completed, bool done)? debugRasterPass;
+  @visibleForTesting
+  static void Function(int commands)? debugVectorWork;
+
   final XppPage? page;
   final double rasterScale;
   final void Function(
@@ -267,6 +275,27 @@ class XppPageStackState extends State<XppPageStack>
   }
 
   Future<Uint8List> toPng() async {
+    // Never export a progressive prefix (or a loading indicator) as if it
+    // were the complete page. PDF export uses the document model separately.
+    void checkReady(Element element) {
+      if (element is StatefulElement &&
+          element.state is _RasterizedStrokeRunState) {
+        final state = element.state as _RasterizedStrokeRunState;
+        final valid = state._cachedPrefixLength(
+          pageSize: state.widget.pageSize,
+        );
+        final remaining =
+            _commandCount(state.widget.strokes) -
+            (valid == null ? 0 : state._completedCommands);
+        if (remaining > _penBudget ||
+            (valid != null && !state._complete && remaining > 0)) {
+          throw StateError('Page ink is still rendering; retry PNG export.');
+        }
+      }
+      element.visitChildren(checkReady);
+    }
+
+    (context as Element).visitChildren(checkReady);
     RenderRepaintBoundary boundary =
         pngKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
     ui.Image image = await boundary.toImage();
@@ -610,7 +639,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       });
       if (_activeBytes - _imageBytes + bytes <= _maxActiveBytes) return true;
     }
-    // Keep exact vector rendering when the visible working set exceeds budget.
+    // Dense work must wait rather than bypassing the command budget.
     return false;
   }
 
@@ -621,6 +650,8 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   Size? _imagePageSize;
   Rect? _imageBounds;
   List<XppStroke> _cachedStrokeIdentities = const [];
+  int _completedCommands = 0;
+  bool _complete = false;
   int _generation = 0;
   Timer? _rasterizeTimer;
   StrokeRasterPolicy? _policy;
@@ -650,7 +681,11 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     final image = _image;
     final cachedPrefixLength = _cachedPrefixLength(pageSize: widget.pageSize);
 
+    final start = cachedPrefixLength == null ? 0 : _completedCommands;
+    final remaining = _commandCount(widget.strokes) - start;
+    final bounded = remaining <= _penBudget;
     if (image == null || cachedPrefixLength == null) {
+      if (!bounded) return const _StrokeLoading(progress: 0);
       return CustomPaint(
         painter: _StrokeRunVectorPainter(widget.strokes),
         size: widget.pageSize,
@@ -671,17 +706,19 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       ),
     ];
 
-    if (cachedPrefixLength < widget.strokes.length) {
+    if (remaining > 0 && bounded && _complete) {
       children.add(
         CustomPaint(
-          painter: _StrokeRunVectorPainter(
-            widget.strokes.sublist(cachedPrefixLength),
-          ),
+          painter: _StrokeRunVectorPainter(widget.strokes, start: start),
           size: widget.pageSize,
         ),
       );
     }
 
+    if (remaining > 0 && (!bounded || !_complete))
+      children.add(
+        _StrokeLoading(progress: start / _commandCount(widget.strokes)),
+      );
     return Stack(fit: StackFit.expand, children: children);
   }
 
@@ -724,6 +761,8 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       _imageBounds = widget.bounds;
       _cachedSignature = signature;
       _cachedStrokeIdentities = widget.strokes;
+      _completedCommands = _commandCount(widget.strokes);
+      _complete = true;
       return;
     }
     if (_rasterizationInProgress) {
@@ -733,199 +772,129 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
     }
 
     final strokes = List<XppStroke>.unmodifiable(widget.strokes);
-    final cachedPrefixLength = _cachedPrefixLength(
+    final prefix = _cachedPrefixLength(
       pageSize: widget.pageSize,
       pixelRatio: pixelRatio,
     );
-    final baseImage =
-        cachedPrefixLength == null || cachedPrefixLength >= strokes.length
-        ? null
-        : _image;
-
+    final start = prefix == null ? 0 : _completedCommands;
     _rasterizeTimer?.cancel();
     _rasterizeTimer = Timer(const Duration(milliseconds: 120), () {
-      _workQueue.schedule(
-        isCurrent: () => mounted && generation == _generation,
-        isVisible: _isVisible,
-        backgroundAllowed: () => _policy?.backgroundAllowed ?? true,
-        run: () => _startRasterization(
-          strokes,
-          widget.pageSize,
-          pixelRatio,
-          signature,
-          generation,
-          baseImage,
-          cachedPrefixLength,
-        ),
-      );
+      _enqueuePass(strokes, signature, generation, start);
     });
   }
 
-  Future<void> _startRasterization(
+  void _enqueuePass(
     List<XppStroke> strokes,
-    Size pageSize,
-    double pixelRatio,
     _StrokeRunKey signature,
     int generation,
-    ui.Image? baseImage,
-    int? cachedPrefixLength,
+    int start,
+  ) {
+    _workQueue.schedule(
+      isCurrent: () => mounted && generation == _generation,
+      isVisible: _isVisible,
+      backgroundAllowed: () => _policy?.backgroundAllowed ?? true,
+      run: () => _startPass(strokes, signature, generation, start),
+    );
+  }
+
+  Future<void> _startPass(
+    List<XppStroke> strokes,
+    _StrokeRunKey signature,
+    int generation,
+    int start,
   ) async {
-    final outputBytes =
-        (signature.bounds.width * pixelRatio).ceil() *
-        (signature.bounds.height * pixelRatio).ceil() *
-        4;
-    if (!_reserveImage(outputBytes, evictOffscreen: true)) {
+    final ratio = signature.pixelRatio;
+    final bounds = signature.bounds;
+    final width = max(1, (bounds.width * ratio).ceil());
+    final height = max(1, (bounds.height * ratio).ceil());
+    final outputBytes = width * height * 4;
+    // Include the previous image and the output concurrently, not just the
+    // eventual replacement. Retained cache handles are reported separately.
+    if (!_reserveImage(outputBytes + _imageBytes, evictOffscreen: true)) {
       _requestedSignature = null;
       widget.onRetryNeeded();
       return;
     }
     _rasterizationInProgress = true;
+    final total = _commandCount(strokes);
+    final end = min(total, start + _penBudget);
     final trace = developer.TimelineTask()
       ..start(
-        'stroke raster',
+        'stroke raster pass',
         arguments: {
-          'strokes': strokes.length,
-          'outputBytes':
-              (signature.bounds.width * pixelRatio).ceil() *
-              (signature.bounds.height * pixelRatio).ceil() *
-              4,
-          'retainedCacheBytes': _cache.bytes,
-          'activeImageBytes': _activeBytes,
-          'inFlightOutputBytes': outputBytes,
-          'cacheHits': _cache.hits,
-          'cacheMisses': _cache.misses,
+          'commands': end - start,
+          'prefix': end,
+          'total': total,
+          'width': width,
+          'height': height,
+          'activeBytes': _activeBytes,
+          'retainedBytes': _cache.bytes,
+          'inFlightBytes': outputBytes,
         },
       );
-    final baseHandle = baseImage?.clone();
+    final recorder = ui.PictureRecorder();
+    ui.Picture? picture;
+    final recording = Stopwatch()..start();
     try {
-      final image = await _rasterize(
-        strokes,
-        pageSize,
-        pixelRatio,
-        baseImage: baseHandle,
-        cachedPrefixLength: cachedPrefixLength,
-        generation: generation,
-        bounds: signature.bounds,
+      final canvas = Canvas(recorder);
+      if (start > 0 && _image != null)
+        canvas.drawImage(_image!, Offset.zero, Paint());
+      canvas.scale(ratio);
+      canvas.translate(-bounds.left, -bounds.top);
+      _paintCommandRange(canvas, strokes, start, end);
+      picture = recorder.endRecording();
+      trace.instant(
+        'recorded',
+        arguments: {'microseconds': recording.elapsedMicroseconds},
+      );
+      XppPageStack.debugRasterPass?.call(end - start, end, end == total);
+      final native = Stopwatch()..start();
+      final image =
+          await (XppPageStack.debugRasterizePicture?.call(
+                picture,
+                width,
+                height,
+              ) ??
+              picture.toImage(width, height));
+      trace.instant(
+        'rasterized',
+        arguments: {'microseconds': native.elapsedMicroseconds},
       );
       if (!mounted || generation != _generation) {
         image.dispose();
-        return;
-      }
-
-      if (!_reserveImage(
-        image.width * image.height * 4,
-        evictOffscreen: true,
-      )) {
-        image.dispose();
-        _requestedSignature = null;
+        trace.instant(
+          'cancelled',
+          arguments: {'reason': 'obsolete generation'},
+        );
         return;
       }
       setState(() {
         _replaceImage(image);
-        _imagePixelRatio = pixelRatio;
-        _imagePageSize = pageSize;
-        _imageBounds = signature.bounds;
+        _imagePixelRatio = ratio;
+        _imagePageSize = signature.pageSize;
+        _imageBounds = bounds;
         _cachedSignature = signature;
         _cachedStrokeIdentities = strokes;
-        _cache.put(signature, image);
+        _completedCommands = end;
+        _complete = end == total;
+        if (_complete) _cache.put(signature, image);
       });
+      if (end < total) _enqueuePass(strokes, signature, generation, end);
     } catch (_) {
-      // Vector painting remains available. Permit a later update to retry,
-      // without spinning indefinitely on an allocation/native-render failure.
       if (mounted && generation == _generation) {
         _requestedSignature = null;
-        // Permit a later parent update to retry even if geometry is unchanged.
-        // Do not schedule a rebuild here: allocation failures must not spin.
         widget.onRetryNeeded();
       }
     } finally {
-      baseHandle?.dispose();
+      if (picture == null) recorder.endRecording().dispose();
+      picture?.dispose();
       trace.finish();
       _rasterizationInProgress = false;
-      _rerasterizeIfRequested();
-    }
-  }
-
-  void _rerasterizeIfRequested() {
-    if (!mounted || !_rasterizeAfterCurrent) return;
-    _rasterizeAfterCurrent = false;
-    _requestedSignature = null;
-    _rasterizeIfNeeded();
-  }
-
-  Future<ui.Image> _rasterize(
-    List<XppStroke> strokes,
-    Size pageSize,
-    double pixelRatio, {
-    ui.Image? baseImage,
-    int? cachedPrefixLength,
-    required int generation,
-    required Rect bounds,
-  }) async {
-    final tailStart = baseImage == null ? 0 : cachedPrefixLength ?? 0;
-    if (tailStart >= strokes.length) return baseImage!.clone();
-
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    if (baseImage != null) {
-      canvas.drawImage(baseImage, Offset.zero, Paint());
-    }
-    canvas.scale(pixelRatio);
-    canvas.translate(-bounds.left, -bounds.top);
-    // Recording is synchronous UI-isolate work even though toImage is async.
-    // Yield between small batches, and stop obsolete work before native raster.
-    try {
-      var pointsRecorded = 0;
-      final recordingSlice = Stopwatch()..start();
-      for (final stroke in strokes.skip(tailStart)) {
-        final points = stroke.points;
-        if (points == null || points.isEmpty) continue;
-        // Pen segments are independent drawLine calls. Keep one shared end
-        // point between batches to preserve pressure and round caps exactly.
-        // Highlighter paths stay intact to preserve translucent joins.
-        final batches = _strokeBatches(stroke, points);
-        for (final batch in batches) {
-          XppStrokePainter(
-            points: batch,
-            color: _strokeColor(stroke),
-            topLeft: Offset.zero,
-            smoothPressure: stroke.tool == XppStrokeTool.PEN,
-            fill: stroke.fill,
-          ).paint(canvas, Size.zero);
-          pointsRecorded += batch.length;
-          if (pointsRecorded >= 512 ||
-              recordingSlice.elapsedMicroseconds >= 2000) {
-            await Future<void>.delayed(Duration.zero);
-            if (!mounted || generation != _generation) {
-              throw StateError('Obsolete stroke raster');
-            }
-            if (!_isVisible() &&
-                (!(_policy?.backgroundAllowed ?? true) ||
-                    _workQueue.hasVisibleWork)) {
-              _rasterizeAfterCurrent = true;
-              throw StateError('Defer offscreen stroke raster');
-            }
-            pointsRecorded = 0;
-            recordingSlice.reset();
-          }
-        }
+      if (mounted && _rasterizeAfterCurrent) {
+        _rasterizeAfterCurrent = false;
+        _requestedSignature = null;
+        _rasterizeIfNeeded();
       }
-    } catch (_) {
-      recorder.endRecording().dispose();
-      rethrow;
-    }
-    final picture = recorder.endRecording();
-    final width = (bounds.width * pixelRatio).ceil().clamp(1, 100000);
-    final height = (bounds.height * pixelRatio).ceil().clamp(1, 100000);
-    try {
-      return await (XppPageStack.debugRasterizePicture?.call(
-            picture,
-            width,
-            height,
-          ) ??
-          picture.toImage(width, height));
-    } finally {
-      picture.dispose();
     }
   }
 
@@ -936,7 +905,9 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
   ) => _StrokeRunKey(strokes, pageSize, pixelRatio, widget.bounds);
 
   int? _cachedPrefixLength({Size? pageSize, double? pixelRatio}) {
-    if (_cachedSignature == null) return null;
+    if (_cachedSignature == null || _image == null) return null;
+    if (!_complete && _cachedStrokeIdentities.length != widget.strokes.length)
+      return null;
     if (pageSize != null && _imagePageSize != pageSize) return null;
     if (pixelRatio != null &&
         (_imagePixelRatio != pixelRatio || _imageBounds != widget.bounds))
@@ -979,36 +950,87 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
 
 class _StrokeRunVectorPainter extends CustomPainter {
   final List<XppStroke> strokes;
+  final int start;
 
-  _StrokeRunVectorPainter(this.strokes);
+  _StrokeRunVectorPainter(this.strokes, {this.start = 0});
 
   @override
   void paint(Canvas canvas, Size size) {
-    _paintStrokes(canvas, strokes);
+    final total = _commandCount(strokes);
+    XppPageStack.debugVectorWork?.call(total - start);
+    _paintCommandRange(canvas, strokes, start, total);
   }
 
   @override
   bool shouldRepaint(covariant _StrokeRunVectorPainter oldDelegate) {
-    return !listEquals(oldDelegate.strokes, strokes);
+    return oldDelegate.start != start ||
+        !listEquals(oldDelegate.strokes, strokes);
   }
 }
 
-void _paintStrokes(Canvas canvas, Iterable<XppStroke> strokes) {
-  final clip = canvas.getLocalClipBounds();
-  for (final stroke in strokes) {
-    final bounds = stroke.eraseBounds;
-    if (bounds != null && !clip.overlaps(bounds)) continue;
-    final points = stroke.points;
-    if (points == null || points.isEmpty) continue;
+int get _penBudget => max(
+  1,
+  XppPageStack.debugPenCommandsPerPass ?? XppPageStack.penCommandsPerPass,
+);
 
+int _strokeCommands(XppStroke stroke) {
+  final count = stroke.points?.length ?? 0;
+  if (count == 0) return 0;
+  // Filled and non-pen paths remain atomic: this is a pen-command bound,
+  // not a universal geometry bound.
+  if (stroke.fill != null || stroke.tool != XppStrokeTool.PEN) return 1;
+  return max(1, count - 1);
+}
+
+int _commandCount(Iterable<XppStroke> strokes) =>
+    strokes.fold(0, (sum, stroke) => sum + _strokeCommands(stroke));
+
+void _paintCommandRange(
+  Canvas canvas,
+  Iterable<XppStroke> strokes,
+  int start,
+  int end,
+) {
+  var offset = 0;
+  for (final stroke in strokes) {
+    final count = _strokeCommands(stroke);
+    final from = max(0, start - offset);
+    final to = min(count, end - offset);
+    offset += count;
+    if (from >= to) continue;
+    final points = stroke.points!;
+    final boundedPen = stroke.tool == XppStrokeTool.PEN && stroke.fill == null;
+    final range = !boundedPen || points.length == 1
+        ? points
+        : points.sublist(from, to + 1);
     XppStrokePainter(
-      points: points,
+      points: range,
       color: _strokeColor(stroke),
       topLeft: Offset.zero,
       smoothPressure: stroke.tool == XppStrokeTool.PEN,
       fill: stroke.fill,
     ).paint(canvas, Size.zero);
+    if (offset >= end) break;
   }
+}
+
+class _StrokeLoading extends StatelessWidget {
+  const _StrokeLoading({required this.progress});
+  final double progress;
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Align(
+      alignment: Alignment.topRight,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(value: progress, strokeWidth: 1),
+        ),
+      ),
+    ),
+  );
 }
 
 Color _strokeColor(XppStroke stroke) {
@@ -1045,21 +1067,6 @@ class _StrokeRunKey {
       pixelRatio == other.pixelRatio &&
       bounds == other.bounds &&
       listEquals(strokes, other.strokes);
-}
-
-Iterable<List<XppStrokePoint>> _strokeBatches(
-  XppStroke stroke,
-  List<XppStrokePoint> points,
-) sync* {
-  if (stroke.fill != null ||
-      stroke.tool != XppStrokeTool.PEN ||
-      points.length <= 512) {
-    yield points;
-    return;
-  }
-  for (var start = 0; start < points.length - 1; start += 512) {
-    yield points.sublist(start, min(start + 513, points.length));
-  }
 }
 
 Rect _strokeRasterBounds(List<XppStroke> strokes, Size pageSize) {

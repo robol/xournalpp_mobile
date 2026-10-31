@@ -291,8 +291,10 @@ void main() {
     first.layers!.first.content!.add((_page().layers!.first.content!.single));
     await tester.pumpWidget(app(true));
     await finishRasters();
-    expect(images, hasLength(2));
-    expect(images.first.debugDisposed, isTrue);
+    // Input plus output no longer fits: retain the valid base, reject the
+    // append without spinning or falling back to dense vector work.
+    expect(images, hasLength(1));
+    expect(images.first.debugDisposed, isFalse);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
