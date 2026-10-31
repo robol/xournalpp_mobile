@@ -321,7 +321,7 @@ class XppFile {
         : rawTitle;
 
     /// decoding file bytes from GZip to a UTF-8 [Uint8List]
-    List<int> bytes = GZipDecoder().decodeBytes(rawFile.toUint8List().toList());
+    List<int> bytes = GZipDecoder().decodeBytes(rawFile.toUint8List());
 
     /// decoding the [Uint8List] to a [String]
     String fileText = utf8.decode(bytes);

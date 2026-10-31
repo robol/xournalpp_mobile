@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/NextcloudConnection.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NotebookMetadata.dart';
 
 /// WebDAV storage rooted at the configured folder.
 class NextcloudStorage implements NotebookStorage {
@@ -195,10 +196,7 @@ class NextcloudStorage implements NotebookStorage {
     final response = await _request('GET', _url(parts.last, folder: parent));
     _check(response, 'Could not read notebook', [200]);
     final bytes = response.bodyBytes;
-    final xml = XmlDocument.parse(
-      utf8.decode(const GZipDecoder().decodeBytes(bytes)),
-    );
-    final name = xml.rootElement.getAttribute('xournalpp-mobile-pdf-map');
+    final name = notebookRootAttribute(bytes, 'xournalpp-mobile-pdf-map');
     if (name != null) {
       if (!RegExp(r'^\.xournalpp-map-[0-9a-f]{64}\.json$').hasMatch(name))
         throw const FormatException('Invalid PDF mapping');

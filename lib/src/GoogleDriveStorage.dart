@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NotebookMetadata.dart';
 
 /// Drive storage uses opaque Drive file IDs and a caller-supplied OAuth token.
 class GoogleDriveStorage implements NotebookStorage {
@@ -268,10 +269,7 @@ class GoogleDriveStorage implements NotebookStorage {
   Future<Uint8List> readNotebook(StoredNotebook notebook) async {
     if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
     final bytes = await _download(notebook.id);
-    final xml = XmlDocument.parse(
-      utf8.decode(const GZipDecoder().decodeBytes(bytes)),
-    );
-    final manifestId = xml.rootElement.getAttribute(_manifestAttribute);
+    final manifestId = notebookRootAttribute(bytes, _manifestAttribute);
     _manifests[notebook.id] = manifestId == null
         ? {}
         : (jsonDecode(utf8.decode(await _download(manifestId))) as Map).map(
