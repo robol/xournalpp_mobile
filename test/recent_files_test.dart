@@ -77,6 +77,35 @@ void main() {
     },
   );
 
+  testWidgets(
+    'restores a saved local name instead of an opaque document ID after restart',
+    (tester) async {
+      const uri = 'content://documents/document/12345';
+      SharedPreferences.setMockInitialValues({
+        'localSavedNotebooks': jsonEncode([
+          {'id': uri, 'name': 'My notebook'},
+        ]),
+        PreferencesKeys.kRecentFiles: jsonEncode([
+          {'path': uri, 'name': '12345'},
+          {
+            'path': 'content://other/document/999',
+            'name': 'Different notebook',
+          },
+        ]),
+      });
+      await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      expect(find.text('My notebook'), findsOneWidget);
+      expect(find.text('12345'), findsNothing);
+      expect(find.text('Different notebook'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      expect(find.text('My notebook'), findsOneWidget);
+      expect(find.text('12345'), findsNothing);
+    },
+  );
+
   testWidgets('recent cloud notebook reopens with its backend', (tester) async {
     final original = XppFile.empty(title: 'Cloud notebook')
       ..previewImage = kTransparentImage;

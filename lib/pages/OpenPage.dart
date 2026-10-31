@@ -53,6 +53,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     RecentFiles.changes.removeListener(_loadRecentFiles);
+    LocalNotebookStorage.changes.removeListener(_loadRecentFiles);
     _mediaSubscription?.cancel();
     _animationController.dispose();
     super.dispose();
@@ -76,6 +77,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     });
 
     RecentFiles.changes.addListener(_loadRecentFiles);
+    LocalNotebookStorage.changes.addListener(_loadRecentFiles);
     unawaited(
       NextcloudManager.restore().catchError((Object error) {
         debugPrint('Could not restore Nextcloud: $error');
@@ -201,27 +203,67 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     }
   }
 
+  int _recentLoadGeneration = 0;
+
   void _loadRecentFiles() {
-    SharedPreferences.getInstance()
-        .then((prefs) {
-          if (!mounted) return;
-          String? jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
-          if (jsonData != null) {
-            recentFiles = (jsonDecode(jsonData) as List).reversed
-                .toList()
-                .toSet();
+    final generation = ++_recentLoadGeneration;
+    () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonData = prefs.getString(PreferencesKeys.kRecentFiles);
+        final entries = jsonData == null
+            ? <dynamic>[]
+            : jsonDecode(jsonData) as List;
+        final savedNames = <String, String>{};
+        try {
+          for (final notebook in await localNotebookStorage.list()) {
+            savedNames[notebook.id] = notebook.name;
           }
-          setState(() {
-            _loadedRecent = true;
-          });
-        })
-        .catchError((e) {
-          if (!mounted) return;
-          print('No SharedPreferences available for this platform.');
-          setState(() {
-            _loadedRecent = true;
-          });
-        });
+        } catch (_) {
+          // Recent files remain usable if the optional local index is damaged.
+        }
+        if (!mounted || generation != _recentLoadGeneration) return;
+        recentFiles = entries.reversed.map((entry) {
+          final file = Map<String, dynamic>.from(entry as Map);
+          final path = file['path'] as String?;
+          final name = file['name'] as String?;
+          if (path != null &&
+              name != null &&
+              (file['backendId'] == null || file['backendId'] == 'local') &&
+              path.startsWith('content://')) {
+            final fallback = _externalFileName(path, null);
+            final extension = fallback.lastIndexOf('.');
+            final fallbackTitle = extension > 0
+                ? fallback.substring(0, extension)
+                : fallback;
+            final saved = savedNames[path];
+            if (saved != null &&
+                saved.isNotEmpty &&
+                (name == fallback || name == fallbackTitle)) {
+              file['name'] = saved;
+            }
+          }
+          return file;
+        }).toSet();
+        setState(() => _loadedRecent = true);
+      } catch (_) {
+        if (!mounted || generation != _recentLoadGeneration) return;
+        setState(() => _loadedRecent = true);
+      }
+    }();
+  }
+
+  Future<String?> _savedLocalDisplayName(String path) async {
+    if (!path.startsWith('content://')) return null;
+    try {
+      final notebooks = await localNotebookStorage.list();
+      return notebooks
+          .where((notebook) => notebook.id == path)
+          .firstOrNull
+          ?.name;
+    } catch (_) {
+      return null;
+    }
   }
 
   void afterFirstLayout(BuildContext context) {
@@ -494,9 +536,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         mimeType: mimeType,
         displayName: displayName,
       );
+      final resolvedName = displayName != null && displayName.isNotEmpty
+          ? displayName
+          : await _savedLocalDisplayName(path);
       var pickedFile = await XppPickedFile.fromExternalPath(
         path: path,
-        fileName: displayName,
+        fileName: resolvedName,
         fileExtension: extension,
       );
       final XppFile file;
