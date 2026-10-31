@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:xournalpp/src/RasterWorkQueue.dart';
 import 'package:xournalpp/widgets/StrokeRasterPolicy.dart';
+import 'package:xournalpp/widgets/StrokeOpeningGate.dart';
 import 'package:xournalpp/src/ContentSpatialIndex.dart';
 import 'package:xournalpp/layer_contents/XppImage.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
@@ -365,6 +366,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
   Map<XppContent, Widget> renderedContent = {};
   Widget? _composition;
   int? _compositionRevision;
+  bool? _openingGateOpen;
 
   @override
   void didUpdateWidget(covariant XppLayerStack oldWidget) {
@@ -385,6 +387,11 @@ class _XppLayerStackState extends State<XppLayerStack> {
 
   @override
   Widget build(BuildContext context) {
+    final openingGateOpen = StrokeOpeningScope.isOpen(context);
+    if (_openingGateOpen != openingGateOpen) {
+      _openingGateOpen = openingGateOpen;
+      _composition = null;
+    }
     if (_composition != null && _compositionRevision == widget.layer!.revision)
       return _composition!;
     _compositionRevision = widget.layer!.revision;
@@ -421,6 +428,7 @@ class _XppLayerStackState extends State<XppLayerStack> {
       if (element == null) return;
 
       if (element is XppStroke) {
+        if (!openingGateOpen) return;
         if (pendingStrokes.isNotEmpty &&
             widget.selectedContents.contains(pendingStrokes.first) !=
                 widget.selectedContents.contains(element))

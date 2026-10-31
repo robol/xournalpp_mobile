@@ -37,6 +37,7 @@ import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'package:xournalpp/widgets/MainDrawer.dart';
 import 'package:xournalpp/widgets/PointerListener.dart';
 import 'package:xournalpp/widgets/StrokeRasterPolicy.dart';
+import 'package:xournalpp/widgets/StrokeOpeningGate.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
@@ -343,50 +344,52 @@ class _CanvasPageState extends State<CanvasPage>
   Widget build(BuildContext context) {
     return StrokeRasterScope(
       policy: _strokeRasterPolicy,
-      child: Focus(
-        canRequestFocus: false,
-        onKeyEvent: (_, _) {
-          _recordDraftActivity();
-          return KeyEventResult.ignored;
-        },
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (event) {
-            _draftActivePointers.add(event.pointer);
+      child: StrokeOpeningGate(
+        child: Focus(
+          canRequestFocus: false,
+          onKeyEvent: (_, _) {
             _recordDraftActivity();
+            return KeyEventResult.ignored;
           },
-          onPointerMove: (_) => _recordDraftActivity(),
-          onPointerHover: (_) => _recordDraftActivity(),
-          onPointerSignal: (_) => _recordDraftActivity(),
-          onPointerUp: (event) {
-            _draftActivePointers.remove(event.pointer);
-            _recordDraftActivity();
-          },
-          onPointerCancel: (event) {
-            _draftActivePointers.remove(event.pointer);
-            _recordDraftActivity();
-          },
-          child: AbsorbPointer(
-            absorbing: _erasing,
-            child: Stack(
-              children: [
-                PdfSourceScope(
-                  resolve: _resolvePdfSource,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) => _buildEditor(
-                      context,
-                      embedToolbar: constraints.maxWidth >= 1000,
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (event) {
+              _draftActivePointers.add(event.pointer);
+              _recordDraftActivity();
+            },
+            onPointerMove: (_) => _recordDraftActivity(),
+            onPointerHover: (_) => _recordDraftActivity(),
+            onPointerSignal: (_) => _recordDraftActivity(),
+            onPointerUp: (event) {
+              _draftActivePointers.remove(event.pointer);
+              _recordDraftActivity();
+            },
+            onPointerCancel: (event) {
+              _draftActivePointers.remove(event.pointer);
+              _recordDraftActivity();
+            },
+            child: AbsorbPointer(
+              absorbing: _erasing,
+              child: Stack(
+                children: [
+                  PdfSourceScope(
+                    resolve: _resolvePdfSource,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => _buildEditor(
+                        context,
+                        embedToolbar: constraints.maxWidth >= 1000,
+                      ),
                     ),
                   ),
-                ),
-                if (_erasing)
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: LinearProgressIndicator(),
-                  ),
-              ],
+                  if (_erasing)
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
