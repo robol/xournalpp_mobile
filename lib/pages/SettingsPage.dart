@@ -1,3 +1,4 @@
+import 'package:xournalpp/widgets/NotebookCacheSettings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xournalpp/src/NextcloudManager.dart';
@@ -34,6 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          if (!kIsWeb) const NotebookCacheSettings(),
           if (GoogleDriveManager.supported)
             ValueListenableBuilder<int>(
               valueListenable: GoogleDriveManager.changes,

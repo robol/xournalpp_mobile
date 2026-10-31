@@ -48,6 +48,56 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "background": MessageLookupByLibrary.simpleMessage("Hintergrund"),
     "between1And": MessageLookupByLibrary.simpleMessage("Zwischen 1 und"),
+    "cacheBrowse": MessageLookupByLibrary.simpleMessage(
+      "Zwischengespeicherte Notizbücher",
+    ),
+    "cacheCheckpoint": MessageLookupByLibrary.simpleMessage(
+      "Lokaler Speicherzeitpunkt",
+    ),
+    "cacheClear": MessageLookupByLibrary.simpleMessage("Cache leeren"),
+    "cacheClearConfirm": MessageLookupByLibrary.simpleMessage(
+      "Alle zwischengespeicherten Notizbücher und PDFs löschen? Wiederherstellungsentwürfe bleiben erhalten.",
+    ),
+    "cacheEmpty": MessageLookupByLibrary.simpleMessage(
+      "Keine zwischengespeicherten Notizbücher verfügbar.",
+    ),
+    "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
+      "Einige PDF-Hintergründe fehlen.",
+    ),
+    "cacheOpen": MessageLookupByLibrary.simpleMessage(
+      "Zwischengespeicherte Kopie öffnen",
+    ),
+    "cacheOpenTitle": MessageLookupByLibrary.simpleMessage(
+      "Zwischengespeicherte Kopie öffnen?",
+    ),
+    "cacheOverwrite": MessageLookupByLibrary.simpleMessage(
+      "Original überschreiben",
+    ),
+    "cacheOverwriteTitle": MessageLookupByLibrary.simpleMessage(
+      "Original überschreiben?",
+    ),
+    "cacheSaveCopy": MessageLookupByLibrary.simpleMessage("Kopie speichern"),
+    "cacheSaved": MessageLookupByLibrary.simpleMessage(
+      "Zuletzt bestätigte Version",
+    ),
+    "cacheSetting": MessageLookupByLibrary.simpleMessage(
+      "Lokaler Notizbuch-Cache",
+    ),
+    "cacheSettingDescription": MessageLookupByLibrary.simpleMessage(
+      "Lokale Kopien von Notizbüchern und PDF-Hintergründen für Speicherausfälle behalten. Der Speicherbedarf kann wachsen. Beim Ausschalten bleiben vorhandene Kopien bis zum Löschen erhalten.",
+    ),
+    "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Der lokale Cache ist nicht verfügbar.",
+    ),
+    "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
+      "Enthält ungespeicherte Änderungen",
+    ),
+    "cacheUpdateFailed": MessageLookupByLibrary.simpleMessage(
+      "Die lokale Kopie konnte nicht aktualisiert werden. Der Vorgang beim Speicheranbieter war nicht betroffen.",
+    ),
+    "cacheWarning": MessageLookupByLibrary.simpleMessage(
+      "Du bearbeitest eine zwischengespeicherte Kopie. Sie ist möglicherweise veraltet. Beim Speichern am ursprünglichen Ort können neuere Änderungen überschrieben werden.",
+    ),
     "cancel": MessageLookupByLibrary.simpleMessage("Abbrechen"),
     "close": MessageLookupByLibrary.simpleMessage("Schließen"),
     "color": MessageLookupByLibrary.simpleMessage("Farbe"),

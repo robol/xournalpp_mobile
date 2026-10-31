@@ -48,6 +48,48 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "background": MessageLookupByLibrary.simpleMessage("Background"),
     "between1And": MessageLookupByLibrary.simpleMessage("Between 1 and"),
+    "cacheBrowse": MessageLookupByLibrary.simpleMessage("Cached notebooks"),
+    "cacheCheckpoint": MessageLookupByLibrary.simpleMessage("Local checkpoint"),
+    "cacheClear": MessageLookupByLibrary.simpleMessage("Clear cache"),
+    "cacheClearConfirm": MessageLookupByLibrary.simpleMessage(
+      "Delete all cached notebooks and PDFs? Recovery drafts will be kept.",
+    ),
+    "cacheEmpty": MessageLookupByLibrary.simpleMessage(
+      "No cached notebooks are available.",
+    ),
+    "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
+      "Some PDF backgrounds are missing.",
+    ),
+    "cacheOpen": MessageLookupByLibrary.simpleMessage("Open cached copy"),
+    "cacheOpenTitle": MessageLookupByLibrary.simpleMessage("Open cached copy?"),
+    "cacheOverwrite": MessageLookupByLibrary.simpleMessage(
+      "Overwrite original",
+    ),
+    "cacheOverwriteTitle": MessageLookupByLibrary.simpleMessage(
+      "Overwrite original?",
+    ),
+    "cacheSaveCopy": MessageLookupByLibrary.simpleMessage("Save a copy"),
+    "cacheSaved": MessageLookupByLibrary.simpleMessage(
+      "Last confirmed version",
+    ),
+    "cacheSetting": MessageLookupByLibrary.simpleMessage(
+      "Local notebook cache",
+    ),
+    "cacheSettingDescription": MessageLookupByLibrary.simpleMessage(
+      "Keep local copies of notebooks and PDF backgrounds for provider failures. Storage usage can grow. Turning this off retains existing copies until cleared.",
+    ),
+    "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
+      "The local cache is unavailable.",
+    ),
+    "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
+      "Includes unsaved edits",
+    ),
+    "cacheUpdateFailed": MessageLookupByLibrary.simpleMessage(
+      "The local copy could not be updated. The provider operation was not affected.",
+    ),
+    "cacheWarning": MessageLookupByLibrary.simpleMessage(
+      "You are editing a cached copy. It may be outdated. Saving to the original location may overwrite newer changes.",
+    ),
     "cancel": MessageLookupByLibrary.simpleMessage("Cancel"),
     "close": MessageLookupByLibrary.simpleMessage("Close"),
     "color": MessageLookupByLibrary.simpleMessage("Color"),

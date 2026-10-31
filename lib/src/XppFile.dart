@@ -1,9 +1,10 @@
+import 'NotebookCache.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:flutter/foundation.dart' show compute;
+import 'package:flutter/foundation.dart' show compute, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
@@ -27,20 +28,182 @@ import 'package:xournalpp/widgets/LoadingFileDialog.dart';
 import 'XppLayer.dart';
 import 'XppPage.dart';
 
+int _cacheSessionCounter = 0;
+
 class XppFile {
   XppFile({this.title, this.pages, this.previewImage});
 
   NotebookStorage? storage;
   StoredNotebook? storageNotebook;
+  bool openedFromCache = false;
+  bool cachedEdits = false;
+  int cachedPage = 0;
+  final cachedPdfs = <String, Uint8List>{};
+  void Function()? onCacheError;
+  Future<void>? _cacheWork;
+  String _cacheSession =
+      '${DateTime.now().microsecondsSinceEpoch}_${_cacheSessionCounter++}';
+  final _pendingCachePdfs = <String>{};
+
+  List<String> get pdfReferences =>
+      pages
+          ?.map((page) => page.background)
+          .whereType<XppBackgroundPdf>()
+          .map((pdf) => pdf.filename ?? '')
+          .toSet()
+          .toList() ??
+      [];
+
+  Future<void> cacheSnapshot(
+    Uint8List bytes, {
+    required bool dirty,
+    int page = 0,
+    bool saved = false,
+    int? expectedGeneration,
+  }) {
+    final notebook = storageNotebook;
+    if (notebook == null) return Future.value();
+    final references = pdfReferences;
+    final generation = expectedGeneration ?? NotebookCache.instance.generation;
+    final sourceStorage = storage;
+    _cacheWork = (_cacheWork ?? Future<void>.value())
+        .then((_) async {
+          if (!await NotebookCache.instance.enabled) return;
+          await NotebookCache.instance.record(
+            notebook: notebook,
+            bytes: bytes,
+            pdfs: cachedPdfs,
+            references: references,
+            dirty: dirty,
+            page: page,
+            expectedGeneration: generation,
+            resourceSession: _cacheSession,
+          );
+          if (saved && generation == NotebookCache.instance.generation)
+            await NotebookCache.instance.discardWorking(notebook);
+          if (!openedFromCache &&
+              generation == NotebookCache.instance.generation) {
+            for (final ref in references) {
+              if (ref.isEmpty ||
+                  cachedPdfs.containsKey(ref) ||
+                  !_pendingCachePdfs.add(ref))
+                continue;
+              unawaited(_cachePdf(sourceStorage, notebook, ref, generation));
+            }
+          }
+        })
+        .catchError((Object error) {
+          debugPrint('Could not update notebook cache: $error');
+          onCacheError?.call();
+        });
+    return _cacheWork!;
+  }
+
+  void useCachedResources(CachedNotebook cached) {
+    cachedPdfs.addAll(cached.pdfs);
+    _cacheSession = cached.resourceSession ?? _cacheSession;
+  }
+
+  void _rememberPdf(String reference, Uint8List bytes) {
+    cachedPdfs[reference] = bytes;
+    final notebook = storageNotebook;
+    if (notebook == null) return;
+    unawaited(
+      NotebookCache.instance
+          .addPdfs(
+            notebook,
+            {reference: bytes},
+            expectedGeneration: NotebookCache.instance.generation,
+            resourceSession: _cacheSession,
+          )
+          .catchError((Object _) {
+            onCacheError?.call();
+          }),
+    );
+  }
+
+  Future<void> _cachePdf(
+    NotebookStorage? sourceStorage,
+    StoredNotebook notebook,
+    String ref,
+    int generation,
+  ) async {
+    try {
+      final bytes = sourceStorage != null
+          ? await sourceStorage
+                .readPdf(notebook, ref)
+                .timeout(const Duration(seconds: 15))
+          : (await XppPickedFile.fromInternalPath(path: ref)).bytes;
+      cachedPdfs[ref] = bytes;
+      try {
+        await NotebookCache.instance.addPdfs(
+          notebook,
+          {ref: bytes},
+          expectedGeneration: generation,
+          resourceSession: _cacheSession,
+        );
+      } catch (_) {
+        onCacheError?.call();
+      }
+    } catch (_) {
+      /* The published checkpoint explicitly marks this PDF missing. */
+    } finally {
+      _pendingCachePdfs.remove(ref);
+    }
+  }
+
+  Future<void> discardCachedEdits() async {
+    await _cacheWork;
+    final notebook = storageNotebook;
+    if (notebook == null) return;
+    try {
+      await NotebookCache.instance.discardWorking(notebook);
+    } catch (_) {
+      onCacheError?.call();
+    }
+  }
+
+  static Future<XppFile> fromCachedNotebook(
+    CachedNotebook cached,
+    NotebookStorage? storage,
+    FileNotAvailableCallback onUnavailable,
+  ) async {
+    final file = await fromXppPickedFile(
+      XppPickedFile(
+        cached.bytes,
+        fileName: cached.notebook.name,
+        fileExtension: 'xopp',
+      ),
+      null,
+      onUnavailable,
+    );
+    file.storage = storage;
+    file.storageNotebook = cached.notebook;
+    file.openedFromCache = true;
+    file.cachedEdits = cached.dirty;
+    file.cachedPage = cached.page;
+    file.useCachedResources(cached);
+    return file;
+  }
 
   static Future<XppFile> openStoredNotebook(
     NotebookStorage storage,
     StoredNotebook notebook,
-    FileNotAvailableCallback onUnavailable,
-  ) async {
+    FileNotAvailableCallback onUnavailable, {
+    Future<CachedNotebook?> Function(Object error)? onReadFailure,
+    void Function()? onCacheError,
+  }) async {
     if (notebook.backendId != storage.id)
       throw ArgumentError('Notebook belongs to a different storage backend');
-    final bytes = await storage.readNotebook(notebook);
+    late final Uint8List bytes;
+    try {
+      bytes = await storage.readNotebook(notebook);
+    } catch (error) {
+      final cached = await onReadFailure?.call(error);
+      if (cached != null)
+        return fromCachedNotebook(cached, storage, onUnavailable);
+      rethrow;
+    }
     final file = await fromXppPickedFile(
       XppPickedFile(bytes, fileName: notebook.name, fileExtension: 'xopp'),
       null,
@@ -48,6 +211,8 @@ class XppFile {
     );
     file.storage = storage;
     file.storageNotebook = notebook;
+    file.onCacheError = onCacheError;
+    unawaited(file.cacheSnapshot(bytes, dirty: false));
     return file;
   }
 
@@ -56,9 +221,22 @@ class XppFile {
     XppBackgroundPdf background,
   ) async {
     final filename = background.filename;
+    if (openedFromCache) {
+      if (cachedPdfs.containsKey(filename)) {
+        return XppPickedFile(
+          cachedPdfs[filename]!,
+          fileName: filename!,
+          fileExtension: 'pdf',
+        );
+      }
+      final recovered = await background.onUnavailable(context, filename);
+      if (filename != null) _rememberPdf(filename, recovered.bytes);
+      return recovered;
+    }
     if (storage != null && storageNotebook != null && filename != null) {
       try {
         final bytes = await storage!.readPdf(storageNotebook!, filename);
+        _rememberPdf(filename, bytes);
         return XppPickedFile(bytes, fileName: filename, fileExtension: 'pdf');
       } catch (_) {
         if (!context.mounted) rethrow;
@@ -106,8 +284,8 @@ class XppFile {
       late final Future<PdfBackgroundRenderSource> pending;
       pending = service
           .sourceForPath(
-            storage != null ? null : background.filename,
-            fallback: () => storage == null
+            storage != null || openedFromCache ? null : background.filename,
+            fallback: () => storage == null && !openedFromCache
                 ? background.onUnavailable(context, background.filename)
                 : readBackgroundPdf(context, background),
             isCurrent: () => context.mounted,
@@ -223,6 +401,12 @@ class XppFile {
           rawFile,
           (percentage) => null,
           showMissingFileDialog,
+          onCacheError: () {
+            if (context.mounted)
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                SnackBar(content: Text(S.of(context).cacheUpdateFailed)),
+              );
+          },
         );
       });
 
@@ -281,8 +465,9 @@ class XppFile {
   static Future<XppFile> fromXppPickedFile(
     XppPickedFile rawFile,
     Function(double)? percentageCallback,
-    FileNotAvailableCallback onUnavailable,
-  ) async {
+    FileNotAvailableCallback onUnavailable, {
+    void Function()? onCacheError,
+  }) async {
     final file = await compute(
       _parseNotebook,
       rawFile,
@@ -298,6 +483,16 @@ class XppFile {
           domain: background.domain,
         );
       }
+    }
+    file.onCacheError = onCacheError;
+    if (rawFile.path != null) {
+      file.storage = localNotebookStorage;
+      file.storageNotebook = StoredNotebook(
+        backendId: 'local',
+        id: rawFile.path!,
+        name: rawFile.fileName ?? file.title ?? 'Untitled',
+      );
+      unawaited(file.cacheSnapshot(rawFile.bytes, dirty: false));
     }
     try {
       percentageCallback?.call(1.0);

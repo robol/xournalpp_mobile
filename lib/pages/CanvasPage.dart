@@ -1,3 +1,5 @@
+import 'package:xournalpp/src/NotebookCache.dart';
+import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
@@ -287,6 +289,25 @@ class _CanvasPageState extends State<CanvasPage>
               _draftActivePointers.isNotEmpty ||
               _pinchZoomActive ||
               _viewportPinchZooming;
+    if (_file?.cachedEdits == true) _revision = 1;
+    _file?.onCacheError = () {
+      if (mounted)
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(S.of(context).cacheUpdateFailed)),
+        );
+    };
+    if (_file != null &&
+        _file!.storageNotebook == null &&
+        filePath != null &&
+        widget.recoveryDraftId == null) {
+      final file = _file!;
+      file.storage = localNotebookStorage;
+      file.storageNotebook = StoredNotebook(
+        backendId: 'local',
+        id: filePath!,
+        name: file.title ?? 'Untitled',
+      );
+    }
     _draftId = widget.recoveryDraftId ?? DraftRecovery.newId();
     if (widget.recoveryDraftId != null) {
       _revision = 1;
@@ -439,39 +460,58 @@ class _CanvasPageState extends State<CanvasPage>
       },
       child: Scaffold(
         drawer: MainDrawer(onLeaveRequested: _confirmLeave),
-        body: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        body: Column(
           children: [
+            if (_file?.openedFromCache == true)
+              MaterialBanner(
+                content: Text(S.of(context).cacheWarning),
+                leading: const Icon(Icons.offline_pin_outlined),
+                actions: [
+                  TextButton(
+                    onPressed: savingFile ? null : () => saveFile(saveAs: true),
+                    child: Text(S.of(context).cacheSaveCopy),
+                  ),
+                ],
+              ),
             Expanded(
-              child: Hero(
-                tag: 'ZoomArea',
-                child: _buildScrollablePages(),
-                /*ColorFiltered(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Hero(
+                      tag: 'ZoomArea',
+                      child: _buildScrollablePages(),
+                      /*ColorFiltered(
                   colorFilter: ColorFilter.mode(
                       Theme.of(context).colorScheme.surface.withOpacity(.5),
                       BlendMode.darken),
                   child: child,
                 )*/
-              ),
-            ),
-            if (embedToolbar)
-              Material(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                elevation: 4,
-                child: SafeArea(
-                  left: false,
-                  top: false,
-                  child: SizedBox(
-                    width: 88,
-                    child: Center(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: _buildPageBrowser(direction: Axis.vertical),
-                      ),
                     ),
                   ),
-                ),
+                  if (embedToolbar)
+                    Material(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                      elevation: 4,
+                      child: SafeArea(
+                        left: false,
+                        top: false,
+                        child: SizedBox(
+                          width: 88,
+                          child: Center(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: _buildPageBrowser(
+                                direction: Axis.vertical,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
         appBar: AppBar(
@@ -617,9 +657,12 @@ class _CanvasPageState extends State<CanvasPage>
     _file = widget.file;
     _pageGeometry = null;
     filePath = widget.filePath ?? widget.file?.storageNotebook?.id;
-    currentPage = widget.initialPage
-        .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
-        .toInt();
+    currentPage =
+        (_file?.openedFromCache == true
+                ? _file!.cachedPage
+                : widget.initialPage)
+            .clamp(0, max((_file?.pages?.length ?? 1) - 1, 0))
+            .toInt();
   }
 
   GlobalKey<XppPageStackState> get _currentPageStackKey =>
@@ -1503,6 +1546,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _checkpointDraft({int? idleGeneration}) {
+    final cacheGeneration = NotebookCache.instance.generation;
     if (kIsWeb || !_isDirty || _revision == _draftRevision || _file == null)
       return;
     _draftWork = _draftWork
@@ -1523,10 +1567,20 @@ class _CanvasPageState extends State<CanvasPage>
               page: currentPage,
               title: file.title,
               originalPath: filePath ?? widget.recoveryOriginalPath,
+              backendId: file.storageNotebook?.backendId,
+              cachedOrigin: file.openedFromCache,
             ),
           );
           _hasRecoveryDraft = true;
           _draftRevision = revision;
+          unawaited(
+            file.cacheSnapshot(
+              bytes,
+              dirty: true,
+              page: currentPage,
+              expectedGeneration: cacheGeneration,
+            ),
+          );
         })
         .catchError((Object error) {
           debugPrint('Could not save recovery draft: $error');
@@ -1583,6 +1637,7 @@ class _CanvasPageState extends State<CanvasPage>
       case _UnsavedChangesAction.discard:
         try {
           await _removeDraft();
+          await _file?.discardCachedEdits();
           return true;
         } catch (error) {
           debugPrint('Could not remove recovery draft: $error');
@@ -2863,12 +2918,26 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   Future<bool> saveFile({bool saveAs = false}) async {
+    final cacheGeneration = NotebookCache.instance.generation;
     await _pendingErase;
     if (!mounted) return false;
     if (savingFile) return false;
     setState(() {
       savingFile = true;
     });
+    if (_file!.openedFromCache && !saveAs) {
+      if (_file!.storage == null) {
+        saveAs = true;
+      } else {
+        final choice = await confirmCachedOverwrite(context);
+        if (!mounted) return false;
+        if (choice == CachedSaveChoice.cancel) {
+          setState(() => savingFile = false);
+          return false;
+        }
+        saveAs = choice == CachedSaveChoice.copy;
+      }
+    }
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.removeCurrentSnackBar();
     scaffoldMessenger.clearSnackBars();
@@ -2958,6 +3027,14 @@ class _CanvasPageState extends State<CanvasPage>
       }
       final bytes = await _file!.toUint8ListAsync();
       if (!mounted) return false;
+      unawaited(
+        _file!.cacheSnapshot(
+          bytes,
+          dirty: true,
+          page: currentPage,
+          expectedGeneration: cacheGeneration,
+        ),
+      );
       final resources = backgrounds.entries
           .map(
             (entry) => NotebookPdfResource(
@@ -3024,25 +3101,41 @@ class _CanvasPageState extends State<CanvasPage>
             ? conflict.notebookId
             : (conflict as GoogleDriveNameConflict).fileId;
         if (!mounted) return false;
-        final replace = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(S.of(context).nextcloudReplaceTitle),
-            content: Text(
-              '${S.of(context).nextcloudReplaceMessage}\n$filename',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(S.of(context).cancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(S.of(context).nextcloudReplace),
-              ),
-            ],
-          ),
-        );
+        if (_file!.openedFromCache) {
+          final choice = await confirmCachedOverwrite(context);
+          if (!mounted) return false;
+          if (choice == CachedSaveChoice.copy) {
+            savingSnackBar.close();
+            setState(() => savingFile = false);
+            return await saveFile(saveAs: true);
+          }
+          if (choice == CachedSaveChoice.cancel) {
+            savingSnackBar.close();
+            setState(() => savingFile = false);
+            return false;
+          }
+        }
+        final replace = _file!.openedFromCache
+            ? true
+            : await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(S.of(context).nextcloudReplaceTitle),
+                  content: Text(
+                    '${S.of(context).nextcloudReplaceMessage}\n$filename',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: Text(S.of(context).cancel),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: Text(S.of(context).nextcloudReplace),
+                    ),
+                  ],
+                ),
+              );
         if (replace == true)
           saved = await performSave(
             StoredNotebook(
@@ -3066,6 +3159,20 @@ class _CanvasPageState extends State<CanvasPage>
       _file!.storage = storage;
       _file!.storageNotebook = saved;
       filePath = savedPath;
+      _file!.openedFromCache = false;
+      final savedFile = _file!;
+      final savedPage = currentPage;
+      unawaited(
+        _draftWork.then(
+          (_) => savedFile.cacheSnapshot(
+            bytes,
+            dirty: false,
+            page: savedPage,
+            saved: _revision == savedRevision,
+            expectedGeneration: cacheGeneration,
+          ),
+        ),
+      );
 
       await RecentFiles.remember(
         path: savedPath,

@@ -48,6 +48,52 @@ class MessageLookup extends MessageLookupByLibrary {
         ),
     "background": MessageLookupByLibrary.simpleMessage("Background"),
     "between1And": MessageLookupByLibrary.simpleMessage("Entre 1 e"),
+    "cacheBrowse": MessageLookupByLibrary.simpleMessage("Cadernos em cache"),
+    "cacheCheckpoint": MessageLookupByLibrary.simpleMessage(
+      "Ponto de gravação local",
+    ),
+    "cacheClear": MessageLookupByLibrary.simpleMessage("Limpar cache"),
+    "cacheClearConfirm": MessageLookupByLibrary.simpleMessage(
+      "Eliminar todos os cadernos e PDFs em cache? Os rascunhos de recuperação serão mantidos.",
+    ),
+    "cacheEmpty": MessageLookupByLibrary.simpleMessage(
+      "Não existem cadernos em cache.",
+    ),
+    "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
+      "Faltam alguns fundos PDF.",
+    ),
+    "cacheOpen": MessageLookupByLibrary.simpleMessage("Abrir cópia em cache"),
+    "cacheOpenTitle": MessageLookupByLibrary.simpleMessage(
+      "Abrir cópia em cache?",
+    ),
+    "cacheOverwrite": MessageLookupByLibrary.simpleMessage(
+      "Substituir o original",
+    ),
+    "cacheOverwriteTitle": MessageLookupByLibrary.simpleMessage(
+      "Substituir o original?",
+    ),
+    "cacheSaveCopy": MessageLookupByLibrary.simpleMessage("Guardar uma cópia"),
+    "cacheSaved": MessageLookupByLibrary.simpleMessage(
+      "Última versão confirmada",
+    ),
+    "cacheSetting": MessageLookupByLibrary.simpleMessage(
+      "Cache local de cadernos",
+    ),
+    "cacheSettingDescription": MessageLookupByLibrary.simpleMessage(
+      "Manter cópias locais de cadernos e fundos PDF para falhas do fornecedor. O espaço utilizado pode aumentar. Desativar mantém as cópias existentes até serem eliminadas.",
+    ),
+    "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
+      "A cache local não está disponível.",
+    ),
+    "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
+      "Inclui alterações não guardadas",
+    ),
+    "cacheUpdateFailed": MessageLookupByLibrary.simpleMessage(
+      "Não foi possível atualizar a cópia local. A operação no fornecedor não foi afetada.",
+    ),
+    "cacheWarning": MessageLookupByLibrary.simpleMessage(
+      "Está a editar uma cópia em cache. Pode estar desatualizada. Guardar na localização original pode substituir alterações mais recentes.",
+    ),
     "cancel": MessageLookupByLibrary.simpleMessage("Cancelar"),
     "close": MessageLookupByLibrary.simpleMessage("Fechar"),
     "color": MessageLookupByLibrary.simpleMessage("Cor"),

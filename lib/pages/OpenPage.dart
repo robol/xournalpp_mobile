@@ -1,3 +1,6 @@
+import 'package:xournalpp/src/NotebookCache.dart';
+import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
+import 'package:xournalpp/widgets/CachedNotebookList.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -154,6 +157,27 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           showMissingFileDialog,
         );
         file.title = draft.title;
+        if (draft.backendId != null && draft.originalPath != null) {
+          file.storageNotebook = StoredNotebook(
+            backendId: draft.backendId!,
+            id: draft.originalPath!,
+            name: draft.title ?? 'Untitled',
+          );
+          file.storage = notebookStorageBackends
+              .where((b) => b.id == draft.backendId)
+              .firstOrNull;
+          file.openedFromCache = draft.cachedOrigin || file.storage == null;
+          file.cachedEdits = true;
+          file.cachedPage = draft.page;
+          try {
+            final cached = await NotebookCache.instance.load(
+              file.storageNotebook!,
+            );
+            if (cached != null) file.useCachedResources(cached);
+          } catch (_) {
+            /* Notebook recovery must not depend on its cache. */
+          }
+        }
         if (!mounted) return;
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -257,6 +281,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       appBar: AppBar(
         title: const Text('Xournal++ Mobile'),
         actions: [
+          if (!kIsWeb)
+            IconButton(
+              tooltip: S.of(context).cacheBrowse,
+              icon: const Icon(Icons.offline_pin_outlined),
+              onPressed: _showCachedNotebooks,
+            ),
           IconButton(
             tooltip: S.of(context).savedNotebooks,
             icon: const Icon(Icons.folder_outlined),
@@ -583,15 +613,35 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           final file = await runWithLoadingFileDialog(context, () async {
             final backendId = fileInfo['backendId'] as String?;
             if (backendId != null && backendId != localNotebookStorage.id) {
-              if (backendId.startsWith('nextcloud:'))
-                await NextcloudManager.restore();
-              if (backendId.startsWith('gdrive:'))
-                await GoogleDriveManager.restore();
+              try {
+                if (backendId.startsWith('nextcloud:'))
+                  await NextcloudManager.restore();
+                if (backendId.startsWith('gdrive:'))
+                  await GoogleDriveManager.restore();
+              } catch (_) {
+                /* Cached fallback remains available without credentials. */
+              }
+              if (!context.mounted) throw StateError('Document owner disposed');
               final backend = notebookStorageBackends
                   .where((storage) => storage.id == backendId)
                   .firstOrNull;
-              if (backend == null)
+              if (backend == null) {
+                final cached = await offerCachedNotebook(
+                  context,
+                  StoredNotebook(
+                    backendId: backendId,
+                    id: fileInfo['path'],
+                    name: fileInfo['name'],
+                  ),
+                );
+                if (cached != null)
+                  return XppFile.fromCachedNotebook(
+                    cached,
+                    null,
+                    showMissingFileDialog,
+                  );
                 throw StateError(S.of(context).recentBackendUnavailable);
+              }
               return XppFile.openStoredNotebook(
                 backend,
                 StoredNotebook(
@@ -600,12 +650,34 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                   name: fileInfo['name'],
                 ),
                 showMissingFileDialog,
+                onCacheError: _cacheFailed,
+                onReadFailure: (_) => offerCachedNotebook(
+                  context,
+                  StoredNotebook(
+                    backendId: backendId,
+                    id: fileInfo['path'],
+                    name: fileInfo['name'],
+                  ),
+                ),
               );
             }
-            return XppFile.fromXppPickedFile(
-              await XppPickedFile.fromInternalPath(path: fileInfo['path']),
-              (percent) {},
+            return XppFile.openStoredNotebook(
+              localNotebookStorage,
+              StoredNotebook(
+                backendId: 'local',
+                id: fileInfo['path'],
+                name: fileInfo['name'],
+              ),
               showMissingFileDialog,
+              onCacheError: _cacheFailed,
+              onReadFailure: (_) => offerCachedNotebook(
+                context,
+                StoredNotebook(
+                  backendId: 'local',
+                  id: fileInfo['path'],
+                  name: fileInfo['name'],
+                ),
+              ),
             );
           });
           if (!context.mounted) return;
@@ -628,6 +700,54 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         }
       },
     );
+  }
+
+  void _cacheFailed() {
+    if (mounted)
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(SnackBar(content: Text(S.of(context).cacheUpdateFailed)));
+  }
+
+  Future<void> _showCachedNotebooks() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(S.of(context).cacheBrowse)),
+          body: CachedNotebookList(onOpen: _openCached),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openCached(StoredNotebook notebook) async {
+    try {
+      final cached = await offerCachedNotebook(context, notebook);
+      if (cached == null || !mounted) return;
+      final backend = notebookStorageBackends
+          .where((b) => b.id == notebook.backendId)
+          .firstOrNull;
+      final file = await runWithLoadingFileDialog(
+        context,
+        () =>
+            XppFile.fromCachedNotebook(cached, backend, showMissingFileDialog),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CanvasPage(
+            file: file,
+            filePath: notebook.id,
+            initialPage: cached.page,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(S.of(context).cacheUnavailable)));
+    }
   }
 
   Future<void> _openNotebook() async {
@@ -763,10 +883,16 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                               ),
                             ),
                       builder: (context, snapshot) {
-                        if (snapshot.hasError)
-                          return Text(
-                            '${S.of(context).errorOpeningFile}${snapshot.error}',
+                        if (snapshot.hasError) {
+                          return CachedNotebookList(
+                            error: snapshot.error,
+                            backendId: selected.id,
+                            onOpen: (entry) {
+                              Navigator.of(dialogContext).pop();
+                              _openCached(entry);
+                            },
                           );
+                        }
                         if (!snapshot.hasData)
                           return const Center(
                             child: CircularProgressIndicator(),
@@ -880,6 +1006,11 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                     backend,
                                     entry,
                                     showMissingFileDialog,
+                                    onCacheError: _cacheFailed,
+                                    onReadFailure: (_) => offerCachedNotebook(
+                                      this.context,
+                                      entry,
+                                    ),
                                   ),
                                 );
                                 if (!this.context.mounted) return;

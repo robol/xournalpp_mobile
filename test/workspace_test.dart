@@ -115,7 +115,9 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 800));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        'notebookCache.enabled.v1': false,
+      });
       final backend = _LoadingStorage();
       notebookStorageBackends.add(backend);
       addTearDown(() => notebookStorageBackends.remove(backend));

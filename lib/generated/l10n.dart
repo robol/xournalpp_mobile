@@ -55,6 +55,181 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `Open cached copy?`
+  String get cacheOpenTitle {
+    return Intl.message(
+      'Open cached copy?',
+      name: 'cacheOpenTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `You are editing a cached copy. It may be outdated. Saving to the original location may overwrite newer changes.`
+  String get cacheWarning {
+    return Intl.message(
+      'You are editing a cached copy. It may be outdated. Saving to the original location may overwrite newer changes.',
+      name: 'cacheWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Local checkpoint`
+  String get cacheCheckpoint {
+    return Intl.message(
+      'Local checkpoint',
+      name: 'cacheCheckpoint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Includes unsaved edits`
+  String get cacheUnsaved {
+    return Intl.message(
+      'Includes unsaved edits',
+      name: 'cacheUnsaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Last confirmed version`
+  String get cacheSaved {
+    return Intl.message(
+      'Last confirmed version',
+      name: 'cacheSaved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Some PDF backgrounds are missing.`
+  String get cacheIncomplete {
+    return Intl.message(
+      'Some PDF backgrounds are missing.',
+      name: 'cacheIncomplete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Open cached copy`
+  String get cacheOpen {
+    return Intl.message(
+      'Open cached copy',
+      name: 'cacheOpen',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Overwrite original?`
+  String get cacheOverwriteTitle {
+    return Intl.message(
+      'Overwrite original?',
+      name: 'cacheOverwriteTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Save a copy`
+  String get cacheSaveCopy {
+    return Intl.message(
+      'Save a copy',
+      name: 'cacheSaveCopy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Overwrite original`
+  String get cacheOverwrite {
+    return Intl.message(
+      'Overwrite original',
+      name: 'cacheOverwrite',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The local cache is unavailable.`
+  String get cacheUnavailable {
+    return Intl.message(
+      'The local cache is unavailable.',
+      name: 'cacheUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No cached notebooks are available.`
+  String get cacheEmpty {
+    return Intl.message(
+      'No cached notebooks are available.',
+      name: 'cacheEmpty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Local notebook cache`
+  String get cacheSetting {
+    return Intl.message(
+      'Local notebook cache',
+      name: 'cacheSetting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Keep local copies of notebooks and PDF backgrounds for provider failures. Storage usage can grow. Turning this off retains existing copies until cleared.`
+  String get cacheSettingDescription {
+    return Intl.message(
+      'Keep local copies of notebooks and PDF backgrounds for provider failures. Storage usage can grow. Turning this off retains existing copies until cleared.',
+      name: 'cacheSettingDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Clear cache`
+  String get cacheClear {
+    return Intl.message('Clear cache', name: 'cacheClear', desc: '', args: []);
+  }
+
+  /// `Delete all cached notebooks and PDFs? Recovery drafts will be kept.`
+  String get cacheClearConfirm {
+    return Intl.message(
+      'Delete all cached notebooks and PDFs? Recovery drafts will be kept.',
+      name: 'cacheClearConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cached notebooks`
+  String get cacheBrowse {
+    return Intl.message(
+      'Cached notebooks',
+      name: 'cacheBrowse',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The local copy could not be updated. The provider operation was not affected.`
+  String get cacheUpdateFailed {
+    return Intl.message(
+      'The local copy could not be updated. The provider operation was not affected.',
+      name: 'cacheUpdateFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `After connecting, you will choose a folder. Documents must be in that folder or its subfolders.`
   String get storageFolderOnboarding {
     return Intl.message(
