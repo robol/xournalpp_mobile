@@ -252,6 +252,8 @@ class _CanvasPageState extends State<CanvasPage>
   bool _erasing = false;
   late final String _draftId;
   Timer? _draftTimer;
+  final Set<int> _draftActivePointers = {};
+  int _draftActivityGeneration = 0;
   Future<void> _draftWork = Future.value();
   int _draftRevision = -1;
   bool _hasRecoveryDraft = false;
@@ -325,27 +327,52 @@ class _CanvasPageState extends State<CanvasPage>
 
   @override
   Widget build(BuildContext context) {
-    return AbsorbPointer(
-      absorbing: _erasing,
-      child: Stack(
-        children: [
-          PdfSourceScope(
-            resolve: _resolvePdfSource,
-            child: LayoutBuilder(
-              builder: (context, constraints) => _buildEditor(
-                context,
-                embedToolbar: constraints.maxWidth >= 1000,
+    return Focus(
+      canRequestFocus: false,
+      onKeyEvent: (_, _) {
+        _recordDraftActivity();
+        return KeyEventResult.ignored;
+      },
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (event) {
+          _draftActivePointers.add(event.pointer);
+          _recordDraftActivity();
+        },
+        onPointerMove: (_) => _recordDraftActivity(),
+        onPointerHover: (_) => _recordDraftActivity(),
+        onPointerSignal: (_) => _recordDraftActivity(),
+        onPointerUp: (event) {
+          _draftActivePointers.remove(event.pointer);
+          _recordDraftActivity();
+        },
+        onPointerCancel: (event) {
+          _draftActivePointers.remove(event.pointer);
+          _recordDraftActivity();
+        },
+        child: AbsorbPointer(
+          absorbing: _erasing,
+          child: Stack(
+            children: [
+              PdfSourceScope(
+                resolve: _resolvePdfSource,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => _buildEditor(
+                    context,
+                    embedToolbar: constraints.maxWidth >= 1000,
+                  ),
+                ),
               ),
-            ),
+              if (_erasing)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(),
+                ),
+            ],
           ),
-          if (_erasing)
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: LinearProgressIndicator(),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -1423,10 +1450,18 @@ class _CanvasPageState extends State<CanvasPage>
 
   void _markDirty() {
     _revision++;
-    if (!kIsWeb) {
-      _draftTimer ??= Timer(const Duration(seconds: 2), () {
+    _recordDraftActivity();
+  }
+
+  void _recordDraftActivity() {
+    _draftActivityGeneration++;
+    _draftTimer?.cancel();
+    _draftTimer = null;
+    if (!kIsWeb && _isDirty && _draftActivePointers.isEmpty) {
+      final generation = _draftActivityGeneration;
+      _draftTimer = Timer(const Duration(seconds: 2), () {
         _draftTimer = null;
-        _checkpointDraft();
+        _checkpointDraft(idleGeneration: generation);
       });
     }
   }
@@ -1442,12 +1477,16 @@ class _CanvasPageState extends State<CanvasPage>
     }
   }
 
-  void _checkpointDraft() {
+  void _checkpointDraft({int? idleGeneration}) {
     if (kIsWeb || !_isDirty || _revision == _draftRevision || _file == null)
       return;
     _draftWork = _draftWork
         .then((_) async {
           await _pendingErase;
+          if (idleGeneration != null &&
+              (idleGeneration != _draftActivityGeneration ||
+                  _draftActivePointers.isNotEmpty))
+            return;
           if (!_isDirty || _revision == _draftRevision || _file == null) return;
           final revision = _revision;
           final file = _file!;
@@ -3014,7 +3053,7 @@ class _CanvasPageState extends State<CanvasPage>
 
       if (_revision == savedRevision) {
         await _removeDraft();
-        if (_revision != savedRevision) _checkpointDraft();
+        if (_revision != savedRevision) _recordDraftActivity();
       }
 
       if (!mounted) return false;

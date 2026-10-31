@@ -258,4 +258,65 @@ void main() {
       hasLength(1),
     );
   });
+
+  testWidgets('draft waits for pointer release and two seconds of inactivity', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final size = XppPageSize(width: 200, height: 200);
+    final file = XppFile(
+      pages: [
+        XppPage(
+          pageSize: size,
+          background: XppBackgroundSolidPlain(size: size),
+          layers: [XppLayer.empty()],
+        ),
+      ],
+    );
+    await tester.pumpWidget(app(CanvasPage(file: file)));
+    await tester.pump();
+    final start =
+        tester.getRect(find.byType(XppPageStack)).topLeft +
+        const Offset(200, 200);
+    final first = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.stylus,
+    );
+    await first.moveTo(start + const Offset(30, 30));
+    await first.up();
+    await tester.pump(const Duration(seconds: 1));
+    final second = await tester.startGesture(
+      start,
+      kind: PointerDeviceKind.stylus,
+    );
+    await second.moveTo(start + const Offset(40, 40));
+    await tester.pump(const Duration(seconds: 3));
+    expect(
+      directory.listSync().where((f) => f.path.endsWith('.json')),
+      isEmpty,
+    );
+    await second.up();
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(
+      directory.listSync().where((f) => f.path.endsWith('.json')),
+      isEmpty,
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    for (
+      var i = 0;
+      i < 100 &&
+          directory.listSync().where((f) => f.path.endsWith('.json')).isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+    }
+    expect(
+      directory.listSync().where((f) => f.path.endsWith('.json')),
+      hasLength(1),
+    );
+  });
 }
