@@ -202,6 +202,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Source Code"),
     "storageBackend": MessageLookupByLibrary.simpleMessage("Storage location"),
+    "storageFolderOnboarding": MessageLookupByLibrary.simpleMessage(
+      "After connecting, you will choose a folder. Documents must be in that folder or its subfolders.",
+    ),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stroke width:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Stylus pressure sensitivity",

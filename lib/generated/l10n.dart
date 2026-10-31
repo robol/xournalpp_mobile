@@ -55,6 +55,16 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `After connecting, you will choose a folder. Documents must be in that folder or its subfolders.`
+  String get storageFolderOnboarding {
+    return Intl.message(
+      'After connecting, you will choose a folder. Documents must be in that folder or its subfolders.',
+      name: 'storageFolderOnboarding',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Connected`
   String get googleDriveConnected {
     return Intl.message(

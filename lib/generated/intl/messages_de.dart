@@ -217,6 +217,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Quellcode"),
     "storageBackend": MessageLookupByLibrary.simpleMessage("Speicherort"),
+    "storageFolderOnboarding": MessageLookupByLibrary.simpleMessage(
+      "Nach dem Verbinden wählen Sie einen Ordner aus. Dokumente müssen sich in diesem Ordner oder seinen Unterordnern befinden.",
+    ),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Stiftstärke:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Druckempfindlichkeit des Eingabestifts",

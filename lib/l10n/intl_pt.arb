@@ -1,4 +1,5 @@
 {
+  "storageFolderOnboarding": "Depois de conectar, você escolherá uma pasta. Os documentos devem estar nessa pasta ou em suas subpastas.",
   "googleDriveConnected": "Conectado",
   "googleDriveConnect": "Conectar ao Google Drive",
   "recentBackendUnavailable": "O armazenamento não está disponível. Reconecte a conta e a pasta originais.",

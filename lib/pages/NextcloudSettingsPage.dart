@@ -90,6 +90,8 @@ class _NextcloudSettingsPageState extends State<NextcloudSettingsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         if (credentials == null) ...[
+          Text(S.of(context).storageFolderOnboarding),
+          const SizedBox(height: 12),
           TextField(
             controller: address,
             decoration: InputDecoration(

@@ -1,4 +1,5 @@
 {
+  "storageFolderOnboarding": "After connecting, you will choose a folder. Documents must be in that folder or its subfolders.",
   "googleDriveConnected": "Connected",
   "googleDriveConnect": "Connect Google Drive",
   "recentBackendUnavailable": "Storage is unavailable. Reconnect the original account and folder.",

@@ -69,12 +69,14 @@ class _GoogleDriveSettingsPageState extends State<GoogleDriveSettingsPage> {
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (storage == null)
+        if (storage == null) ...[
+          Text(S.of(context).storageFolderOnboarding),
+          const SizedBox(height: 12),
           FilledButton(
             onPressed: busy ? null : connect,
             child: Text(S.of(context).googleDriveConnect),
-          )
-        else ...[
+          ),
+        ] else ...[
           Text(
             '${S.of(context).nextcloudChooseFolder}: /${path.map((folder) => folder.name).join('/')}',
           ),

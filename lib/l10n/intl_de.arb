@@ -1,4 +1,5 @@
 {
+  "storageFolderOnboarding": "Nach dem Verbinden wählen Sie einen Ordner aus. Dokumente müssen sich in diesem Ordner oder seinen Unterordnern befinden.",
   "googleDriveConnected": "Verbunden",
   "googleDriveConnect": "Google Drive verbinden",
   "recentBackendUnavailable": "Der Speicher ist nicht verfügbar. Verbinden Sie das ursprüngliche Konto und den Ordner erneut.",

@@ -216,6 +216,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "storageBackend": MessageLookupByLibrary.simpleMessage(
       "Local de armazenamento",
     ),
+    "storageFolderOnboarding": MessageLookupByLibrary.simpleMessage(
+      "Depois de conectar, você escolherá uma pasta. Os documentos devem estar nessa pasta ou em suas subpastas.",
+    ),
     "strokeWidth": MessageLookupByLibrary.simpleMessage("Grossura da linha:"),
     "stylusPressureSensitivity": MessageLookupByLibrary.simpleMessage(
       "Sensibilidade à pressão da caneta",
