@@ -46,6 +46,8 @@ flutter build apk
 
 Android builds require the Android SDK and a compatible JDK. Other targets require their platform-specific Flutter build dependencies.
 
+On Android, iOS, and desktop, new notebooks default to **Internal** storage in the app's private data. Saving there needs no file picker. Use **Save As** and choose **Local storage** to save a file in shared phone storage, on an SD card, or elsewhere through the system picker. Existing Local storage notebooks stay in their original locations. Internal notebooks and their PDF backgrounds are removed when the app's data is deleted. Save a Local storage copy and retain any original PDF backgrounds separately to keep them outside the app. The web app continues to use its existing storage workflow.
+
 On Linux, building the Nextcloud credential-storage plugin also requires `libsecret-1-dev`; using Nextcloud requires a running desktop keyring service.
 
 ## Development and tests

@@ -1,4 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
+import 'conditional/internal_storage/internal_storage_stub.dart'
+    if (dart.library.io) 'conditional/internal_storage/internal_storage_io.dart'
+    as internal_disk;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -145,10 +150,247 @@ class LocalNotebookStorage implements NotebookStorage {
       (await XppPickedFile.fromInternalPath(path: reference)).bytes;
 }
 
+class InternalNameConflict implements Exception {
+  InternalNameConflict(this.notebook);
+  final StoredNotebook notebook;
+}
+
+/// App-private notebooks. A small manifest atomically publishes immutable blobs.
+class InternalNotebookStorage implements NotebookStorage {
+  static final changes = ValueNotifier<int>(0);
+  static Future<void> _pending = Future.value();
+  @visibleForTesting
+  static void resetForTesting() => _pending = Future.value();
+  @override
+  String get id => 'internal';
+  @override
+  String? get iconAsset => null;
+
+  Future<T> _enqueue<T>(Future<T> Function() action) {
+    final operation = _pending.then(
+      (_) => internal_disk.withInternalLock(action),
+    );
+    _pending = operation.then<void>((_) {}, onError: (Object _) {});
+    return operation;
+  }
+
+  String _newId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
+
+  static String _digest(Uint8List bytes) => sha256.convert(bytes).toString();
+  Future<String> _hash(Uint8List bytes) => bytes.length < 1024 * 1024
+      ? Future.value(_digest(bytes))
+      : compute(_digest, bytes, debugLabel: 'hash internal notebook');
+  Future<String> _writeBlob(Uint8List bytes) async {
+    final key = '${await _hash(bytes)}.blob';
+    try {
+      final existing = await internal_disk.readInternalFile(key);
+      if ('${await _hash(existing)}.blob' == key) return key;
+    } catch (_) {
+      /* Missing or unreadable blobs must be written afresh. */
+    }
+    await internal_disk.writeInternalFile(key, bytes);
+    return key;
+  }
+
+  Future<Uint8List> _readBlob(Object? value) async {
+    if (value is! String || !RegExp(r'^[a-f0-9]{64}\.blob$').hasMatch(value)) {
+      throw const FormatException('Invalid internal resource');
+    }
+    final data = await internal_disk.readInternalFile(value);
+    if ('${await _hash(data)}.blob' != value)
+      throw const FormatException('Damaged internal resource');
+    return data;
+  }
+
+  Future<Map<String, dynamic>> _metadata(String notebookId) async {
+    final data =
+        jsonDecode(
+              utf8.decode(
+                await internal_disk.readInternalFile('$notebookId.json'),
+              ),
+            )
+            as Map<String, dynamic>;
+    final hashPattern = RegExp(r'^[a-f0-9]{64}\.blob$');
+    bool validBlob(Object? value) =>
+        value is String && hashPattern.hasMatch(value);
+    if (data['version'] != 1 ||
+        data['name'] is! String ||
+        !validBlob(data['notebook']) ||
+        data['pdfs'] is! Map ||
+        !(data['pdfs'] as Map).entries.every(
+          (entry) => entry.key is String && validBlob(entry.value),
+        )) {
+      throw const FormatException('Invalid internal notebook manifest');
+    }
+    return data;
+  }
+
+  Future<List<StoredNotebook>> _list() async {
+    final result = <StoredNotebook>[];
+    for (final notebookId in await internal_disk.listInternalFiles()) {
+      try {
+        final metadata = await _metadata(notebookId);
+        result.add(
+          StoredNotebook(
+            backendId: id,
+            id: notebookId,
+            name: metadata['name'] as String,
+            modified: DateTime.tryParse(metadata['modified'] as String? ?? ''),
+          ),
+        );
+      } catch (_) {
+        /* Keep unreadable files intact. */
+      }
+    }
+    result.sort(
+      (a, b) =>
+          (a.modified ?? DateTime(0)).compareTo(b.modified ?? DateTime(0)),
+    );
+    return result;
+  }
+
+  Future<void> _collect() async {
+    final used = <String>{};
+    for (final notebookId in await internal_disk.listInternalFiles()) {
+      try {
+        final metadata = await _metadata(notebookId);
+        used.add(metadata['notebook'] as String);
+        used.addAll((metadata['pdfs'] as Map).values.cast<String>());
+      } catch (_) {
+        return;
+      } // Never discard data referenced by an unreadable manifest.
+    }
+    for (final blob in await internal_disk.listInternalBlobs()) {
+      if (!used.contains(blob)) await internal_disk.deleteInternalFile(blob);
+    }
+  }
+
+  Future<void> _collectBestEffort() async {
+    try {
+      await _collect();
+    } catch (error) {
+      debugPrint('Could not clean internal storage: $error');
+    }
+  }
+
+  @override
+  Future<List<StoredNotebook>> list() => _enqueue(_list);
+  Future<void> _checkDestination(String name, StoredNotebook? existing) async {
+    if (existing != null && existing.backendId != id)
+      throw ArgumentError('Wrong storage backend');
+    final notebooks = await _list();
+    final conflict = notebooks
+        .where((item) => item.name == name && item.id != existing?.id)
+        .firstOrNull;
+    if (conflict != null) throw InternalNameConflict(conflict);
+    if (existing != null && !notebooks.any((item) => item.id == existing.id)) {
+      throw StateError('Internal notebook is unavailable');
+    }
+  }
+
+  @override
+  Future<StoredNotebook?> save({
+    required Uint8List bytes,
+    required String name,
+    StoredNotebook? existing,
+    required List<NotebookPdfResource> pdfs,
+  }) async {
+    // PDF callbacks may read this provider; do not invoke them while holding its lock.
+    await _enqueue(() => _checkDestination(name, existing));
+    final pdfBytes = <String, Uint8List>{};
+    for (final pdf in pdfs) {
+      if (!pdfBytes.containsKey(pdf.reference))
+        pdfBytes[pdf.reference] = await pdf.read();
+    }
+    return _enqueue(() async {
+      // Another save can change the destination while PDF reads are in flight.
+      await _checkDestination(name, existing);
+      var notebookId = existing?.id;
+      if (notebookId == null) {
+        final existingIds = await internal_disk.listInternalFiles();
+        do {
+          notebookId = _newId();
+        } while (existingIds.contains(notebookId));
+      }
+      try {
+        final notebookBlob = await _writeBlob(bytes);
+        final resources = <String, String>{};
+        for (final pdf in pdfBytes.entries) {
+          resources[pdf.key] = await _writeBlob(pdf.value);
+        }
+        final modified = DateTime.now().toUtc();
+        final metadata = utf8.encode(
+          jsonEncode({
+            'version': 1,
+            'name': name,
+            'modified': modified.toIso8601String(),
+            'notebook': notebookBlob,
+            'pdfs': resources,
+          }),
+        );
+        await internal_disk.writeInternalFile(
+          '$notebookId.json',
+          Uint8List.fromList(metadata),
+        );
+        changes.value++;
+        await _collectBestEffort();
+        return StoredNotebook(
+          backendId: id,
+          id: notebookId,
+          name: name,
+          modified: modified,
+        );
+      } catch (_) {
+        await _collectBestEffort();
+        rethrow;
+      }
+    });
+  }
+
+  @override
+  Future<Uint8List> readNotebook(StoredNotebook notebook) => _enqueue(() async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    return _readBlob((await _metadata(notebook.id))['notebook']);
+  });
+  @override
+  Future<Uint8List> readPdf(
+    StoredNotebook notebook,
+    String reference,
+  ) => _enqueue(() async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    final resource = ((await _metadata(notebook.id))['pdfs'] as Map)[reference];
+    if (resource == null) throw StateError('Background PDF is unavailable');
+    return _readBlob(resource);
+  });
+
+  /// Forget only removes a recent entry; deleting Internal content is explicit.
+  @override
+  Future<void> forget(StoredNotebook notebook) async {}
+  Future<void> delete(StoredNotebook notebook) => _enqueue(() async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    await internal_disk.deleteInternalFile('${notebook.id}.json');
+    changes.value++;
+    await _collectBestEffort();
+  });
+}
+
+final internalNotebookStorage = InternalNotebookStorage();
 final localNotebookStorage = LocalNotebookStorage();
 
 /// Providers offered when choosing where to save a notebook.
-final List<NotebookStorage> notebookStorageBackends = [localNotebookStorage];
+final List<NotebookStorage> notebookStorageBackends = [
+  if (!kIsWeb) internalNotebookStorage,
+  localNotebookStorage,
+];
+
+NotebookStorage get defaultNotebookStorage =>
+    kIsWeb ? localNotebookStorage : internalNotebookStorage;
 
 /// Keeps icons for known providers visible even when their account is offline.
 String? storageIconForBackendId(String? id) {

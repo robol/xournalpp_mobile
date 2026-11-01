@@ -645,11 +645,15 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       preview: fileInfo['preview']?.toString(),
       provider: switch (fileInfo['backendId'] as String?) {
         null || 'local' => S.of(context).localStorage,
+        'internal' => S.of(context).internalStorage,
         final id when id.startsWith('nextcloud:') => 'Nextcloud',
         final id when id.startsWith('gdrive:') => 'Google Drive',
         final id => id,
       },
       providerIcon: storageIconForBackendId(fileInfo['backendId'] as String?),
+      providerIconData: fileInfo['backendId'] == 'internal'
+          ? Icons.inventory_2_outlined
+          : null,
       onLongPress: () =>
           showDeleteDialog(fileInfo['path'], backendId: fileInfo['backendId']),
       onOpen: () async {
@@ -803,7 +807,6 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
       );
-      return;
     }
     try {
       await GoogleDriveManager.restore();
@@ -811,7 +814,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       debugPrint('Could not restore Google Drive: $error');
     }
     if (!mounted) return;
-    NotebookStorage? selected = localNotebookStorage;
+    NotebookStorage? selected = defaultNotebookStorage;
     if (notebookStorageBackends.length > 1) {
       selected = await showDialog<NotebookStorage>(
         context: context,
@@ -823,7 +826,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                   onPressed: () => Navigator.pop(dialogContext, backend),
                   child: StorageProviderLabel(
                     iconAsset: backend.iconAsset,
-                    label: backend == localNotebookStorage
+                    icon: backend == internalNotebookStorage
+                        ? Icons.inventory_2_outlined
+                        : null,
+                    label: backend == internalNotebookStorage
+                        ? S.of(dialogContext).internalStorage
+                        : backend == localNotebookStorage
                         ? S.of(dialogContext).localStorage
                         : backend.id.startsWith('nextcloud:')
                         ? 'Nextcloud'
@@ -845,8 +853,44 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _deleteInternalNotebook(
+    BuildContext dialogContext,
+    StoredNotebook notebook,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: Text(S.of(context).internalDelete),
+        content: Text(
+          '${S.of(context).internalDeleteConfirm}\n${notebook.name}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(S.of(context).cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(S.of(context).internalDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await NotebookCache.instance.remove(notebook);
+      await internalNotebookStorage.delete(notebook);
+      await RecentFiles.forget(notebook.id, backendId: notebook.backendId);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   Future<void> _showSavedNotebooks({NotebookStorage? initialBackend}) async {
-    NotebookStorage selected = initialBackend ?? localNotebookStorage;
+    NotebookStorage selected = initialBackend ?? defaultNotebookStorage;
     var folder = <String>[];
     await showDialog<void>(
       context: context,
@@ -867,7 +911,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                           value: backend,
                           child: StorageProviderLabel(
                             iconAsset: backend.iconAsset,
-                            label: backend == localNotebookStorage
+                            icon: backend == internalNotebookStorage
+                                ? Icons.inventory_2_outlined
+                                : null,
+                            label: backend == internalNotebookStorage
+                                ? S.of(context).internalStorage
+                                : backend == localNotebookStorage
                                 ? S.of(context).localStorage
                                 : backend.id.startsWith('nextcloud:')
                                 ? 'Nextcloud'
@@ -887,9 +936,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                   },
                 ),
                 Flexible(
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: LocalNotebookStorage.changes,
-                    builder: (context, _, __) => FutureBuilder<_StorageListing>(
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([
+                      LocalNotebookStorage.changes,
+                      InternalNotebookStorage.changes,
+                    ]),
+                    builder: (context, _) => FutureBuilder<_StorageListing>(
                       key: ValueKey('${selected.id}:${jsonEncode(folder)}'),
                       future: selected is NextcloudStorage
                           ? (selected as NextcloudStorage)
@@ -1016,7 +1068,14 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                     ),
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                            trailing: selected != localNotebookStorage
+                            trailing: selected == internalNotebookStorage
+                                ? IconButton(
+                                    tooltip: S.of(context).internalDelete,
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () =>
+                                        _deleteInternalNotebook(context, entry),
+                                  )
+                                : selected != localNotebookStorage
                                 ? null
                                 : IconButton(
                                     tooltip: S.of(context).removeSavedNotebook,
@@ -1083,7 +1142,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                           );
                         }
 
-                        if (selected == localNotebookStorage) {
+                        if (selected == localNotebookStorage ||
+                            selected == internalNotebookStorage) {
                           return ListView.builder(
                             shrinkWrap: true,
                             itemCount: itemCount,

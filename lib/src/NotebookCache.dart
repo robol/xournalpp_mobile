@@ -295,6 +295,15 @@ class NotebookCache {
     }
     return size;
   });
+  Future<void> remove(StoredNotebook notebook) {
+    _generation++;
+    return _queue(() async {
+      await persistence.delete(_key(notebook));
+      await _collect();
+      changes.value++;
+    });
+  }
+
   Future<void> clear() {
     _generation++;
     return _queue(() async {

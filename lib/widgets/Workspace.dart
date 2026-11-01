@@ -117,6 +117,7 @@ class DocumentCard extends StatelessWidget {
   final String? preview;
   final String? provider;
   final String? providerIcon;
+  final IconData? providerIconData;
   final VoidCallback onOpen, onLongPress;
   const DocumentCard({
     super.key,
@@ -126,6 +127,7 @@ class DocumentCard extends StatelessWidget {
     this.preview,
     this.provider,
     this.providerIcon,
+    this.providerIconData,
     required this.onOpen,
     required this.onLongPress,
   });
@@ -186,6 +188,7 @@ class DocumentCard extends StatelessWidget {
                     child: StorageProviderLabel(
                       label: provider!,
                       iconAsset: providerIcon,
+                      icon: providerIconData,
                       iconSize: 16,
                       style: TextStyle(
                         fontSize: 10,

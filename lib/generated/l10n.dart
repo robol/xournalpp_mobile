@@ -55,6 +55,56 @@ class S {
     return Localizations.of<S>(context, S);
   }
 
+  /// `PDF backgrounds are not copied`
+  String get internalPdfExternalTitle {
+    return Intl.message(
+      'PDF backgrounds are not copied',
+      name: 'internalPdfExternalTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Local storage saves the notebook file only. PDF backgrounds kept in Internal storage may need to be located again. Keep the Internal notebook or retain the original PDFs separately.`
+  String get internalPdfExternalWarning {
+    return Intl.message(
+      'Local storage saves the notebook file only. PDF backgrounds kept in Internal storage may need to be located again. Keep the Internal notebook or retain the original PDFs separately.',
+      name: 'internalPdfExternalWarning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Internal`
+  String get internalStorage {
+    return Intl.message(
+      'Internal',
+      name: 'internalStorage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Delete notebook`
+  String get internalDelete {
+    return Intl.message(
+      'Delete notebook',
+      name: 'internalDelete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Permanently delete this internal notebook and its stored PDF backgrounds?`
+  String get internalDeleteConfirm {
+    return Intl.message(
+      'Permanently delete this internal notebook and its stored PDF backgrounds?',
+      name: 'internalDeleteConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Open cached copy?`
   String get cacheOpenTitle {
     return Intl.message(

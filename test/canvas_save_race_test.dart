@@ -11,6 +11,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
+import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 
 class _BlockingRecentStore extends InMemorySharedPreferencesStore {
@@ -87,6 +88,10 @@ void main() {
         .text;
     expect(title, anyOf(nameFor(before), nameFor(after)));
     expect(find.text('Storage location'), findsOneWidget);
+    expect(find.text('Internal'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<NotebookStorage>));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Local storage'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
@@ -98,6 +103,9 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.tap(find.text('Local storage').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Cancel'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

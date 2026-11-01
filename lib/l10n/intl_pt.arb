@@ -1,4 +1,9 @@
 {
+  "internalPdfExternalTitle": "Os fundos PDF não são copiados",
+  "internalPdfExternalWarning": "O armazenamento local guarda apenas o ficheiro do caderno. Poderá ser necessário localizar novamente os fundos PDF guardados em Interno. Mantenha o caderno interno ou guarde os PDFs originais separadamente.",
+  "internalStorage": "Interno",
+  "internalDelete": "Eliminar caderno",
+  "internalDeleteConfirm": "Eliminar permanentemente este caderno interno e os seus fundos PDF guardados?",
   "cacheOpenTitle": "Abrir cópia em cache?",
   "cacheWarning": "Está a editar uma cópia em cache. Pode estar desatualizada. Guardar na localização original pode substituir alterações mais recentes.",
   "cacheCheckpoint": "Ponto de gravação local",

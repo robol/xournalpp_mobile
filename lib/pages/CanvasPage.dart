@@ -1692,7 +1692,12 @@ class _CanvasPageState extends State<CanvasPage>
                                   value: backend,
                                   child: StorageProviderLabel(
                                     iconAsset: backend.iconAsset,
-                                    label: backend.id == localNotebookStorage.id
+                                    icon: backend == internalNotebookStorage
+                                        ? Icons.inventory_2_outlined
+                                        : null,
+                                    label: backend == internalNotebookStorage
+                                        ? S.of(context).internalStorage
+                                        : backend.id == localNotebookStorage.id
                                         ? S.of(context).localStorage
                                         : backend is NextcloudStorage
                                         ? 'Nextcloud'
@@ -2948,7 +2953,9 @@ class _CanvasPageState extends State<CanvasPage>
       ),
     );
     try {
-      var storage = _file!.storage ?? localNotebookStorage;
+      var storage =
+          _file!.storage ??
+          (filePath == null ? defaultNotebookStorage : localNotebookStorage);
       if (_file!.title == null) {
         final titleApplied = await _showTitleDialog(
           selectedStorage: storage,
@@ -2964,7 +2971,7 @@ class _CanvasPageState extends State<CanvasPage>
           }
           return false;
         }
-      } else if (saveAs || filePath == null) {
+      } else if (saveAs || (filePath == null && kIsWeb)) {
         final selected = await showDialog<NotebookStorage>(
           context: context,
           builder: (dialogContext) => SimpleDialog(
@@ -2975,7 +2982,12 @@ class _CanvasPageState extends State<CanvasPage>
                     onPressed: () => Navigator.pop(dialogContext, backend),
                     child: StorageProviderLabel(
                       iconAsset: backend.iconAsset,
-                      label: backend.id == localNotebookStorage.id
+                      icon: backend == internalNotebookStorage
+                          ? Icons.inventory_2_outlined
+                          : null,
+                      label: backend == internalNotebookStorage
+                          ? S.of(dialogContext).internalStorage
+                          : backend.id == localNotebookStorage.id
                           ? S.of(dialogContext).localStorage
                           : backend is NextcloudStorage
                           ? 'Nextcloud'
@@ -3023,6 +3035,33 @@ class _CanvasPageState extends State<CanvasPage>
         final background = page.background;
         if (background is XppBackgroundPdf && background.filename != null) {
           backgrounds.putIfAbsent(background.filename!, () => background);
+        }
+      }
+      if (storage is LocalNotebookStorage &&
+          _file!.storage is InternalNotebookStorage &&
+          backgrounds.isNotEmpty) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(S.of(dialogContext).internalPdfExternalTitle),
+            content: Text(S.of(dialogContext).internalPdfExternalWarning),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(S.of(dialogContext).cancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(S.of(dialogContext).save),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return false;
+        if (proceed != true) {
+          savingSnackBar.close();
+          setState(() => savingFile = false);
+          return false;
         }
       }
       final bytes = await _file!.toUint8ListAsync();
@@ -3092,14 +3131,19 @@ class _CanvasPageState extends State<CanvasPage>
             : await pending.timeout(_saveOverwriteTimeout);
       } catch (conflict) {
         if (conflict is! NextcloudNameConflict &&
-            conflict is! GoogleDriveNameConflict)
+            conflict is! GoogleDriveNameConflict &&
+            conflict is! InternalNameConflict)
           rethrow;
         final filename = conflict is NextcloudNameConflict
             ? conflict.filename
-            : (conflict as GoogleDriveNameConflict).filename;
+            : conflict is GoogleDriveNameConflict
+            ? conflict.filename
+            : (conflict as InternalNameConflict).notebook.name;
         final existingId = conflict is NextcloudNameConflict
             ? conflict.notebookId
-            : (conflict as GoogleDriveNameConflict).fileId;
+            : conflict is GoogleDriveNameConflict
+            ? conflict.fileId
+            : (conflict as InternalNameConflict).notebook.id;
         if (!mounted) return false;
         if (_file!.openedFromCache) {
           final choice = await confirmCachedOverwrite(context);

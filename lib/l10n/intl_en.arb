@@ -1,4 +1,9 @@
 {
+  "internalPdfExternalTitle": "PDF backgrounds are not copied",
+  "internalPdfExternalWarning": "Local storage saves the notebook file only. PDF backgrounds kept in Internal storage may need to be located again. Keep the Internal notebook or retain the original PDFs separately.",
+  "internalStorage": "Internal",
+  "internalDelete": "Delete notebook",
+  "internalDeleteConfirm": "Permanently delete this internal notebook and its stored PDF backgrounds?",
   "cacheOpenTitle": "Open cached copy?",
   "cacheWarning": "You are editing a cached copy. It may be outdated. Saving to the original location may overwrite newer changes.",
   "cacheCheckpoint": "Local checkpoint",

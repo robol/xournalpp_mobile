@@ -137,6 +137,17 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "image": MessageLookupByLibrary.simpleMessage("Imagem"),
     "importPdf": MessageLookupByLibrary.simpleMessage("Importar PDF"),
+    "internalDelete": MessageLookupByLibrary.simpleMessage("Eliminar caderno"),
+    "internalDeleteConfirm": MessageLookupByLibrary.simpleMessage(
+      "Eliminar permanentemente este caderno interno e os seus fundos PDF guardados?",
+    ),
+    "internalPdfExternalTitle": MessageLookupByLibrary.simpleMessage(
+      "Os fundos PDF não são copiados",
+    ),
+    "internalPdfExternalWarning": MessageLookupByLibrary.simpleMessage(
+      "O armazenamento local guarda apenas o ficheiro do caderno. Poderá ser necessário localizar novamente os fundos PDF guardados em Interno. Mantenha o caderno interno ou guarde os PDFs originais separadamente.",
+    ),
+    "internalStorage": MessageLookupByLibrary.simpleMessage("Interno"),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (não implementado)",
     ),

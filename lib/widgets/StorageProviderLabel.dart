@@ -6,11 +6,13 @@ class StorageProviderLabel extends StatelessWidget {
     super.key,
     required this.label,
     this.iconAsset,
+    this.icon,
     this.iconSize = 20,
     this.style,
   });
   final String label;
   final String? iconAsset;
+  final IconData? icon;
   final double iconSize;
   final TextStyle? style;
 
@@ -18,7 +20,10 @@ class StorageProviderLabel extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      if (iconAsset != null) ...[
+      if (icon != null) ...[
+        Icon(icon, size: iconSize),
+        const SizedBox(width: 6),
+      ] else if (iconAsset != null) ...[
         Image.asset(
           iconAsset!,
           width: iconSize,

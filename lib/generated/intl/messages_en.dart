@@ -136,6 +136,17 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "image": MessageLookupByLibrary.simpleMessage("Image"),
     "importPdf": MessageLookupByLibrary.simpleMessage("Import PDF"),
+    "internalDelete": MessageLookupByLibrary.simpleMessage("Delete notebook"),
+    "internalDeleteConfirm": MessageLookupByLibrary.simpleMessage(
+      "Permanently delete this internal notebook and its stored PDF backgrounds?",
+    ),
+    "internalPdfExternalTitle": MessageLookupByLibrary.simpleMessage(
+      "PDF backgrounds are not copied",
+    ),
+    "internalPdfExternalWarning": MessageLookupByLibrary.simpleMessage(
+      "Local storage saves the notebook file only. PDF backgrounds kept in Internal storage may need to be located again. Keep the Internal notebook or retain the original PDFs separately.",
+    ),
+    "internalStorage": MessageLookupByLibrary.simpleMessage("Internal"),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (not implemented)",
     ),

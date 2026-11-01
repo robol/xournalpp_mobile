@@ -177,6 +177,8 @@ class XppFile {
       null,
       onUnavailable,
     );
+    if (cached.notebook.backendId == 'internal')
+      file.title = cached.notebook.name;
     file.storage = storage;
     file.storageNotebook = cached.notebook;
     file.openedFromCache = true;
@@ -209,6 +211,7 @@ class XppFile {
       null,
       onUnavailable,
     );
+    if (storage is InternalNotebookStorage) file.title = notebook.name;
     file.storage = storage;
     file.storageNotebook = notebook;
     file.onCacheError = onCacheError;

@@ -141,6 +141,17 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "image": MessageLookupByLibrary.simpleMessage("Bild"),
     "importPdf": MessageLookupByLibrary.simpleMessage("PDF importieren"),
+    "internalDelete": MessageLookupByLibrary.simpleMessage("Notizbuch löschen"),
+    "internalDeleteConfirm": MessageLookupByLibrary.simpleMessage(
+      "Dieses interne Notizbuch und seine gespeicherten PDF-Hintergründe dauerhaft löschen?",
+    ),
+    "internalPdfExternalTitle": MessageLookupByLibrary.simpleMessage(
+      "PDF-Hintergründe werden nicht kopiert",
+    ),
+    "internalPdfExternalWarning": MessageLookupByLibrary.simpleMessage(
+      "Im lokalen Speicher wird nur die Notizbuchdatei gespeichert. In Intern gespeicherte PDF-Hintergründe müssen möglicherweise erneut gesucht werden. Behalte das interne Notizbuch oder die ursprünglichen PDFs separat.",
+    ),
+    "internalStorage": MessageLookupByLibrary.simpleMessage("Intern"),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (nicht implementiert)",
     ),

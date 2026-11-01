@@ -1,4 +1,9 @@
 {
+  "internalPdfExternalTitle": "PDF-Hintergründe werden nicht kopiert",
+  "internalPdfExternalWarning": "Im lokalen Speicher wird nur die Notizbuchdatei gespeichert. In Intern gespeicherte PDF-Hintergründe müssen möglicherweise erneut gesucht werden. Behalte das interne Notizbuch oder die ursprünglichen PDFs separat.",
+  "internalStorage": "Intern",
+  "internalDelete": "Notizbuch löschen",
+  "internalDeleteConfirm": "Dieses interne Notizbuch und seine gespeicherten PDF-Hintergründe dauerhaft löschen?",
   "cacheOpenTitle": "Zwischengespeicherte Kopie öffnen?",
   "cacheWarning": "Du bearbeitest eine zwischengespeicherte Kopie. Sie ist möglicherweise veraltet. Beim Speichern am ursprünglichen Ort können neuere Änderungen überschrieben werden.",
   "cacheCheckpoint": "Lokaler Speicherzeitpunkt",
