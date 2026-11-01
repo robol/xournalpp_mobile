@@ -180,5 +180,8 @@
   "cacheUnlimited": "Unlimited",
   "exportingPdf": "Exporting PDF...",
   "stillSaving": "Still saving. Keep this notebook open until the operation finishes.",
-  "notebookEditConflict": "The notebook changed in storage. Save a separate copy to protect both versions."
+  "notebookEditConflict": "The notebook changed in storage. Save a separate copy to protect both versions.",
+  "safOriginalCopy": " (before the interrupted save)",
+  "safEditedCopy": " (pending save)",
+  "safSaveFailed": "The document provider did not confirm the save. Recovery copies are stored on this device. Reopen the app to recover them, then use Save As."
 }

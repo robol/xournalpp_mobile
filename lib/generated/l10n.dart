@@ -1544,6 +1544,36 @@ class S {
       args: [],
     );
   }
+
+  /// ` (before the interrupted save)`
+  String get safOriginalCopy {
+    return Intl.message(
+      ' (before the interrupted save)',
+      name: 'safOriginalCopy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// ` (pending save)`
+  String get safEditedCopy {
+    return Intl.message(
+      ' (pending save)',
+      name: 'safEditedCopy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The document provider did not confirm the save. Recovery copies are stored on this device. Reopen the app to recover them, then use Save As.`
+  String get safSaveFailed {
+    return Intl.message(
+      'The document provider did not confirm the save. Recovery copies are stored on this device. Reopen the app to recover them, then use Save As.',
+      name: 'safSaveFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

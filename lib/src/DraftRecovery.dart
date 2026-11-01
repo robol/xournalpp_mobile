@@ -18,6 +18,7 @@ class RecoveryDraft {
     this.backendId,
     this.cachedOrigin = false,
     this.sourceDigest,
+    this.safRecoveryKind,
   });
 
   final String id;
@@ -28,6 +29,7 @@ class RecoveryDraft {
   final String? backendId;
   final bool cachedOrigin;
   final String? sourceDigest;
+  final String? safRecoveryKind;
 
   Map<String, Object?> toJson() => {
     'version': 1,
@@ -39,6 +41,7 @@ class RecoveryDraft {
     'backendId': backendId,
     'cachedOrigin': cachedOrigin,
     'sourceDigest': sourceDigest,
+    'safRecoveryKind': safRecoveryKind,
   };
 
   static RecoveryDraft fromJson(Map<String, dynamic> data) {
@@ -59,6 +62,7 @@ class RecoveryDraft {
       backendId: data['backendId'] as String?,
       cachedOrigin: data['cachedOrigin'] == true,
       sourceDigest: data['sourceDigest'] as String?,
+      safRecoveryKind: data['safRecoveryKind'] as String?,
     );
   }
 }

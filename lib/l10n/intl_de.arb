@@ -180,5 +180,8 @@
   "stillSaving": "Speichern läuft noch. Lassen Sie das Notizbuch geöffnet, bis der Vorgang abgeschlossen ist.",
   "notebookEditConflict": "Das Notizbuch wurde im Speicher geändert. Speichern Sie eine separate Kopie, um beide Versionen zu bewahren.",
   "forkedBy": "Dieser Code wurde von xournalpp_mobile aus der Arbeit von @TheOneWithTheBraid abgeleitet und basiert weitgehend darauf.",
-  "whiteoutEraserNotImplemented": "Weißer Radierer (noch nicht implementiert)"
+  "whiteoutEraserNotImplemented": "Weißer Radierer (noch nicht implementiert)",
+  "safOriginalCopy": " (vor dem unterbrochenen Speichern)",
+  "safEditedCopy": " (ausstehender Speichervorgang)",
+  "safSaveFailed": "Der Dokumentanbieter hat das Speichern nicht bestätigt. Wiederherstellungskopien sind auf diesem Gerät gespeichert. Öffnen Sie die App erneut, um sie wiederherzustellen, und verwenden Sie dann „Speichern unter“."
 }

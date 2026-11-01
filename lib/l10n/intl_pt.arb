@@ -180,5 +180,8 @@
   "notebookEditConflict": "O caderno foi alterado no armazenamento. Guarde uma cópia separada para preservar ambas as versões.",
   "forkedBy": "Este código foi derivado por xournalpp_mobile do trabalho de @TheOneWithTheBraid e baseia-se sobretudo nele.",
   "whiteoutEraserNotImplemented": "Borracha branca (ainda não implementada)",
-  "openNavigation": "Abrir navegação"
+  "openNavigation": "Abrir navegação",
+  "safOriginalCopy": " (antes de salvar)",
+  "safEditedCopy": " (salvamento pendente)",
+  "safSaveFailed": "O provedor de documentos não confirmou o salvamento. Cópias de recuperação estão armazenadas neste dispositivo. Reabra o aplicativo para recuperá-las e use Salvar como."
 }

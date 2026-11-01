@@ -120,7 +120,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             S
                 .of(dialogContext)
                 .recoveryMessage(
-                  draft.title ?? S.of(dialogContext).newDocument,
+                  '${draft.title ?? S.of(dialogContext).newDocument}'
+                  '${draft.safRecoveryKind == 'original'
+                      ? S.of(dialogContext).safOriginalCopy
+                      : draft.safRecoveryKind == 'edited'
+                      ? S.of(dialogContext).safEditedCopy
+                      : ''}',
                 ),
           ),
           actions: [

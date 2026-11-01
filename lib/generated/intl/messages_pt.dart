@@ -293,6 +293,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "Tentar excluir novamente",
     ),
     "ruled": MessageLookupByLibrary.simpleMessage("Com linhas e margem"),
+    "safEditedCopy": MessageLookupByLibrary.simpleMessage(
+      " (salvamento pendente)",
+    ),
+    "safOriginalCopy": MessageLookupByLibrary.simpleMessage(
+      " (antes de salvar)",
+    ),
+    "safSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "O provedor de documentos não confirmou o salvamento. Cópias de recuperação estão armazenadas neste dispositivo. Reabra o aplicativo para recuperá-las e use Salvar como.",
+    ),
     "save": MessageLookupByLibrary.simpleMessage("Salvar"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Salvar como..."),
     "savedNotebooks": MessageLookupByLibrary.simpleMessage("Cadernos salvos"),

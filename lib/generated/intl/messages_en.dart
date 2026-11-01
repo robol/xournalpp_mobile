@@ -273,6 +273,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "renameNotebook": MessageLookupByLibrary.simpleMessage("Rename"),
     "retrySourceDelete": MessageLookupByLibrary.simpleMessage("Retry deletion"),
     "ruled": MessageLookupByLibrary.simpleMessage("Ruled"),
+    "safEditedCopy": MessageLookupByLibrary.simpleMessage(" (pending save)"),
+    "safOriginalCopy": MessageLookupByLibrary.simpleMessage(
+      " (before the interrupted save)",
+    ),
+    "safSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "The document provider did not confirm the save. Recovery copies are stored on this device. Reopen the app to recover them, then use Save As.",
+    ),
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Save as..."),
     "savedNotebooks": MessageLookupByLibrary.simpleMessage("Saved notebooks"),

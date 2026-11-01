@@ -303,6 +303,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "Löschen wiederholen",
     ),
     "ruled": MessageLookupByLibrary.simpleMessage("Liniert mit Rand"),
+    "safEditedCopy": MessageLookupByLibrary.simpleMessage(
+      " (ausstehender Speichervorgang)",
+    ),
+    "safOriginalCopy": MessageLookupByLibrary.simpleMessage(
+      " (vor dem unterbrochenen Speichern)",
+    ),
+    "safSaveFailed": MessageLookupByLibrary.simpleMessage(
+      "Der Dokumentanbieter hat das Speichern nicht bestätigt. Wiederherstellungskopien sind auf diesem Gerät gespeichert. Öffnen Sie die App erneut, um sie wiederherzustellen, und verwenden Sie dann „Speichern unter“.",
+    ),
     "save": MessageLookupByLibrary.simpleMessage("Speichern"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Speichern unter..."),
     "savedNotebooks": MessageLookupByLibrary.simpleMessage(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
@@ -41,6 +42,70 @@ void main() {
     storage.debugDraftDirectory = null;
     directory.deleteSync(recursive: true);
   });
+
+  testWidgets(
+    'native SAF copies are labelled and recover without the source URI',
+    (tester) async {
+      final bytes = await tester.runAsync(
+        () => XppFile.empty(title: 'Notebook').toUint8ListAsync(),
+      );
+      // Match the native, durably published JSON rather than going through Dart's writer.
+      File('${directory.path}/123_456.json').writeAsStringSync(
+        jsonEncode({
+          'version': 1,
+          'id': '123_456',
+          'bytes': base64Encode(bytes!),
+          'page': 0,
+          'title': 'Notebook',
+          'safRecoveryKind': 'original',
+        }),
+      );
+      final drafts = await tester.runAsync(() => DraftRecovery.list());
+      expect(drafts!.single.safRecoveryKind, 'original');
+      expect(drafts.single.originalPath, isNull);
+      expect(drafts.single.backendId, isNull);
+      expect(
+        RecoveryDraft.fromJson(drafts.single.toJson()).safRecoveryKind,
+        'original',
+      );
+      await tester.pumpWidget(app(OpenPage()));
+      await tester.pumpAndSettle();
+      for (
+        var i = 0;
+        i < 100 &&
+            find
+                .textContaining('before the interrupted save')
+                .evaluate()
+                .isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(
+        find.textContaining('before the interrupted save'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Recover'));
+      for (
+        var i = 0;
+        i < 100 && find.byType(CanvasPage).evaluate().isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      final canvas = tester.widget<CanvasPage>(find.byType(CanvasPage));
+      expect(canvas.file!.storageNotebook, isNull);
+      expect(canvas.filePath, isNull);
+      expect(canvas.recoveryOriginalPath, isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   test(
     'newer snapshots replace older ones, and deletion follows pending writes',

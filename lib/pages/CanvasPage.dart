@@ -3581,7 +3581,11 @@ class _CanvasPageState extends State<CanvasPage>
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            error is NotebookEditConflict
+            error is PlatformException &&
+                    error.details is Map &&
+                    error.details['recoveryAvailable'] == true
+                ? S.of(context).safSaveFailed
+                : error is NotebookEditConflict
                 ? S.of(context).notebookEditConflict
                 : S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
           ),

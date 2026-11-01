@@ -11,8 +11,16 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.FileOutputStream
+import java.io.File
+import android.system.Os
+import android.system.OsConstants
+import android.util.Base64
+import org.json.JSONObject
+import java.util.UUID
+import java.util.concurrent.Executors
 
 class MainActivity: FlutterActivity() {
+    private val documentWrites = Executors.newSingleThreadExecutor()
     private val storageChannel = "it.robol.xournal.mobile/storage"
     private val intentChannel = "it.robol.xournal.mobile/intent"
     private val folderRequestCode = 49318
@@ -116,7 +124,7 @@ class MainActivity: FlutterActivity() {
                             result.error("missing_args", "Document URI and bytes are required.", null)
                             return@setMethodCallHandler
                         }
-                        writeDocument(Uri.parse(uri), bytes, result)
+                        documentWrites.execute { writeDocument(Uri.parse(uri), bytes, result) }
                     }
                     "persistDocumentAccess" -> {
                         val uri = call.argument<String>("uri")
@@ -262,21 +270,75 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun syncDirectory(directory: File) {
+        val descriptor = Os.open(directory.path, OsConstants.O_RDONLY, 0)
+        try { Os.fsync(descriptor) } finally { Os.close(descriptor) }
+    }
+
+    private fun retainSafRecovery(uri: Uri, bytes: ByteArray, kind: String): String {
+        // path_provider's Android application-support directory is filesDir.
+        // Publish a normal recovery draft only after its content is on disk.
+        val directory = File(filesDir, "recovery_drafts")
+        if (!directory.exists()) {
+            check(directory.mkdir()) { "Could not create recovery directory" }
+            syncDirectory(filesDir)
+        }
+        val id = "${System.currentTimeMillis() * 1000}_${UUID.randomUUID().leastSignificantBits and Long.MAX_VALUE}"
+        val temporary = File(directory, "$id.tmp")
+        val published = File(directory, "$id.json")
+        check(temporary.createNewFile() && !published.exists()) { "Recovery name collision" }
+        val name = (displayName(uri) ?: "Notebook").removeSuffix(".xopp")
+        val metadata = JSONObject().apply {
+            put("version", 1)
+            put("id", id)
+            put("bytes", Base64.encodeToString(bytes, Base64.NO_WRAP))
+            put("page", 0)
+            put("title", name)
+            put("safRecoveryKind", kind)
+            // Deliberately omit originalPath/backendId: recovery must use Save As.
+        }
+        try {
+            FileOutputStream(temporary).use { output ->
+                output.write(metadata.toString().toByteArray(Charsets.UTF_8))
+                output.flush()
+                output.fd.sync()
+            }
+            check(temporary.renameTo(published)) { "Could not publish recovery copy" }
+            syncDirectory(directory)
+        } catch (error: Exception) {
+            temporary.delete()
+            throw error
+        }
+        return id
+    }
+
     private fun writeDocument(uri: Uri, bytes: ByteArray, result: MethodChannel.Result) {
         try {
-            contentResolver.openFileDescriptor(uri, "rwt")?.use { descriptor ->
-                FileOutputStream(descriptor.fileDescriptor).use { output ->
-                    output.write(bytes)
-                    output.flush()
+            SafOverwrite.write(object : SafOverwrite.Document {
+                override fun read(): ByteArray = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: error("Could not read document for verification or backup")
+                override fun write(data: ByteArray) {
+                    // Provider-specific truncation is allowed only after both durable copies exist.
+                    contentResolver.openFileDescriptor(uri, "rwt")?.use { descriptor ->
+                        FileOutputStream(descriptor.fileDescriptor).use { output ->
+                            output.write(data)
+                            output.flush()
+                        }
+                    } ?: error("Could not open document for writing")
                 }
-            }
-                ?: run {
-                    result.error("write_failed", "Could not open document for writing.", uri.toString())
-                    return
+            }, object : SafOverwrite.Recovery {
+                override fun retain(data: ByteArray, kind: String): String = retainSafRecovery(uri, data, kind)
+                override fun remove(id: String) {
+                    val directory = File(filesDir, "recovery_drafts")
+                    check(File(directory, "$id.json").delete()) { "Could not remove recovery copy" }
+                    syncDirectory(directory)
                 }
+            }, bytes)
             result.success(null)
+        } catch (error: SafOverwrite.Failure) {
+            result.error("write_failed", error.message, mapOf("recoveryAvailable" to error.recoveryAvailable))
         } catch (error: Exception) {
-            result.error("write_failed", error.message, uri.toString())
+            result.error("write_failed", error.message, mapOf("recoveryAvailable" to false))
         }
     }
 
