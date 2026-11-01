@@ -159,6 +159,7 @@ class CanvasPage extends StatefulWidget {
   final PdfBackgroundRenderService? pdfRenderService;
   final String? recoveryDraftId;
   final String? recoveryOriginalPath;
+
   /// How long an unfinished overwrite waits before showing a progress notice.
   /// Tests can shorten this without waiting 30 real seconds.
   final Duration slowSaveWarningDelay;
@@ -443,7 +444,11 @@ class _CanvasPageState extends State<CanvasPage>
       ),
     );
     return PopScope(
-      canPop: !savingFile && !_transferring && !_erasing && (_allowPop || !_isDirty),
+      canPop:
+          !savingFile &&
+          !_transferring &&
+          !_erasing &&
+          (_allowPop || !_isDirty),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop || _confirmingLeave || _transferring) return;
         _confirmingLeave = true;
@@ -1633,7 +1638,9 @@ class _CanvasPageState extends State<CanvasPage>
     if (!mounted) return false;
     if (savingFile) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The notebook is still saving. Please wait.')),
+        const SnackBar(
+          content: Text('The notebook is still saving. Please wait.'),
+        ),
       );
       return false;
     }
@@ -2768,7 +2775,8 @@ class _CanvasPageState extends State<CanvasPage>
               (_file?.title ?? S.of(context).newFile) +
               ' ${currentPage + 1}' +
               '.png',
-        ).exportToStorage()) ?? '';
+        ).exportToStorage()) ??
+        '';
     if (!mounted) return;
     if (fileName.isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2815,9 +2823,7 @@ class _CanvasPageState extends State<CanvasPage>
       _showSnackBar(
         scaffoldMessenger,
         SnackBar(
-          content: Text(
-            '${S.of(context).successfullySaved} ${savedPath}',
-          ),
+          content: Text('${S.of(context).successfullySaved} ${savedPath}'),
         ),
       );
     } on PdfExportException catch (error) {
@@ -3024,7 +3030,7 @@ class _CanvasPageState extends State<CanvasPage>
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     scaffoldMessenger.removeCurrentSnackBar();
     scaffoldMessenger.clearSnackBars();
-    final savingSnackBar = scaffoldMessenger.showSnackBar(
+    var savingSnackBar = scaffoldMessenger.showSnackBar(
       SnackBar(
         content: Text(S.of(context).savingFile),
         duration: Duration(days: 999),
@@ -3211,9 +3217,11 @@ class _CanvasPageState extends State<CanvasPage>
           slowSaveTimer = Timer(widget.slowSaveWarningDelay, () {
             if (!mounted || !savingFile) return;
             savingSnackBar.close();
-            scaffoldMessenger.showSnackBar(
+            savingSnackBar = scaffoldMessenger.showSnackBar(
               const SnackBar(
-                content: Text('Still saving. Keep this notebook open until the operation finishes.'),
+                content: Text(
+                  'Still saving. Keep this notebook open until the operation finishes.',
+                ),
                 duration: Duration(days: 999),
               ),
             );

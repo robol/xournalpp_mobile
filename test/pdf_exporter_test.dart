@@ -17,6 +17,34 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  test('generated and incremental PDF xref offsets point to objects', () async {
+    final generated = await exportPdfDocument(XppFile.empty());
+    final path = await _writePdf(_minimalPdf());
+    final incremental = await exportPdfDocument(_pdfBackedFile(path));
+    for (final bytes in [generated, incremental]) {
+      final text = latin1.decode(bytes);
+      final start = RegExp(r'startxref\s+(\d+)\s+%%EOF').allMatches(text).last;
+      final offset = int.parse(start.group(1)!);
+      expect(text.substring(offset), startsWith('xref\n'));
+      final section = text.substring(offset, text.indexOf('trailer', offset));
+      final lines = section.split('\n');
+      var i = 1;
+      while (i < lines.length && lines[i].isNotEmpty) {
+        final header = lines[i++].split(' ');
+        final first = int.parse(header[0]);
+        final count = int.parse(header[1]);
+        for (var j = 0; j < count; j++) {
+          final entry = lines[i++];
+          if (entry[17] != 'n') continue;
+          final objectOffset = int.parse(entry.substring(0, 10));
+          expect(
+            text.substring(objectOffset),
+            startsWith('${first + j} 0 obj\n'),
+          );
+        }
+      }
+    }
+  });
   test('exports opaque filled strokes and rejects translucent fills', () async {
     final file = XppFile.empty();
     final stroke = XppStrokePen(
@@ -43,6 +71,34 @@ void main() {
     await Future<void>.delayed(Duration.zero, () => timerRan = true);
     expect(timerRan, isTrue);
     expect(latin1.decode(await export), startsWith('%PDF-'));
+  });
+
+  test('F4: export rejects text it cannot encode without data loss', () async {
+    final file = XppFile.empty();
+    file.pages!.single.layers!.single.content!.add(
+      XppText(
+        text: 'Greek Ω and Japanese 日本語',
+        offset: const Offset(10, 10),
+        size: 14,
+        color: const Color(0xff000000),
+      ),
+    );
+    await expectLater(
+      exportPdfDocument(file),
+      throwsA(isA<PdfExportException>()),
+    );
+  });
+
+  test('F5: unresolved PDF backgrounds never silently disappear', () async {
+    final file = XppFile.empty();
+    file.pages!.single.background = XppBackgroundPdf(
+      onUnavailable: (_, __) => throw StateError('not reachable'),
+      page: 1,
+    );
+    await expectLater(
+      exportPdfDocument(file),
+      throwsA(isA<PdfExportException>()),
+    );
   });
 
   test('exportPdfDocument appends vector overlay update', () async {
@@ -109,6 +165,49 @@ void main() {
     expect(text, contains('/Subtype /Image'));
     expect(text, contains('/XObject'));
     expect(text, contains('/FXPIm1'));
+  });
+
+  test('F3: transparent images retain a PDF soft mask', () async {
+    final png = img.Image(width: 2, height: 1, numChannels: 4)
+      ..setPixelRgba(0, 0, 255, 0, 0, 0)
+      ..setPixelRgba(1, 0, 0, 255, 0, 255);
+    final file = XppFile.empty();
+    file.pages!.single.layers!.single.content!.add(
+      XppImage(
+        data: Uint8List.fromList(img.encodePng(png)),
+        topLeft: const Offset(10, 10),
+        bottomRight: const Offset(30, 30),
+      ),
+    );
+    final output = latin1.decode(await exportPdfDocument(file));
+    expect(output, contains('/SMask'));
+    expect(output, contains('/DeviceGray'));
+  });
+
+  test('16-bit PNG channels are scaled to PDF 8-bit samples', () async {
+    final png = img.Image(
+      width: 1,
+      height: 1,
+      numChannels: 4,
+      format: img.Format.uint16,
+    )..setPixelRgba(0, 0, 65535, 0, 0, 32768);
+    final file = XppFile.empty();
+    file.pages!.single.layers!.single.content!.add(
+      XppImage(
+        data: Uint8List.fromList(img.encodePng(png)),
+        topLeft: const Offset(0, 0),
+        bottomRight: const Offset(10, 10),
+      ),
+    );
+    final output = latin1.decode(await exportPdfDocument(file));
+    expect(
+      output,
+      contains('stream\n${String.fromCharCodes([128])}\nendstream'),
+    );
+    expect(
+      output,
+      contains('stream\n${String.fromCharCodes([255, 0, 0])}\nendstream'),
+    );
   });
 
   test('exportPdfDocument can resolve a missing source PDF', () async {

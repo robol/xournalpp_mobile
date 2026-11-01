@@ -103,7 +103,12 @@ _PdfSource? _pdfSourcePlan(XppFile file) {
       pageNumbers.add(null);
       continue;
     }
-    if (background.filename == null || background.page == null) return null;
+    if (background.filename == null || background.page == null) {
+      throw const PdfExportException(
+        'A PDF background has no usable source file or page number. '
+        'Relink its background PDF before exporting.',
+      );
+    }
     filename ??= background.filename;
     sourceBackground ??= background;
     if (filename != background.filename) {
@@ -159,21 +164,26 @@ class _IncrementalPdfWriter {
   Uint8List export({required XppFile file, required _PdfSource source}) {
     final pages = file.pages ?? <XppPage>[];
     final builder = StringBuffer();
+    var appendedLength = 0;
+    void appendObject(String data) {
+      builder.write(data);
+      // PDF streams are represented as Latin-1 strings: one code unit per byte.
+      appendedLength += data.length;
+    }
+
     final newOffsets = <int, int>{};
     var nextObject = _maxObjectNumber + 1;
 
     int addObject(String body) {
       final objectNumber = nextObject++;
-      newOffsets[objectNumber] =
-          _bytes.length + latin1.encode(builder.toString()).length;
-      builder.write('$objectNumber 0 obj\n$body\nendobj\n');
+      newOffsets[objectNumber] = _bytes.length + appendedLength;
+      appendObject('$objectNumber 0 obj\n$body\nendobj\n');
       return objectNumber;
     }
 
     void writeUpdatedObject(int objectNumber, String body) {
-      newOffsets[objectNumber] =
-          _bytes.length + latin1.encode(builder.toString()).length;
-      builder.write('$objectNumber 0 obj\n$body\nendobj\n');
+      newOffsets[objectNumber] = _bytes.length + appendedLength;
+      appendObject('$objectNumber 0 obj\n$body\nendobj\n');
     }
 
     final newPagesObject = nextObject++;
@@ -212,7 +222,10 @@ class _IncrementalPdfWriter {
         mediaBox: pageInfo.mediaBox,
         addImageObject: (image) {
           final name = 'FXPIm${imageObjects.length + 1}';
-          final imageObject = addObject(_imageObject(image));
+          final mask = image.alpha == null
+              ? null
+              : addObject(_alphaMaskObject(image));
+          final imageObject = addObject(_imageObject(image, alphaObject: mask));
           imageObjects[name] = imageObject;
           return name;
         },
@@ -251,7 +264,7 @@ class _IncrementalPdfWriter {
       _replaceDictionaryEntry(catalog, 'Pages', '$newPagesObject 0 R'),
     );
 
-    final xrefOffset = _bytes.length + latin1.encode(builder.toString()).length;
+    final xrefOffset = _bytes.length + appendedLength;
     builder.write('xref\n');
     final sortedObjects = newOffsets.keys.toList()..sort();
     for (final objectNumber in sortedObjects) {
@@ -781,7 +794,10 @@ class _IncrementalPdfWriter {
       mediaBox: mediaBox,
       addImageObject: (image) {
         final name = 'FXPIm${imageObjects.length + 1}';
-        final imageObject = addObject(_imageObject(image));
+        final mask = image.alpha == null
+            ? null
+            : addObject(_alphaMaskObject(image));
+        final imageObject = addObject(_imageObject(image, alphaObject: mask));
         imageObjects[name] = imageObject;
         return name;
       },
@@ -807,11 +823,17 @@ class _IncrementalPdfWriter {
     return '<< /Length ${bytes.length} >>\nstream\n$data\nendstream';
   }
 
-  String _imageObject(_PdfImage image) {
+  String _imageObject(_PdfImage image, {int? alphaObject}) {
     return '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
-        '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} >>\n'
+        '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} '
+        '${alphaObject == null ? '' : '/SMask $alphaObject 0 R '}>>\n'
         'stream\n${latin1.decode(image.rgb)}\nendstream';
   }
+
+  String _alphaMaskObject(_PdfImage image) =>
+      '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
+      '/ColorSpace /DeviceGray /BitsPerComponent 8 /Length ${image.alpha!.length} >>\n'
+      'stream\n${latin1.decode(image.alpha!)}\nendstream';
 
   String _generatedResources({
     required int fontObject,
@@ -842,13 +864,19 @@ class _GeneratedPdfWriter {
     if (pages.isEmpty) throw const PdfExportException('No pages to export.');
 
     final builder = StringBuffer('%PDF-1.4\n');
+    var appendedLength = '%PDF-1.4\n'.length;
+    void appendObject(String data) {
+      builder.write(data);
+      appendedLength += data.length;
+    }
+
     final offsets = <int, int>{};
     var nextObject = 1;
 
     int addObject(String body) {
       final objectNumber = nextObject++;
-      offsets[objectNumber] = latin1.encode(builder.toString()).length;
-      builder.write('$objectNumber 0 obj\n$body\nendobj\n');
+      offsets[objectNumber] = appendedLength;
+      appendObject('$objectNumber 0 obj\n$body\nendobj\n');
       return objectNumber;
     }
 
@@ -866,20 +894,20 @@ class _GeneratedPdfWriter {
       );
     }
 
-    offsets[pagesObject] = latin1.encode(builder.toString()).length;
-    builder.write(
+    offsets[pagesObject] = appendedLength;
+    appendObject(
       '$pagesObject 0 obj\n'
       '<< /Type /Pages /Kids [ ${kids.join(' ')} ] /Count ${kids.length} >>\n'
       'endobj\n',
     );
-    offsets[catalogObject] = latin1.encode(builder.toString()).length;
-    builder.write(
+    offsets[catalogObject] = appendedLength;
+    appendObject(
       '$catalogObject 0 obj\n'
       '<< /Type /Catalog /Pages $pagesObject 0 R >>\n'
       'endobj\n',
     );
 
-    final xrefOffset = latin1.encode(builder.toString()).length;
+    final xrefOffset = appendedLength;
     builder.write('xref\n0 $nextObject\n');
     builder.write('0000000000 65535 f \n');
     for (var objectNumber = 1; objectNumber < nextObject; objectNumber++) {
@@ -911,7 +939,10 @@ class _GeneratedPdfWriter {
       mediaBox: mediaBox,
       addImageObject: (image) {
         final name = 'FXPIm${imageObjects.length + 1}';
-        final imageObject = addObject(_imageObject(image));
+        final mask = image.alpha == null
+            ? null
+            : addObject(_alphaMaskObject(image));
+        final imageObject = addObject(_imageObject(image, alphaObject: mask));
         imageObjects[name] = imageObject;
         return name;
       },
@@ -937,11 +968,17 @@ class _GeneratedPdfWriter {
     return '<< /Length ${bytes.length} >>\nstream\n$data\nendstream';
   }
 
-  String _imageObject(_PdfImage image) {
+  String _imageObject(_PdfImage image, {int? alphaObject}) {
     return '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
-        '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} >>\n'
+        '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${image.rgb.length} '
+        '${alphaObject == null ? '' : '/SMask $alphaObject 0 R '}>>\n'
         'stream\n${latin1.decode(image.rgb)}\nendstream';
   }
+
+  String _alphaMaskObject(_PdfImage image) =>
+      '<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} '
+      '/ColorSpace /DeviceGray /BitsPerComponent 8 /Length ${image.alpha!.length} >>\n'
+      'stream\n${latin1.decode(image.alpha!)}\nendstream';
 
   String _generatedResources({
     required int fontObject,
@@ -1103,14 +1140,25 @@ class _OverlayBuilder {
     final decoded = img.decodeImage(data);
     if (decoded == null) return;
     final rgb = Uint8List(decoded.width * decoded.height * 3);
+    final alpha = Uint8List(decoded.width * decoded.height);
     var offset = 0;
+    var pixelIndex = 0;
+    var hasTransparency = false;
     for (final pixel in decoded) {
-      rgb[offset++] = pixel.r.toInt();
-      rgb[offset++] = pixel.g.toInt();
-      rgb[offset++] = pixel.b.toInt();
+      rgb[offset++] = (pixel.rNormalized * 255).round().clamp(0, 255);
+      rgb[offset++] = (pixel.gNormalized * 255).round().clamp(0, 255);
+      rgb[offset++] = (pixel.bNormalized * 255).round().clamp(0, 255);
+      final opacity = (pixel.aNormalized * 255).round().clamp(0, 255);
+      alpha[pixelIndex++] = opacity;
+      if (opacity < 255) hasTransparency = true;
     }
     final name = addImageObject(
-      _PdfImage(width: decoded.width, height: decoded.height, rgb: rgb),
+      _PdfImage(
+        width: decoded.width,
+        height: decoded.height,
+        rgb: rgb,
+        alpha: hasTransparency ? alpha : null,
+      ),
     );
     final width = bottomRight.dx - topLeft.dx;
     final height = bottomRight.dy - topLeft.dy;
@@ -1271,11 +1319,13 @@ class _PdfImage {
   final int width;
   final int height;
   final Uint8List rgb;
+  final Uint8List? alpha;
 
   const _PdfImage({
     required this.width,
     required this.height,
     required this.rgb,
+    this.alpha,
   });
 }
 
@@ -1565,7 +1615,15 @@ String _escapePdfString(String value) {
 }
 
 String _latinPdfText(String value) {
-  return String.fromCharCodes(
-    value.codeUnits.map((codeUnit) => codeUnit <= 0xff ? codeUnit : 0x3f),
-  );
+  // Built-in Helvetica with WinAnsi cannot represent arbitrary Unicode.
+  // Failing explicitly keeps exported PDFs from silently changing notes.
+  for (final codePoint in value.runes) {
+    if (codePoint > 0xff || (codePoint >= 0x80 && codePoint <= 0x9f)) {
+      throw const PdfExportException(
+        'This PDF exporter cannot preserve all text characters. '
+        'Use the Xournal++ notebook until Unicode PDF fonts are supported.',
+      );
+    }
+  }
+  return value;
 }

@@ -79,7 +79,8 @@ class _BlockingNotebookStorage implements NotebookStorage {
   @override
   Future<Uint8List> readNotebook(StoredNotebook notebook) async => Uint8List(0);
   @override
-  Future<Uint8List> readPdf(StoredNotebook notebook, String reference) async => Uint8List(0);
+  Future<Uint8List> readPdf(StoredNotebook notebook, String reference) async =>
+      Uint8List(0);
   @override
   Future<void> forget(StoredNotebook notebook) async {}
 }
@@ -144,6 +145,89 @@ void main() {
     expect(picker.name, isNull);
   });
 
+  testWidgets('R1: a slow overwrite remains exclusive after the warning', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({'notebookCache.enabled.v1': false});
+    final storage = _BlockingNotebookStorage();
+    addTearDown(() {
+      if (!storage.release.isCompleted) storage.release.complete();
+    });
+    final notebook = StoredNotebook(
+      backendId: storage.id,
+      id: 'existing',
+      name: 'notes',
+    );
+    final file = XppFile.empty(title: 'notes')
+      ..storage = storage
+      ..storageNotebook = notebook;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(
+          file: file,
+          filePath: notebook.id,
+          slowSaveWarningDelay: const Duration(milliseconds: 20),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    late Future<bool> first;
+    await tester.runAsync(() async {
+      first = canvas.saveFile() as Future<bool>;
+    });
+    for (var i = 0; i < 100 && !storage.started.isCompleted; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(storage.started.isCompleted, isTrue);
+    // Serialization can finish in the real-async zone while widget animations
+    // use fake time. Advance both without a thirty-second wall-clock delay.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 60)),
+    );
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(
+      find.text(
+        'Still saving. Keep this notebook open until the operation finishes.',
+      ),
+      findsOneWidget,
+    );
+    expect(storage.writes, 1);
+    expect(
+      await tester.runAsync(() => canvas.saveFile() as Future<bool>),
+      isFalse,
+    );
+    expect(storage.writes, 1);
+    bool? result;
+    await tester.runAsync(() async {
+      first.then((value) => result = value);
+      storage.release.complete();
+    });
+    for (var i = 0; i < 100 && result == null; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(result, isTrue);
+    await tester.pump();
+    expect(canvas.savingFile, isFalse);
+    expect(storage.writes, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('edits made during save remain unsaved', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = (await tester.runAsync(() async => _BlockingRecentStore()))!;
@@ -197,79 +281,5 @@ void main() {
 
     expect(result, isFalse);
     expect(find.text('2 / 2'), findsOneWidget);
-  });
-
-  testWidgets('R1: a slow overwrite remains exclusive after the warning', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({
-      'notebookCache.enabled.v1': false,
-    });
-    final storage = _BlockingNotebookStorage();
-    addTearDown(() {
-      if (!storage.release.isCompleted) storage.release.complete();
-    });
-    final notebook = StoredNotebook(
-      backendId: storage.id,
-      id: 'existing',
-      name: 'notes',
-    );
-    final file = XppFile.empty(title: 'notes')
-      ..storage = storage
-      ..storageNotebook = notebook;
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          S.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: S.delegate.supportedLocales,
-        home: CanvasPage(
-          file: file,
-          filePath: notebook.id,
-          slowSaveWarningDelay: const Duration(milliseconds: 20),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final dynamic canvas = tester.state(find.byType(CanvasPage));
-    late Future<bool> first;
-    await tester.runAsync(() async {
-      first = canvas.saveFile() as Future<bool>;
-    });
-    await tester.pump();
-    await tester.runAsync(
-      () => storage.started.future.timeout(const Duration(seconds: 10)),
-    );
-    // Serialization can finish in the real-async zone while widget animations
-    // use fake time. Advance both without a thirty-second wall-clock delay.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 60)),
-    );
-    await tester.pump(const Duration(milliseconds: 60));
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pump(const Duration(milliseconds: 350));
-    expect(
-      find.text(
-        'Still saving. Keep this notebook open until the operation finishes.',
-      ),
-      findsOneWidget,
-    );
-    expect(storage.writes, 1);
-    expect(await (canvas.saveFile() as Future<bool>), isFalse);
-    expect(storage.writes, 1);
-    storage.release.complete();
-    expect(
-      await tester.runAsync(
-        () => first.timeout(const Duration(seconds: 10)),
-      ),
-      isTrue,
-    );
-    await tester.pump();
-    expect(canvas.savingFile, isFalse);
-    expect(storage.writes, 1);
-    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
