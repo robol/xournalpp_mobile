@@ -1574,6 +1574,16 @@ class S {
       args: [],
     );
   }
+
+  /// `The notebook was saved, but its thumbnail could not be updated.`
+  String get thumbnailSaveWarning {
+    return Intl.message(
+      'The notebook was saved, but its thumbnail could not be updated.',
+      name: 'thumbnailSaveWarning',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

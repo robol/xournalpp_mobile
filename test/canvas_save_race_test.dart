@@ -1,3 +1,7 @@
+import 'package:xournalpp/widgets/XppPageStack.dart';
+import 'package:xournalpp/layer_contents/XppStroke.dart';
+import 'package:xournalpp/src/TransparentImage.dart';
+import 'package:xournalpp/src/XppPickedFile.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -58,6 +62,7 @@ class _BlockingNotebookStorage implements NotebookStorage {
   final started = Completer<void>();
   final release = Completer<void>();
   int writes = 0;
+  Uint8List? savedBytes;
 
   @override
   String get id => 'blocked-test';
@@ -71,6 +76,7 @@ class _BlockingNotebookStorage implements NotebookStorage {
     required List<NotebookPdfResource> pdfs,
   }) async {
     writes++;
+    savedBytes = bytes;
     if (!started.isCompleted) started.complete();
     await release.future;
     return existing;
@@ -88,6 +94,116 @@ class _BlockingNotebookStorage implements NotebookStorage {
 }
 
 void main() {
+  for (final previousPreview in [false, true]) {
+    testWidgets(
+      'Save tolerates blocked dense raster, previous preview=$previousPreview',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({
+          'notebookCache.enabled.v1': false,
+        });
+        final releaseRaster = Completer<void>();
+        var rasterStarted = false;
+        XppPageStack.debugPenCommandsPerPass = 1;
+        XppPageStack.debugRasterizePicture = (picture, width, height) async {
+          rasterStarted = true;
+          await releaseRaster.future;
+          return picture.toImage(width, height);
+        };
+        addTearDown(() {
+          XppPageStack.debugRasterizePicture = null;
+          XppPageStack.debugPenCommandsPerPass = null;
+          if (!releaseRaster.isCompleted) releaseRaster.complete();
+        });
+        final storage = _BlockingNotebookStorage()..release.complete();
+        final notebook = StoredNotebook(
+          backendId: storage.id,
+          id: 'existing',
+          name: 'Dense',
+        );
+        final oldPreview = Uint8List.fromList(kTransparentImage);
+        final file = XppFile.empty(title: 'Dense')
+          ..storage = storage
+          ..storageNotebook = notebook;
+        file.previewImage = previousPreview ? oldPreview : null;
+        file.pages!.first.layers!.last.content!.add(
+          XppStrokePen(
+            color: Colors.black,
+            points: List.generate(
+              40,
+              (i) => XppStrokePoint(
+                x: i.toDouble() + (previousPreview ? 0.5 : 0),
+                y: i.toDouble(),
+                width: 1,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: const [
+              S.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: S.delegate.supportedLocales,
+            home: CanvasPage(file: file, filePath: notebook.id),
+          ),
+        );
+        for (var i = 0; i < 100 && !rasterStarted; i++) {
+          await tester.pump(const Duration(milliseconds: 150));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
+        expect(rasterStarted, true);
+        final dynamic canvas = tester.state(find.byType(CanvasPage));
+        bool? result;
+        canvas.saveFile().then((bool value) => result = value);
+        for (var i = 0; i < 100 && result == null; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+        }
+        expect(result, true);
+        expect(releaseRaster.isCompleted, false);
+        expect(storage.writes, 1);
+        expect(
+          file.previewImage,
+          previousPreview ? same(oldPreview) : orderedEquals(kTransparentImage),
+        );
+        final reopened = await tester.runAsync(
+          () => XppFile.fromXppPickedFile(
+            XppPickedFile(storage.savedBytes!, fileName: 'Dense.xopp'),
+            null,
+            (_, _) => throw StateError('No PDF'),
+          ),
+        );
+        expect(
+          (reopened!.pages!.first.layers!.last.content!.single as XppStrokePen)
+              .points,
+          hasLength(40),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(
+          find.text(
+            'The notebook was saved, but its thumbnail could not be updated.',
+          ),
+          findsOneWidget,
+        );
+        await tester.pumpWidget(const SizedBox());
+        releaseRaster.complete();
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+      },
+    );
+  }
+
   testWidgets('new notebook suggests a date and time Notes title', (
     tester,
   ) async {

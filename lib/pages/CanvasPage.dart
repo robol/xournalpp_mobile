@@ -3298,9 +3298,17 @@ class _CanvasPageState extends State<CanvasPage>
           return false;
         }
       }
-      _file!.previewImage = kIsWeb
-          ? kTransparentImage
-          : await _currentPagePng();
+      var previewFailed = false;
+      try {
+        _file!.previewImage = kIsWeb
+            ? kTransparentImage
+            : await _currentPagePng();
+      } catch (error) {
+        // Thumbnail rendering is optional; never block saving document bytes.
+        debugPrint('Could not update notebook thumbnail: $error');
+        _file!.previewImage ??= kTransparentImage;
+        previewFailed = true;
+      }
       final savedRevision = _revision;
       final backgrounds = <String, XppBackgroundPdf>{};
       for (final page in _file!.pages ?? <XppPage>[]) {
@@ -3572,6 +3580,11 @@ class _CanvasPageState extends State<CanvasPage>
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text(S.of(context).successfullySaved)),
       );
+      if (previewFailed) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(S.of(context).thumbnailSaveWarning)),
+        );
+      }
       return !_isDirty;
     } catch (error) {
       if (!mounted) return false;

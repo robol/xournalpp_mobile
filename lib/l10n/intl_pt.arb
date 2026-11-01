@@ -183,5 +183,6 @@
   "openNavigation": "Abrir navegação",
   "safOriginalCopy": " (antes de salvar)",
   "safEditedCopy": " (salvamento pendente)",
-  "safSaveFailed": "O provedor de documentos não confirmou o salvamento. Cópias de recuperação estão armazenadas neste dispositivo. Reabra o aplicativo para recuperá-las e use Salvar como."
+  "safSaveFailed": "O provedor de documentos não confirmou o salvamento. Cópias de recuperação estão armazenadas neste dispositivo. Reabra o aplicativo para recuperá-las e use Salvar como.",
+  "thumbnailSaveWarning": "O caderno foi salvo, mas não foi possível atualizar sua miniatura."
 }

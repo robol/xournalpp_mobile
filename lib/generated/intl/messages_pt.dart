@@ -363,6 +363,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "thereWereNoMorePagesWeAddedOne": MessageLookupByLibrary.simpleMessage(
       "Não haviam mais páginas. Adicionamos uma.",
     ),
+    "thumbnailSaveWarning": MessageLookupByLibrary.simpleMessage(
+      "O caderno foi salvo, mas não foi possível atualizar sua miniatura.",
+    ),
     "tool": MessageLookupByLibrary.simpleMessage("Ferramenta"),
     "toolboxNotImplementedYet": MessageLookupByLibrary.simpleMessage(
       "Caixa de ferramentas ainda não implementada.",

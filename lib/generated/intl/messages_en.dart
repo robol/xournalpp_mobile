@@ -335,6 +335,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "thereWereNoMorePagesWeAddedOne": MessageLookupByLibrary.simpleMessage(
       "There were no more pages. We added one.",
     ),
+    "thumbnailSaveWarning": MessageLookupByLibrary.simpleMessage(
+      "The notebook was saved, but its thumbnail could not be updated.",
+    ),
     "tool": MessageLookupByLibrary.simpleMessage("Tool"),
     "toolboxNotImplementedYet": MessageLookupByLibrary.simpleMessage(
       "Toolbox not implemented yet.",
