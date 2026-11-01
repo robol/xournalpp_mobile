@@ -52,6 +52,38 @@ class _SavePicker extends FilePickerPlatform {
   }
 }
 
+class _BlockingNotebookStorage implements NotebookStorage {
+  final started = Completer<void>();
+  final release = Completer<void>();
+  int writes = 0;
+
+  @override
+  String get id => 'blocked-test';
+  @override
+  String? get iconAsset => null;
+  @override
+  Future<StoredNotebook?> save({
+    required Uint8List bytes,
+    required String name,
+    StoredNotebook? existing,
+    required List<NotebookPdfResource> pdfs,
+  }) async {
+    writes++;
+    if (!started.isCompleted) started.complete();
+    await release.future;
+    return existing;
+  }
+
+  @override
+  Future<List<StoredNotebook>> list() async => [];
+  @override
+  Future<Uint8List> readNotebook(StoredNotebook notebook) async => Uint8List(0);
+  @override
+  Future<Uint8List> readPdf(StoredNotebook notebook, String reference) async => Uint8List(0);
+  @override
+  Future<void> forget(StoredNotebook notebook) async {}
+}
+
 void main() {
   testWidgets('new notebook suggests a dated title', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -165,5 +197,79 @@ void main() {
 
     expect(result, isFalse);
     expect(find.text('2 / 2'), findsOneWidget);
+  });
+
+  testWidgets('R1: a slow overwrite remains exclusive after the warning', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'notebookCache.enabled.v1': false,
+    });
+    final storage = _BlockingNotebookStorage();
+    addTearDown(() {
+      if (!storage.release.isCompleted) storage.release.complete();
+    });
+    final notebook = StoredNotebook(
+      backendId: storage.id,
+      id: 'existing',
+      name: 'notes',
+    );
+    final file = XppFile.empty(title: 'notes')
+      ..storage = storage
+      ..storageNotebook = notebook;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(
+          file: file,
+          filePath: notebook.id,
+          slowSaveWarningDelay: const Duration(milliseconds: 20),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    late Future<bool> first;
+    await tester.runAsync(() async {
+      first = canvas.saveFile() as Future<bool>;
+    });
+    await tester.pump();
+    await tester.runAsync(
+      () => storage.started.future.timeout(const Duration(seconds: 10)),
+    );
+    // Serialization can finish in the real-async zone while widget animations
+    // use fake time. Advance both without a thirty-second wall-clock delay.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 60)),
+    );
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(
+      find.text(
+        'Still saving. Keep this notebook open until the operation finishes.',
+      ),
+      findsOneWidget,
+    );
+    expect(storage.writes, 1);
+    expect(await (canvas.saveFile() as Future<bool>), isFalse);
+    expect(storage.writes, 1);
+    storage.release.complete();
+    expect(
+      await tester.runAsync(
+        () => first.timeout(const Duration(seconds: 10)),
+      ),
+      isTrue,
+    );
+    await tester.pump();
+    expect(canvas.savingFile, isFalse);
+    expect(storage.writes, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

@@ -150,6 +150,7 @@ class CanvasPage extends StatefulWidget {
     this.pdfRenderService,
     this.recoveryDraftId,
     this.recoveryOriginalPath,
+    this.slowSaveWarningDelay = const Duration(seconds: 30),
   }) : super(key: key);
 
   final XppFile? file;
@@ -158,6 +159,9 @@ class CanvasPage extends StatefulWidget {
   final PdfBackgroundRenderService? pdfRenderService;
   final String? recoveryDraftId;
   final String? recoveryOriginalPath;
+  /// How long an unfinished overwrite waits before showing a progress notice.
+  /// Tests can shorten this without waiting 30 real seconds.
+  final Duration slowSaveWarningDelay;
 
   @override
   _CanvasPageState createState() => _CanvasPageState();
@@ -167,7 +171,6 @@ class _CanvasPageState extends State<CanvasPage>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   static const String _exportPdfMenuItem = 'Export PDF...';
   static const String _sharePdfMenuItem = 'Share PDF...';
-  static const Duration _saveOverwriteTimeout = Duration(seconds: 30);
   static const int _defaultToolColor = 0xFF336699;
   static const int _defaultHighlighterColor = 0xFFFFFF00;
   static const Color _laserColor = Colors.redAccent;
@@ -440,7 +443,7 @@ class _CanvasPageState extends State<CanvasPage>
       ),
     );
     return PopScope(
-      canPop: !_transferring && !_erasing && (_allowPop || !_isDirty),
+      canPop: !savingFile && !_transferring && !_erasing && (_allowPop || !_isDirty),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop || _confirmingLeave || _transferring) return;
         _confirmingLeave = true;
@@ -1628,6 +1631,12 @@ class _CanvasPageState extends State<CanvasPage>
   Future<bool> _confirmLeave() async {
     await _pendingErase;
     if (!mounted) return false;
+    if (savingFile) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The notebook is still saving. Please wait.')),
+      );
+      return false;
+    }
     if (!_isDirty) return true;
 
     final action = await showDialog<_UnsavedChangesAction>(
@@ -2807,7 +2816,7 @@ class _CanvasPageState extends State<CanvasPage>
         scaffoldMessenger,
         SnackBar(
           content: Text(
-            '${S.of(context).successfullySaved} ${savedPath ?? fileName}',
+            '${S.of(context).successfullySaved} ${savedPath}',
           ),
         ),
       );
@@ -3194,10 +3203,27 @@ class _CanvasPageState extends State<CanvasPage>
                 name: _file!.title!,
               )
             : null;
-        final pending = performSave(existing);
-        saved = existing == null
-            ? await pending
-            : await pending.timeout(_saveOverwriteTimeout);
+        // Future.timeout does not cancel a provider write. Permitting a retry
+        // while the old request continues can overwrite the newer revision.
+        // Keep the save exclusive until the provider reports its outcome.
+        Timer? slowSaveTimer;
+        if (existing != null) {
+          slowSaveTimer = Timer(widget.slowSaveWarningDelay, () {
+            if (!mounted || !savingFile) return;
+            savingSnackBar.close();
+            scaffoldMessenger.showSnackBar(
+              const SnackBar(
+                content: Text('Still saving. Keep this notebook open until the operation finishes.'),
+                duration: Duration(days: 999),
+              ),
+            );
+          });
+        }
+        try {
+          saved = await performSave(existing);
+        } finally {
+          slowSaveTimer?.cancel();
+        }
       } catch (conflict) {
         if (conflict is! NextcloudNameConflict &&
             conflict is! GoogleDriveNameConflict &&
