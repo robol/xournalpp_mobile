@@ -12,7 +12,11 @@ import 'package:xournalpp/src/NotebookMetadata.dart';
 
 /// WebDAV storage rooted at the configured folder.
 class NextcloudStorage
-    implements NotebookStorage, NotebookDeletion, NotebookTransfer {
+    implements
+        NotebookStorage,
+        NotebookDeletion,
+        NotebookTransfer,
+        NotebookVersionBaseline {
   @override
   Future<bool> containsNotebook(
     NotebookFolder folder,
@@ -69,6 +73,24 @@ class NextcloudStorage
   final http.Client _client;
   final Map<String, Map<String, String>> _manifests = {};
   final Map<String, String> _readDigests = {};
+  @override
+  String? sourceDigest(StoredNotebook notebook) =>
+      notebook.backendId == id ? _readDigests[notebook.id] : null;
+  @override
+  Future<bool> restoreSourceDigest(
+    StoredNotebook notebook,
+    String expected,
+  ) async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    try {
+      final bytes = await readNotebook(notebook);
+      return sha256.convert(bytes).toString() == expected;
+    } finally {
+      // Never adopt the newer remote version as the draft's original baseline.
+      _readDigests[notebook.id] = expected;
+    }
+  }
+
   final Map<String, String> _readEtags = {};
 
   @override

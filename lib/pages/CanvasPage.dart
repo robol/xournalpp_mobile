@@ -1625,6 +1625,7 @@ class _CanvasPageState extends State<CanvasPage>
               originalPath: filePath ?? widget.recoveryOriginalPath,
               backendId: file.storageNotebook?.backendId,
               cachedOrigin: file.openedFromCache,
+              sourceDigest: file.cloudSourceDigest,
             ),
           );
           _hasRecoveryDraft = true;
@@ -3177,6 +3178,30 @@ class _CanvasPageState extends State<CanvasPage>
     setState(() {
       savingFile = true;
     });
+    if (_file!.requiresSeparateCopy && !saveAs) {
+      final copy = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          content: Text(S.of(context).notebookEditConflict),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(S.of(context).cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(S.of(context).cacheSaveCopy),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return false;
+      if (copy != true) {
+        setState(() => savingFile = false);
+        return false;
+      }
+      saveAs = true;
+    }
     if (_file!.openedFromCache && !saveAs) {
       if (_file!.storage == null) {
         saveAs = true;
@@ -3419,6 +3444,7 @@ class _CanvasPageState extends State<CanvasPage>
           slowSaveTimer?.cancel();
         }
       } catch (conflict) {
+        if (_file!.requiresSeparateCopy) rethrow;
         if (conflict is! NextcloudNameConflict &&
             conflict is! GoogleDriveNameConflict &&
             conflict is! InternalNameConflict)
@@ -3491,6 +3517,8 @@ class _CanvasPageState extends State<CanvasPage>
       final savedPath = saved.id;
       _file!.storage = storage;
       _file!.storageNotebook = saved;
+      _file!.captureCloudSourceDigest();
+      _file!.requiresSeparateCopy = false;
       filePath = savedPath;
       _file!.openedFromCache = false;
       final savedFile = _file!;

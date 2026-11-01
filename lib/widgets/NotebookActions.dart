@@ -64,7 +64,8 @@ Future<NotebookTransferResult?> transferNotebook(
 }) async {
   final source = file.storage;
   final original = file.storageNotebook;
-  if (!canTransferNotebook(source, original) || file.openedFromCache)
+  if (!canTransferNotebook(source, original) ||
+      (file.openedFromCache || file.requiresSeparateCopy))
     return null;
   var destination = source!;
   if (!rename) {
@@ -235,6 +236,7 @@ Future<NotebookTransferResult?> transferNotebook(
   if (result.notebook != null) {
     file.storage = destination;
     file.storageNotebook = result.notebook;
+    file.captureCloudSourceDigest();
     file.title = result.notebook!.name;
     file.openedFromCache = false;
   }

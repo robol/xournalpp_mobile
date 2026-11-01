@@ -170,6 +170,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
               .where((b) => b.id == draft.backendId)
               .firstOrNull;
           file.openedFromCache = draft.cachedOrigin || file.storage == null;
+          await file.restoreCloudSourceDigest(draft.sourceDigest);
           file.cachedEdits = true;
           file.cachedPage = draft.page;
           try {

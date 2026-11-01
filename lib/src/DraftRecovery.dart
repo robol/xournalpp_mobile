@@ -17,6 +17,7 @@ class RecoveryDraft {
     this.originalPath,
     this.backendId,
     this.cachedOrigin = false,
+    this.sourceDigest,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class RecoveryDraft {
   final String? originalPath;
   final String? backendId;
   final bool cachedOrigin;
+  final String? sourceDigest;
 
   Map<String, Object?> toJson() => {
     'version': 1,
@@ -36,6 +38,7 @@ class RecoveryDraft {
     'originalPath': originalPath,
     'backendId': backendId,
     'cachedOrigin': cachedOrigin,
+    'sourceDigest': sourceDigest,
   };
 
   static RecoveryDraft fromJson(Map<String, dynamic> data) {
@@ -55,6 +58,7 @@ class RecoveryDraft {
       originalPath: data['originalPath'] as String?,
       backendId: data['backendId'] as String?,
       cachedOrigin: data['cachedOrigin'] == true,
+      sourceDigest: data['sourceDigest'] as String?,
     );
   }
 }

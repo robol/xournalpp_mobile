@@ -36,6 +36,39 @@ class XppFile {
   NotebookStorage? storage;
   StoredNotebook? storageNotebook;
   bool openedFromCache = false;
+  String? cloudSourceDigest;
+  bool requiresSeparateCopy = false;
+
+  Future<void> restoreCloudSourceDigest(String? expected) async {
+    final notebook = storageNotebook;
+    final backend = storage;
+    final cloud =
+        notebook?.backendId.startsWith('gdrive:') == true ||
+        notebook?.backendId.startsWith('nextcloud:') == true;
+    if (!cloud) return;
+    cloudSourceDigest = expected;
+    requiresSeparateCopy = true;
+    if (expected == null ||
+        openedFromCache ||
+        notebook == null ||
+        backend is! NotebookVersionBaseline)
+      return;
+    try {
+      requiresSeparateCopy = !await (backend as NotebookVersionBaseline)
+          .restoreSourceDigest(notebook, expected);
+    } catch (_) {
+      /* Offline recovery remains editable but cannot overwrite. */
+    }
+  }
+
+  void captureCloudSourceDigest() {
+    final backend = storage;
+    final notebook = storageNotebook;
+    cloudSourceDigest = backend is NotebookVersionBaseline && notebook != null
+        ? (backend as NotebookVersionBaseline).sourceDigest(notebook)
+        : null;
+  }
+
   bool cachedEdits = false;
   int cachedPage = 0;
   final cachedPdfs = <String, Uint8List>{};
@@ -240,6 +273,7 @@ class XppFile {
     if (storage is InternalNotebookStorage) file.title = notebook.name;
     file.storage = storage;
     file.storageNotebook = notebook;
+    file.captureCloudSourceDigest();
     file.onCacheError = onCacheError;
     unawaited(file.cacheSnapshot(bytes, dirty: false, cacheToken: cacheToken));
     return file;

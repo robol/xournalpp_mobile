@@ -38,6 +38,12 @@ class NotebookPdfResource {
 /// and must resolve that reference through [readPdf] after reopening the notebook.
 /// The local backend retains the original PDF references instead of copying them.
 /// Null means the user cancelled destination selection; errors must be thrown.
+/// A digest of the exact remote notebook bytes read or successfully saved.
+abstract interface class NotebookVersionBaseline {
+  String? sourceDigest(StoredNotebook notebook);
+  Future<bool> restoreSourceDigest(StoredNotebook notebook, String expected);
+}
+
 abstract interface class NotebookStorage {
   String get id;
 
