@@ -31,6 +31,10 @@ class NextcloudStorage
   @override
   Future<void> delete(StoredNotebook notebook) async {
     if (!canDelete(notebook)) throw ArgumentError('Wrong storage backend');
+    // Accepted limitation (R03): DELETE has no revision/ETag precondition.
+    // Another client's edit after a move/rename's digest check may therefore
+    // be deleted. We accept this race for now to avoid conditional-deletion
+    // complexity across WebDAV providers.
     final parts = _notebookParts(notebook.id);
     final response = await _request(
       'DELETE',
@@ -253,6 +257,11 @@ class NextcloudStorage
     );
     _check(upload, 'Could not upload notebook', [200, 201, 204]);
     final destinationUri = _url(filename, folder: parent);
+    // Accepted limitation (R02): only a usable ETag plus provider enforcement
+    // of the WebDAV If condition protects publication atomically. Without an
+    // ETag, the earlier digest GET and this MOVE are separate operations, and
+    // an intervening edit may be overwritten. We accept that fallback for now
+    // to avoid additional conditional-token and provider-compatibility logic.
     final knownEtag = existing == null ? null : _readEtags[existing.id];
     final move = await _request(
       'MOVE',

@@ -29,6 +29,10 @@ class GoogleDriveStorage
   @override
   Future<void> delete(StoredNotebook notebook) async {
     if (!canDelete(notebook)) throw ArgumentError('Wrong storage backend');
+    // Accepted limitation (R03): trashing by ID has no revision precondition.
+    // A move/rename's preceding digest check cannot prevent another client's
+    // edit in the gap before this request; that newer source may be trashed.
+    // We accept this race for now to avoid conditional-deletion complexity.
     await _request(
       'PATCH',
       Uri.https(
@@ -329,6 +333,10 @@ class GoogleDriveStorage
     final updated = Uint8List.fromList(
       const GZipEncoder().encode(utf8.encode(xml.toXmlString())),
     );
+    // Accepted limitation (R02): this GET/hash check is best effort, not atomic.
+    // _upload subsequently issues an unconditional media PATCH, so another
+    // client's intervening edit may be overwritten. We accept this race for now
+    // to avoid server-precondition or versioned-copy workflow complexity.
     if (existing != null && _readDigests.containsKey(existing.id)) {
       final remote = await _download(existing.id);
       if (sha256.convert(remote).toString() != _readDigests[existing.id]) {

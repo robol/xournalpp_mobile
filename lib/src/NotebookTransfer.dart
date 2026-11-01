@@ -120,8 +120,11 @@ class NotebookTransferCoordinator {
       );
     }
     try {
-      // A second client may have edited the source while resources and the
-      // destination copy were being written. Never delete that newer version.
+      // Detect source edits made while the destination copy was being written.
+      // Accepted limitation (R03): verification and deletion are separate
+      // operations. A cloud edit after this check can still be deleted even
+      // though the destination contains older content. We accept this race for
+      // now to avoid revision-aware conditional deletion across providers.
       await _verifySourceUnchanged(source, original, sourceDigest);
       await (source as NotebookDeletion).delete(original);
     } catch (error) {
@@ -148,6 +151,9 @@ class NotebookTransferCoordinator {
         !(source as NotebookDeletion).canDelete(original)) {
       throw UnsupportedError('Deletion unavailable');
     }
+    // Accepted limitation (R03): retry has the same check/delete race as the
+    // initial move. A newer source may be deleted between these requests; we
+    // accept this for now to avoid conditional-deletion protocol complexity.
     await _verifySourceUnchanged(source, original, sourceDigest);
     await (source as NotebookDeletion).delete(original);
     await _afterMove(original, destination);
