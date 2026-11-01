@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 final Map<String, Uint8List> _cache = {};
 
+bool get hasNativeDocumentSave => false;
+
 Future<Uint8List> readFileBytes(String path) {
   throw UnsupportedError('Reading local file paths is not supported here.');
 }

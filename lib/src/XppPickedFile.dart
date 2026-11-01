@@ -70,11 +70,14 @@ class XppPickedFile {
   }
 
   Future<String?> exportToStorage() async {
-    final savedDocumentPath = await saveDocumentBytes(
-      bytes,
-      fileName: fileName ?? 'xournalpp-export',
-    );
-    if (savedDocumentPath != null) return savedDocumentPath;
+    // Android's native document picker returning null means the user cancelled.
+    // Falling through to a second picker would turn one cancellation into two.
+    if (hasNativeDocumentSave) {
+      return saveDocumentBytes(
+        bytes,
+        fileName: fileName ?? 'xournalpp-export',
+      );
+    }
 
     final savedPath = await FilePicker.saveFile(
       fileName: fileName ?? 'xournalpp-export',

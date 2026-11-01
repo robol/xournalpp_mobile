@@ -5,6 +5,8 @@ import 'package:path_provider/path_provider.dart';
 
 const _storageChannel = MethodChannel('it.robol.xournal.mobile/storage');
 
+bool get hasNativeDocumentSave => Platform.isAndroid;
+
 Future<Uint8List> readFileBytes(String path) async {
   final documentUri = _androidDocumentUriForPath(path);
   if (documentUri != null) {

@@ -2759,9 +2759,9 @@ class _CanvasPageState extends State<CanvasPage>
               (_file?.title ?? S.of(context).newFile) +
               ' ${currentPage + 1}' +
               '.png',
-        ).exportToStorage()) ??
-        (_file?.title ?? S.of(context).newFile);
+        ).exportToStorage()) ?? '';
     if (!mounted) return;
+    if (fileName.isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(S.of(context).successfullyShared + ' ' + fileName),
@@ -2802,6 +2802,7 @@ class _CanvasPageState extends State<CanvasPage>
       if (!mounted) return;
       _closeSnackBar(exportSnackBar);
       _removeCurrentSnackBar(scaffoldMessenger);
+      if (savedPath == null) return;
       _showSnackBar(
         scaffoldMessenger,
         SnackBar(
