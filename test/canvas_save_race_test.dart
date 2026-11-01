@@ -88,7 +88,9 @@ class _BlockingNotebookStorage implements NotebookStorage {
 }
 
 void main() {
-  testWidgets('new notebook suggests a dated title', (tester) async {
+  testWidgets('new notebook suggests a date and time Notes title', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final original = FilePickerPlatform.instance;
     final picker = _SavePicker();
@@ -116,7 +118,9 @@ void main() {
     String nameFor(DateTime date) =>
         '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
-        '${date.day.toString().padLeft(2, '0')}';
+        '${date.day.toString().padLeft(2, '0')}_'
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}_Notes';
     final title = tester
         .widget<TextField>(find.byType(TextField))
         .controller!

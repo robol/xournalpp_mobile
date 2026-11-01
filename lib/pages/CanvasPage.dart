@@ -1723,7 +1723,9 @@ class _CanvasPageState extends State<CanvasPage>
     final suggestedTitle =
         '${now.year.toString().padLeft(4, '0')}-'
         '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}_Notes';
     return await showDialog<bool>(
           context: context,
           builder: (context) {
