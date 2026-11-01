@@ -1579,6 +1579,10 @@ class _CanvasPageState extends State<CanvasPage>
   void _checkpointDraft({int? idleGeneration}) {
     if (_transferring) return;
     final cacheGeneration = NotebookCache.instance.generation;
+    final notebook = _file?.storageNotebook;
+    final cacheToken = notebook == null
+        ? null
+        : NotebookCache.instance.tokenFor(notebook);
     if (kIsWeb || !_isDirty || _revision == _draftRevision || _file == null)
       return;
     _draftWork = _draftWork
@@ -1605,14 +1609,16 @@ class _CanvasPageState extends State<CanvasPage>
           );
           _hasRecoveryDraft = true;
           _draftRevision = revision;
-          unawaited(
-            file.cacheSnapshot(
-              bytes,
-              dirty: true,
-              page: currentPage,
-              expectedGeneration: cacheGeneration,
-            ),
-          );
+          if (cacheToken != null)
+            unawaited(
+              file.cacheSnapshot(
+                bytes,
+                dirty: true,
+                page: currentPage,
+                expectedGeneration: cacheGeneration,
+                cacheToken: cacheToken,
+              ),
+            );
         })
         .catchError((Object error) {
           debugPrint('Could not save recovery draft: $error');
@@ -3008,6 +3014,11 @@ class _CanvasPageState extends State<CanvasPage>
 
   Future<bool> saveFile({bool saveAs = false}) async {
     final cacheGeneration = NotebookCache.instance.generation;
+    final cacheRemovalSerial = NotebookCache.instance.removalSerial;
+    final originalNotebook = _file?.storageNotebook;
+    final cacheToken = originalNotebook == null
+        ? null
+        : NotebookCache.instance.tokenFor(originalNotebook);
     await _pendingErase;
     if (!mounted) return false;
     if (savingFile || _transferring) return false;
@@ -3150,14 +3161,16 @@ class _CanvasPageState extends State<CanvasPage>
       }
       final bytes = await _file!.toUint8ListAsync();
       if (!mounted) return false;
-      unawaited(
-        _file!.cacheSnapshot(
-          bytes,
-          dirty: true,
-          page: currentPage,
-          expectedGeneration: cacheGeneration,
-        ),
-      );
+      if (cacheToken != null)
+        unawaited(
+          _file!.cacheSnapshot(
+            bytes,
+            dirty: true,
+            page: currentPage,
+            expectedGeneration: cacheGeneration,
+            cacheToken: cacheToken,
+          ),
+        );
       final resources = backgrounds.entries
           .map(
             (entry) => NotebookPdfResource(
@@ -3309,17 +3322,30 @@ class _CanvasPageState extends State<CanvasPage>
       _file!.openedFromCache = false;
       final savedFile = _file!;
       final savedPage = currentPage;
-      unawaited(
-        _draftWork.then(
-          (_) => savedFile.cacheSnapshot(
-            bytes,
-            dirty: false,
-            page: savedPage,
-            saved: _revision == savedRevision,
-            expectedGeneration: cacheGeneration,
+      final destinationToken =
+          cacheToken != null &&
+              NotebookCache.instance.isCurrent(saved, cacheToken)
+          ? cacheToken
+          : (cacheToken == null ||
+                    originalNotebook?.backendId != saved.backendId ||
+                    originalNotebook?.id != saved.id) &&
+                cacheRemovalSerial == NotebookCache.instance.removalSerial &&
+                cacheGeneration == NotebookCache.instance.generation
+          ? NotebookCache.instance.tokenFor(saved)
+          : null;
+      if (destinationToken != null)
+        unawaited(
+          _draftWork.then(
+            (_) => savedFile.cacheSnapshot(
+              bytes,
+              dirty: false,
+              page: savedPage,
+              saved: _revision == savedRevision,
+              expectedGeneration: cacheGeneration,
+              cacheToken: destinationToken,
+            ),
           ),
-        ),
-      );
+        );
 
       await RecentFiles.remember(
         path: savedPath,

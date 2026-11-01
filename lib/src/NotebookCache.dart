@@ -56,6 +56,19 @@ class CachedNotebook {
 
 /// The manifest is published only after all content-addressed blobs are durable.
 /// All operations are ordered; clear invalidates pending work before it runs.
+class NotebookCacheToken {
+  const NotebookCacheToken._(
+    this._owner,
+    this._key,
+    this._generation,
+    this._epoch,
+  );
+  final NotebookCache _owner;
+  final String _key;
+  final int _generation;
+  final int _epoch;
+}
+
 class NotebookCache {
   NotebookCache({NotebookCachePersistence? persistence})
     : persistence = persistence ?? FileNotebookCachePersistence();
@@ -67,6 +80,9 @@ class NotebookCache {
   final changes = ValueNotifier<int>(0);
   Future<void> _pending = Future.value();
   int _generation = 0;
+  final Map<String, int> _epochs = {};
+  int _removalSerial = 0;
+  int get removalSerial => _removalSerial;
   int get generation => _generation;
   static const _setting = 'notebookCache.enabled.v1';
   Future<bool> get enabled async =>
@@ -85,6 +101,16 @@ class NotebookCache {
 
   String _key(StoredNotebook n) =>
       '${sha256.convert(utf8.encode(jsonEncode([n.backendId, n.id])))}.json';
+  NotebookCacheToken tokenFor(StoredNotebook notebook) {
+    final key = _key(notebook);
+    return NotebookCacheToken._(this, key, _generation, _epochs[key] ?? 0);
+  }
+
+  bool isCurrent(StoredNotebook notebook, NotebookCacheToken token) =>
+      identical(token._owner, this) &&
+      token._key == _key(notebook) &&
+      token._generation == _generation &&
+      token._epoch == (_epochs[token._key] ?? 0);
   Future<T> _queue<T>(Future<T> Function() operation) {
     final result = _pending.then((_) => operation());
     _pending = result.then<void>((_) {}, onError: (Object _) {});
@@ -130,11 +156,16 @@ class NotebookCache {
     required bool dirty,
     int page = 0,
     int? expectedGeneration,
+    NotebookCacheToken? token,
     String? resourceSession,
   }) {
     final generation = expectedGeneration ?? _generation;
+    final operation = token ?? tokenFor(notebook);
     return _queue(() async {
-      if (generation != _generation || !await enabled) return;
+      if (generation != _generation ||
+          !isCurrent(notebook, operation) ||
+          !await enabled)
+        return;
       final manifest = await _manifest(notebook);
       final previous = (manifest['working'] ?? manifest['baseline']) as Map?;
       final resources = <String, String>{};
@@ -174,7 +205,7 @@ class NotebookCache {
         manifest['baseline'] = snapshot;
         // A successful provider read must not destroy unsaved local work.
       }
-      if (generation != _generation) return;
+      if (generation != _generation || !isCurrent(notebook, operation)) return;
       await persistence.write(
         _key(notebook),
         Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
@@ -191,45 +222,63 @@ class NotebookCache {
     Map<String, Uint8List> pdfs, {
     required int expectedGeneration,
     required String resourceSession,
-  }) => _queue(() async {
-    if (expectedGeneration != _generation || !await enabled) return;
-    final manifest = await _manifest(notebook);
-    var changed = false;
-    for (final name in ['baseline', 'working']) {
-      final snapshot = manifest[name] as Map?;
-      if (snapshot == null || snapshot['resourceSession'] != resourceSession)
-        continue;
-      final missing = List<String>.from(snapshot['missing'] as List);
-      for (final ref in missing.toList()) {
-        final bytes = pdfs[ref];
-        if (bytes == null) continue;
-        (snapshot['pdfs'] as Map)[ref] = await _blob(bytes);
-        missing.remove(ref);
-        changed = true;
+    NotebookCacheToken? token,
+  }) {
+    final operation = token ?? tokenFor(notebook);
+    return _queue(() async {
+      if (expectedGeneration != _generation ||
+          !isCurrent(notebook, operation) ||
+          !await enabled)
+        return;
+      final manifest = await _manifest(notebook);
+      var changed = false;
+      for (final name in ['baseline', 'working']) {
+        final snapshot = manifest[name] as Map?;
+        if (snapshot == null || snapshot['resourceSession'] != resourceSession)
+          continue;
+        final missing = List<String>.from(snapshot['missing'] as List);
+        for (final ref in missing.toList()) {
+          final bytes = pdfs[ref];
+          if (bytes == null) continue;
+          (snapshot['pdfs'] as Map)[ref] = await _blob(bytes);
+          missing.remove(ref);
+          changed = true;
+        }
+        snapshot['missing'] = missing;
       }
-      snapshot['missing'] = missing;
-    }
-    if (!changed || expectedGeneration != _generation) return;
-    await persistence.write(
-      _key(notebook),
-      Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
-    );
-    await _collect();
-    changes.value++;
-  });
+      if (!changed ||
+          expectedGeneration != _generation ||
+          !isCurrent(notebook, operation))
+        return;
+      await persistence.write(
+        _key(notebook),
+        Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
+      );
+      await _collect();
+      changes.value++;
+    });
+  }
 
-  Future<void> discardWorking(StoredNotebook notebook) => _queue(() async {
-    if (!await enabled) return;
-    final manifest = await _manifest(notebook);
-    if (manifest.isEmpty) return;
-    manifest.remove('working');
-    await persistence.write(
-      _key(notebook),
-      Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
-    );
-    await _collect();
-    changes.value++;
-  });
+  Future<void> discardWorking(
+    StoredNotebook notebook, {
+    NotebookCacheToken? token,
+  }) {
+    final operation = token ?? tokenFor(notebook);
+    return _queue(() async {
+      if (!isCurrent(notebook, operation) || !await enabled) return;
+      final manifest = await _manifest(notebook);
+      if (manifest.isEmpty) return;
+      manifest.remove('working');
+      if (!isCurrent(notebook, operation)) return;
+      await persistence.write(
+        _key(notebook),
+        Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
+      );
+      await _collect();
+      changes.value++;
+    });
+  }
+
   Future<CachedNotebook?> load(StoredNotebook notebook) => _queue(() async {
     if (!await enabled) return null;
     final manifest = await _manifest(notebook);
@@ -296,7 +345,9 @@ class NotebookCache {
     return size;
   });
   Future<void> remove(StoredNotebook notebook) {
-    _generation++;
+    _removalSerial++;
+    final key = _key(notebook);
+    _epochs[key] = (_epochs[key] ?? 0) + 1;
     return _queue(() async {
       await persistence.delete(_key(notebook));
       await _collect();

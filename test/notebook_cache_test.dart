@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'package:xournalpp/src/conditional/notebook_cache/cache_io.dart'
     as cache_io;
@@ -34,6 +35,20 @@ class MemoryCache implements NotebookCachePersistence {
   @override
   Future<void> delete(String key) async {
     files.remove(key);
+  }
+}
+
+class BlockingManifestCache extends MemoryCache {
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<void> write(String key, Uint8List bytes) async {
+    if (key.endsWith('.json') && !started.isCompleted) {
+      started.complete();
+      await release.future;
+    }
+    await super.write(key, bytes);
   }
 }
 
@@ -193,6 +208,61 @@ void main() {
     expect(await cache.list(), isEmpty);
     expect(await cache.size(), 0);
   });
+  test(
+    'removal invalidates only the removed notebook operation token',
+    () async {
+      const other = StoredNotebook(
+        backendId: 'remote',
+        id: 'two',
+        name: 'Other',
+      );
+      final old = cache.tokenFor(notebook);
+      final otherToken = cache.tokenFor(other);
+      await cache.remove(notebook);
+      Future<void> write(
+        StoredNotebook target,
+        NotebookCacheToken token,
+        int value,
+      ) => cache.record(
+        notebook: target,
+        bytes: Uint8List.fromList([value]),
+        pdfs: {},
+        references: [],
+        dirty: true,
+        token: token,
+      );
+      await write(notebook, old, 1);
+      await write(other, otherToken, 2);
+      expect(await cache.load(notebook), isNull);
+      expect((await cache.load(other))!.bytes, [2]);
+      await write(notebook, cache.tokenFor(notebook), 3);
+      expect((await cache.load(notebook))!.bytes, [3]);
+      await cache.discardWorking(notebook, token: old);
+      expect((await cache.load(notebook))!.bytes, [3]);
+      await write(other, old, 4);
+      expect((await cache.load(other))!.bytes, [2]);
+    },
+  );
+
+  test(
+    'removal during manifest publication deletes the completed write',
+    () async {
+      final blocking = BlockingManifestCache();
+      final subject = NotebookCache(persistence: blocking);
+      final write = subject.record(
+        notebook: notebook,
+        bytes: Uint8List.fromList([1]),
+        pdfs: {},
+        references: [],
+        dirty: true,
+      );
+      await blocking.started.future;
+      final removal = subject.remove(notebook);
+      blocking.release.complete();
+      await Future.wait([write, removal]);
+      expect(await subject.load(notebook), isNull);
+    },
+  );
   test('corrupt entries do not hide other notebooks', () async {
     await record(1);
     disk.files['broken.json'] = Uint8List.fromList(utf8.encode('not JSON'));

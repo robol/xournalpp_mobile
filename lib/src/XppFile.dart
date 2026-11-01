@@ -60,11 +60,13 @@ class XppFile {
     int page = 0,
     bool saved = false,
     int? expectedGeneration,
+    NotebookCacheToken? cacheToken,
   }) {
     final notebook = storageNotebook;
     if (notebook == null) return Future.value();
     final references = pdfReferences;
     final generation = expectedGeneration ?? NotebookCache.instance.generation;
+    final token = cacheToken ?? NotebookCache.instance.tokenFor(notebook);
     final sourceStorage = storage;
     _cacheWork = (_cacheWork ?? Future<void>.value())
         .then((_) async {
@@ -77,18 +79,22 @@ class XppFile {
             dirty: dirty,
             page: page,
             expectedGeneration: generation,
+            token: token,
             resourceSession: _cacheSession,
           );
           if (saved && generation == NotebookCache.instance.generation)
-            await NotebookCache.instance.discardWorking(notebook);
+            await NotebookCache.instance.discardWorking(notebook, token: token);
           if (!openedFromCache &&
-              generation == NotebookCache.instance.generation) {
+              generation == NotebookCache.instance.generation &&
+              NotebookCache.instance.isCurrent(notebook, token)) {
             for (final ref in references) {
               if (ref.isEmpty ||
                   cachedPdfs.containsKey(ref) ||
                   !_pendingCachePdfs.add(ref))
                 continue;
-              unawaited(_cachePdf(sourceStorage, notebook, ref, generation));
+              unawaited(
+                _cachePdf(sourceStorage, notebook, ref, generation, token),
+              );
             }
           }
         })
@@ -104,16 +110,29 @@ class XppFile {
     _cacheSession = cached.resourceSession ?? _cacheSession;
   }
 
-  void _rememberPdf(String reference, Uint8List bytes) {
+  void _rememberPdf(
+    String reference,
+    Uint8List bytes,
+    StoredNotebook? notebook,
+    NotebookCacheToken? token,
+    int generation,
+  ) {
+    if (notebook == null || token == null) {
+      cachedPdfs[reference] = bytes;
+      return;
+    }
+    if (!NotebookCache.instance.isCurrent(notebook, token) ||
+        storageNotebook?.backendId != notebook.backendId ||
+        storageNotebook?.id != notebook.id)
+      return;
     cachedPdfs[reference] = bytes;
-    final notebook = storageNotebook;
-    if (notebook == null) return;
     unawaited(
       NotebookCache.instance
           .addPdfs(
             notebook,
             {reference: bytes},
-            expectedGeneration: NotebookCache.instance.generation,
+            expectedGeneration: generation,
+            token: token,
             resourceSession: _cacheSession,
           )
           .catchError((Object _) {
@@ -127,6 +146,7 @@ class XppFile {
     StoredNotebook notebook,
     String ref,
     int generation,
+    NotebookCacheToken token,
   ) async {
     try {
       final bytes = sourceStorage != null
@@ -134,12 +154,17 @@ class XppFile {
                 .readPdf(notebook, ref)
                 .timeout(const Duration(seconds: 15))
           : (await XppPickedFile.fromInternalPath(path: ref)).bytes;
+      if (!NotebookCache.instance.isCurrent(notebook, token) ||
+          storageNotebook?.backendId != notebook.backendId ||
+          storageNotebook?.id != notebook.id)
+        return;
       cachedPdfs[ref] = bytes;
       try {
         await NotebookCache.instance.addPdfs(
           notebook,
           {ref: bytes},
           expectedGeneration: generation,
+          token: token,
           resourceSession: _cacheSession,
         );
       } catch (_) {
@@ -197,6 +222,7 @@ class XppFile {
   }) async {
     if (notebook.backendId != storage.id)
       throw ArgumentError('Notebook belongs to a different storage backend');
+    final cacheToken = NotebookCache.instance.tokenFor(notebook);
     late final Uint8List bytes;
     try {
       bytes = await storage.readNotebook(notebook);
@@ -215,7 +241,7 @@ class XppFile {
     file.storage = storage;
     file.storageNotebook = notebook;
     file.onCacheError = onCacheError;
-    unawaited(file.cacheSnapshot(bytes, dirty: false));
+    unawaited(file.cacheSnapshot(bytes, dirty: false, cacheToken: cacheToken));
     return file;
   }
 
@@ -224,6 +250,10 @@ class XppFile {
     XppBackgroundPdf background,
   ) async {
     final filename = background.filename;
+    final notebook = storageNotebook;
+    final cache = NotebookCache.instance;
+    final token = notebook == null ? null : cache.tokenFor(notebook);
+    final generation = cache.generation;
     if (openedFromCache) {
       if (cachedPdfs.containsKey(filename)) {
         return XppPickedFile(
@@ -233,13 +263,14 @@ class XppFile {
         );
       }
       final recovered = await background.onUnavailable(context, filename);
-      if (filename != null) _rememberPdf(filename, recovered.bytes);
+      if (filename != null)
+        _rememberPdf(filename, recovered.bytes, notebook, token, generation);
       return recovered;
     }
     if (storage != null && storageNotebook != null && filename != null) {
       try {
-        final bytes = await storage!.readPdf(storageNotebook!, filename);
-        _rememberPdf(filename, bytes);
+        final bytes = await storage!.readPdf(notebook!, filename);
+        _rememberPdf(filename, bytes, notebook, token, generation);
         return XppPickedFile(bytes, fileName: filename, fileExtension: 'pdf');
       } catch (_) {
         if (!context.mounted) rethrow;
@@ -557,7 +588,9 @@ class XppFile {
           case "pixmap":
             // The image renderer is not implemented. Preserve everything,
             // including the attached/clone domain and extension attributes.
-            background = XppBackgroundPreserved(backgroundElement.toXmlString());
+            background = XppBackgroundPreserved(
+              backgroundElement.toXmlString(),
+            );
             break;
           case "pdf":
             final filename =
@@ -608,11 +641,15 @@ class XppFile {
                 );
                 break;
               default:
-                background = XppBackgroundPreserved(backgroundElement.toXmlString());
+                background = XppBackgroundPreserved(
+                  backgroundElement.toXmlString(),
+                );
             }
             break;
           default:
-            background = XppBackgroundPreserved(backgroundElement.toXmlString());
+            background = XppBackgroundPreserved(
+              backgroundElement.toXmlString(),
+            );
             break;
         }
       }
