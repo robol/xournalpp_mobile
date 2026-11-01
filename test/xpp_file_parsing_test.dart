@@ -165,6 +165,45 @@ void main() {
     );
   });
 
+  test('unsupported image background survives an edit and save', () async {
+    const background = '<background type="pixmap" domain="attach" filename="background.png" custom="keep-me"/>';
+    final file = await parseNotebook(
+      XppPickedFile(
+        Uint8List.fromList(GZipEncoder().encode(utf8.encode(
+          '<xournal><page width="200" height="300">$background<layer/></page></xournal>',
+        ))),
+      ),
+    );
+    expect(file.pages!.single.background, isA<XppBackgroundPreserved>());
+    final saved = file.toXmlString();
+    expect(saved, contains(background));
+  });
+
+  test('F2: dotted and attached PDF background attributes survive', () async {
+    final dotted = await parseNotebook(
+      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(
+        '<xournal><page width="200" height="300">'
+        '<background type="solid" style="dotted" color="#ffffff"/>'
+        '<layer/></page></xournal>',
+      )))),
+    );
+    expect(dotted.pages!.single.background, isA<XppBackgroundSolidDot>());
+    expect(dotted.toXmlString(), contains('style="dotted"'));
+
+    final attached = await parseNotebook(
+      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(
+        '<xournal><page width="200" height="300">'
+        '<background type="pdf" domain="attach" filename="file.pdf" pageno="1"/>'
+        '<layer/></page></xournal>',
+      )))),
+    );
+    expect(
+      (attached.pages!.single.background as XppBackgroundPdf).domain,
+      XppBackgroundImageDomain.ATTACH,
+    );
+    expect(attached.toXmlString(), contains('domain="attach"'));
+  });
+
   testWidgets('PDF inheritance and recovery callback survive parsing', (
     tester,
   ) async {

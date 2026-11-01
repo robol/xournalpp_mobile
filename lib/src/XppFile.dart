@@ -555,9 +555,9 @@ class XppFile {
             .toList()[0];
         switch (backgroundElement.getAttribute('type')) {
           case "pixmap":
-            background = XppBackgroundImage(
-              filename: backgroundElement.getAttribute('filename'),
-            );
+            // The image renderer is not implemented. Preserve everything,
+            // including the attached/clone domain and extension attributes.
+            background = XppBackgroundPreserved(backgroundElement.toXmlString());
             break;
           case "pdf":
             final filename =
@@ -568,6 +568,11 @@ class XppFile {
               onUnavailable: _unusedPdfRecovery,
               filename: filename,
               page: int.parse(backgroundElement.getAttribute('pageno')!),
+              domain: switch (backgroundElement.getAttribute('domain')) {
+                'attach' => XppBackgroundImageDomain.ATTACH,
+                'clone' => XppBackgroundImageDomain.CLONE,
+                _ => XppBackgroundImageDomain.ABSOLUTE,
+              },
             );
             break;
           case "solid":
@@ -590,6 +595,12 @@ class XppFile {
                   color: parseColor(backgroundElement.getAttribute('color')),
                 );
                 break;
+              case 'dotted':
+                background = XppBackgroundSolidDot(
+                  size: pageSize,
+                  color: parseColor(backgroundElement.getAttribute('color')),
+                );
+                break;
               case 'plain':
                 background = XppBackgroundSolidPlain(
                   size: pageSize,
@@ -597,11 +608,11 @@ class XppFile {
                 );
                 break;
               default:
-                background = XppBackground.none;
+                background = XppBackgroundPreserved(backgroundElement.toXmlString());
             }
             break;
           default:
-            background = XppBackground.none;
+            background = XppBackgroundPreserved(backgroundElement.toXmlString());
             break;
         }
       }

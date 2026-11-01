@@ -30,6 +30,36 @@ abstract class XppBackground {
   XmlElement toXmlElement();
 }
 
+/// Preserve backgrounds that the editor cannot draw yet. Silently replacing an
+/// unknown background with plain white would permanently alter a .xopp file.
+class XppBackgroundPreserved extends XppBackground {
+  XppBackgroundPreserved(this.originalXml);
+
+  final String originalXml;
+
+  @override
+  Widget render({
+    ValueChanged<bool>? onLoadingChanged,
+    ValueListenable<bool>? deferRasterUpdates,
+    double? targetPixelWidth,
+    double? targetPixelHeight,
+    double? pageWidthPoints,
+    double? pageHeightPoints,
+  }) => const ColoredBox(
+    color: Colors.white,
+    child: Align(
+      alignment: Alignment.topLeft,
+      child: Text(
+        'Background not supported for display (preserved on save)',
+        style: TextStyle(color: Colors.deepOrange, fontSize: 12),
+      ),
+    ),
+  );
+
+  @override
+  XmlElement toXmlElement() => XmlDocument.parse(originalXml).rootElement;
+}
+
 /// page background for a [XppPage] made from an image URI. I am sure it will be hard to implement for web.
 /// TODO: implement background for web
 class XppBackgroundImage extends XppBackground {
@@ -126,10 +156,15 @@ class XppBackgroundPdf extends XppBackground {
 
   @override
   XmlElement toXmlElement() {
+    final domainString = switch (domain) {
+      XppBackgroundImageDomain.ABSOLUTE => 'absolute',
+      XppBackgroundImageDomain.ATTACH => 'attach',
+      XppBackgroundImageDomain.CLONE => 'clone',
+    };
     final attributes = [
       XmlAttribute(XmlName.parts('type'), 'pdf'),
       XmlAttribute(XmlName.parts('pageno'), page.toString()),
-      XmlAttribute(XmlName.parts('domain'), 'absolute'),
+      XmlAttribute(XmlName.parts('domain'), domainString),
       if (filename != null) XmlAttribute(XmlName.parts('filename'), filename!),
     ];
     XmlElement node = XmlElement(XmlName.parts('background'), attributes);
