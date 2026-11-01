@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:xml/xml.dart';
-import 'package:xournalpp/layer_contents/XppText.dart';
 import 'package:xournalpp/src/HexColor.dart';
 import 'package:xournalpp/src/XppLayer.dart';
 import 'package:xournalpp/src/XppPageContentWidget.dart';
@@ -73,6 +72,6 @@ class XppTexImage extends XppContent {
       XmlAttribute(XmlName.parts('top'), topLeft!.dy.toString()),
       XmlAttribute(XmlName.parts('bottom'), bottomRight?.dy.toString() ?? '0'),
     ],
-    [XmlText(XppText.encodeText(text!))],
+    [XmlText(text!)],
   );
 }

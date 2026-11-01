@@ -666,20 +666,7 @@ class XppFile {
           content[int.parse(textElement.getAttribute('counter')!)] = XppText(
             color: color,
             // note: not trimming
-            text: textElement.innerText.replaceAllMapped(
-              RegExp(r'(&amp;|&lt;|&gt;)'),
-              (Match subtext) {
-                switch (subtext.group(0)) {
-                  case '&amp;':
-                    return '&';
-                  case '&lt;':
-                    return '<';
-                  case '&gt;':
-                    return '>';
-                }
-                return subtext.group(0)!;
-              },
-            ),
+            text: textElement.innerText,
             size: double.parse(textElement.getAttribute('size')!),
             fontFamily: textElement.getAttribute('font'),
             offset: Offset(

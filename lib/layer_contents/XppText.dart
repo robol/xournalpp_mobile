@@ -144,13 +144,6 @@ class XppText extends XppContent {
         (color ?? Colors.black).toHexTriplet(),
       ),
     ],
-    [XmlText(encodeText(text ?? ''))],
+    [XmlText(text ?? '')],
   );
-
-  static String encodeText(String text) {
-    return text
-        .replaceAll(r'&', r'&amp;')
-        .replaceAll(r'<', r'&lt;')
-        .replaceAll(r'>', r'&gt;');
-  }
 }

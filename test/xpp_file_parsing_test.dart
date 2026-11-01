@@ -140,6 +140,31 @@ void main() {
     expect(file.title, 'notes');
   });
 
+  test('text XML entities round-trip without double decoding', () async {
+    const original = 'A & B < C > D &amp; &lt; Ω';
+    final loaded = await parseNotebook(
+      notebook(
+        '<text font="Sans" size="12" x="1" y="2" color="#000000">'
+        'A &amp; B &lt; C &gt; D &amp;amp; &amp;lt; Ω'
+        '</text>',
+      ),
+    );
+    final text = loaded.pages!.single.layers!.single.content!.single as XppText;
+    expect(text.text, original);
+
+    final encoded = loaded.toXmlString();
+    expect(encoded, contains('A &amp; B &lt; C'));
+    expect(encoded, contains('D &amp;amp; &amp;lt; Ω'));
+    expect(encoded, isNot(contains('&amp;amp;amp;')));
+    final reloaded = await parseNotebook(
+      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(encoded)))),
+    );
+    expect(
+      (reloaded.pages!.single.layers!.single.content!.single as XppText).text,
+      original,
+    );
+  });
+
   testWidgets('PDF inheritance and recovery callback survive parsing', (
     tester,
   ) async {
