@@ -157,5 +157,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "moveTo": "Verschieben nach…",
+  "renameNotebook": "Umbenennen",
+  "deleteNotebookConfirm": "Dieses Notizbuch aus seinem Speicher löschen? Dies kann hier nicht rückgängig gemacht werden. Wiederherstellungsentwürfe bleiben erhalten. Google-Drive-Notizbücher werden in den Papierkorb verschoben.",
+  "movePdfUnsafe": "Dieses Notizbuch verwendet gespeicherte PDF-Hintergründe. Beim Verschieben in den lokalen Speicher würden sie vom ursprünglichen Speicher abhängig bleiben. Verwenden Sie „Speichern unter“.",
+  "renameFolderAccess": "Wählen Sie zum Umbenennen den aktuellen Ordner des Notizbuchs. Ein anderer Ordner bricht den Vorgang ab.",
+  "moveCopyRetained": "Kopie gespeichert, aber das Original konnte nicht gelöscht werden. Beide Kopien bleiben erhalten. Speichern aktualisiert jetzt das Ziel.",
+  "notebookMoved": "Notizbuch verschoben.",
+  "moveFailed": "Notizbuch konnte nicht verschoben werden. Das Original bleibt erhalten. Wählen Sie bei vorhandenem Ziel einen anderen Namen.",
+  "retrySourceDelete": "Löschen wiederholen",
+  "notebookActionUnavailable": "Der Speicheranbieter ist nicht verfügbar oder unterstützt diese Aktion nicht.",
+  "moveNeedsFreshSource": "Öffnen Sie das Original erneut aus seinem Speicher, bevor Sie ein zwischengespeichertes Notizbuch verschieben oder umbenennen.",
+  "invalidNotebookName": "Geben Sie einen Notizbuchnamen ohne Schrägstriche oder Steuerzeichen ein."
 }

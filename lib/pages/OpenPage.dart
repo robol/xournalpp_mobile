@@ -1,3 +1,4 @@
+import 'package:xournalpp/widgets/NotebookActions.dart';
 import 'package:xournalpp/src/NotebookCache.dart';
 import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
 import 'package:xournalpp/widgets/CachedNotebookList.dart';
@@ -654,8 +655,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       providerIconData: fileInfo['backendId'] == 'internal'
           ? Icons.inventory_2_outlined
           : null,
-      onLongPress: () =>
-          showDeleteDialog(fileInfo['path'], backendId: fileInfo['backendId']),
+      onLongPress: () => _showNotebookMenu(fileInfo),
       onOpen: () async {
         try {
           final initialPage = _currentPageFromRecentFile(fileInfo);
@@ -857,30 +857,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     BuildContext dialogContext,
     StoredNotebook notebook,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: dialogContext,
-      builder: (context) => AlertDialog(
-        title: Text(S.of(context).internalDelete),
-        content: Text(
-          '${S.of(context).internalDeleteConfirm}\n${notebook.name}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(S.of(context).cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(S.of(context).internalDelete),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
     try {
-      await NotebookCache.instance.remove(notebook);
-      await internalNotebookStorage.delete(notebook);
-      await RecentFiles.forget(notebook.id, backendId: notebook.backendId);
+      await deleteNotebook(context, internalNotebookStorage, notebook);
     } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -1218,60 +1196,110 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return int.tryParse(page?.toString() ?? '') ?? 0;
   }
 
-  showDeleteDialog(String path, {String? backendId}) {
-    var deleteFile = false;
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(S.of(context).confirmDelete),
-          content: SingleChildScrollView(
+  bool _notebookActionBusy = false;
+
+  Future<void> _showNotebookMenu(Map info) async {
+    if (_notebookActionBusy) return;
+    _notebookActionBusy = true;
+    try {
+      final backendId = info['backendId'] as String? ?? 'local';
+      // Account restoration can fail offline. Forget remains available.
+      try {
+        if (backendId.startsWith('nextcloud:'))
+          await NextcloudManager.restore();
+        if (backendId.startsWith('gdrive:')) await GoogleDriveManager.restore();
+      } catch (_) {}
+      if (!mounted) return;
+      final storage = notebookStorageBackends
+          .where((item) => item.id == backendId)
+          .firstOrNull;
+      final notebook = StoredNotebook(
+        backendId: backendId,
+        id: info['path'] as String,
+        name: info['name'] as String,
+      );
+      final deletable =
+          !kIsWeb &&
+          storage is NotebookDeletion &&
+          (storage as NotebookDeletion).canDelete(notebook);
+      final transferable = canTransferNotebook(storage, notebook);
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(S.of(context).areYouSureToDeleteTheSelectedFileThisCannot),
-                if ((backendId == null ||
-                        backendId == localNotebookStorage.id) &&
-                    XppPickedFile.canDelete(path: path))
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(S.of(context).alsoDeleteFile),
-                    value: deleteFile,
-                    onChanged: (value) =>
-                        setDialogState(() => deleteFile = value ?? false),
-                  ),
+                ListTile(
+                  title: Text(S.of(context).internalDelete),
+                  enabled: deletable,
+                  subtitle: deletable
+                      ? null
+                      : Text(S.of(context).notebookActionUnavailable),
+                  onTap: () => Navigator.pop(context, 'delete'),
+                ),
+                ListTile(
+                  title: Text(S.of(context).renameNotebook),
+                  enabled: transferable,
+                  subtitle: transferable
+                      ? null
+                      : Text(S.of(context).notebookActionUnavailable),
+                  onTap: () => Navigator.pop(context, 'rename'),
+                ),
+                ListTile(
+                  title: Text(S.of(context).moveTo),
+                  enabled: transferable,
+                  subtitle: transferable
+                      ? null
+                      : Text(S.of(context).notebookActionUnavailable),
+                  onTap: () => Navigator.pop(context, 'move'),
+                ),
+                ListTile(
+                  title: Text(S.of(context).forgetRecent),
+                  onTap: () => Navigator.pop(context, 'forget'),
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: Navigator.of(context).pop,
-              child: Text(S.of(context).cancel),
-            ),
-            TextButton(
-              onPressed: () async {
-                try {
-                  if (deleteFile) await XppPickedFile.delete(path: path);
-                  await RecentFiles.forget(path, backendId: backendId);
-                } catch (error) {
-                  if (!context.mounted) return;
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${S.of(context).errorOpeningFile} $error'),
-                    ),
-                  );
-                  return;
-                }
-                if (!context.mounted) return;
-                Navigator.of(context).pop();
-              },
-              child: Text(S.of(context).forgetRecent),
-            ),
-          ],
         ),
-      ),
-    );
+      );
+      if (!mounted || action == null) return;
+      if (action == 'forget') {
+        await RecentFiles.forget(notebook.id, backendId: backendId);
+      } else if (action == 'delete') {
+        await deleteNotebook(context, storage!, notebook);
+      } else {
+        // Transfer only a fresh original; never offer cached fallback here.
+        final file = await runWithLoadingFileDialog(
+          context,
+          () => XppFile.openStoredNotebook(
+            storage!,
+            notebook,
+            showMissingFileDialog,
+          ),
+        );
+        if (!mounted) return;
+        final result = await transferNotebook(
+          context,
+          file,
+          rename: action == 'rename',
+        );
+        if (result == null) return;
+        if (result.notebook != null)
+          await rememberTransferredNotebook(
+            file,
+            page: _currentPageFromRecentFile(info),
+          );
+        if (mounted) showTransferResult(context, result, storage!, notebook);
+      }
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      _notebookActionBusy = false;
+    }
   }
 }
 

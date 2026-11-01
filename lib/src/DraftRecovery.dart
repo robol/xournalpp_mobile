@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'NotebookStorage.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -70,6 +71,37 @@ class DraftRecovery {
 
   static Future<void> save(RecoveryDraft draft) =>
       _enqueue(() => writeDraft(draft.id, jsonEncode(draft.toJson())));
+
+  /// Keep recoverable edits associated with a successfully moved original.
+  /// Draft bytes and cached-origin status are preserved.
+  static Future<void> relocate(
+    StoredNotebook source,
+    StoredNotebook destination,
+  ) => _enqueue(() async {
+    for (final record in await listDrafts()) {
+      RecoveryDraft draft;
+      try {
+        draft = RecoveryDraft.fromJson(
+          jsonDecode(record) as Map<String, dynamic>,
+        );
+      } catch (_) {
+        continue;
+      }
+      if (draft.originalPath != source.id ||
+          (draft.backendId ?? 'local') != source.backendId)
+        continue;
+      final moved = RecoveryDraft(
+        id: draft.id,
+        bytes: draft.bytes,
+        page: draft.page,
+        title: destination.name,
+        originalPath: destination.id,
+        backendId: destination.backendId,
+        cachedOrigin: draft.cachedOrigin,
+      );
+      await writeDraft(moved.id, jsonEncode(moved.toJson()));
+    }
+  });
 
   static Future<void> remove(String id) => _enqueue(() => deleteDraft(id));
 

@@ -108,6 +108,9 @@ class MessageLookup extends MessageLookupByLibrary {
           "Não foi possível encontrar o PDF de fundo. Selecione um novo",
         ),
     "delete": MessageLookupByLibrary.simpleMessage("Deletar"),
+    "deleteNotebookConfirm": MessageLookupByLibrary.simpleMessage(
+      "Excluir este caderno do armazenamento? Esta ação não pode ser desfeita aqui. Os rascunhos de recuperação serão mantidos. No Google Drive, o caderno será movido para a lixeira.",
+    ),
     "deletePage": MessageLookupByLibrary.simpleMessage("Deletar página"),
     "dotted": MessageLookupByLibrary.simpleMessage("Pontilhado"),
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
@@ -148,6 +151,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "O armazenamento local guarda apenas o ficheiro do caderno. Poderá ser necessário localizar novamente os fundos PDF guardados em Interno. Mantenha o caderno interno ou guarde os PDFs originais separadamente.",
     ),
     "internalStorage": MessageLookupByLibrary.simpleMessage("Interno"),
+    "invalidNotebookName": MessageLookupByLibrary.simpleMessage(
+      "Digite um nome de caderno sem barras ou caracteres de controle.",
+    ),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (não implementado)",
     ),
@@ -161,7 +167,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "Aplicativo móvel oficial",
     ),
     "move": MessageLookupByLibrary.simpleMessage("Mover"),
+    "moveCopyRetained": MessageLookupByLibrary.simpleMessage(
+      "Cópia salva, mas não foi possível excluir o original. Ambas as cópias foram mantidas. Salvar agora atualiza o destino.",
+    ),
+    "moveFailed": MessageLookupByLibrary.simpleMessage(
+      "Não foi possível mover o caderno. O original foi mantido. Escolha outro nome se o destino já existir.",
+    ),
+    "moveNeedsFreshSource": MessageLookupByLibrary.simpleMessage(
+      "Reabra o original do armazenamento antes de mover ou renomear um caderno em cache.",
+    ),
     "movePage": MessageLookupByLibrary.simpleMessage("Mover página"),
+    "movePdfUnsafe": MessageLookupByLibrary.simpleMessage(
+      "Este caderno usa fundos PDF armazenados. Mover para o armazenamento local manteria esses fundos dependentes do armazenamento original. Use Salvar como.",
+    ),
+    "moveTo": MessageLookupByLibrary.simpleMessage("Mover para…"),
     "newDocument": MessageLookupByLibrary.simpleMessage("Novo Documento"),
     "newFile": MessageLookupByLibrary.simpleMessage("Novo"),
     "newNotebook": MessageLookupByLibrary.simpleMessage("Novo caderno"),
@@ -209,6 +228,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "notWorkingYet": MessageLookupByLibrary.simpleMessage(
       "Não está funcionando ainda.",
     ),
+    "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "O provedor de armazenamento está indisponível ou não suporta esta ação.",
+    ),
+    "notebookMoved": MessageLookupByLibrary.simpleMessage("Caderno movido."),
     "okay": MessageLookupByLibrary.simpleMessage("Okay"),
     "open": MessageLookupByLibrary.simpleMessage("Abrir"),
     "opening": MessageLookupByLibrary.simpleMessage("Abrindo"),
@@ -240,6 +263,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
       "Remover dos cadernos salvos",
+    ),
+    "renameFolderAccess": MessageLookupByLibrary.simpleMessage(
+      "Selecione a pasta atual do caderno para permitir renomear. Selecionar outra pasta cancela a operação.",
+    ),
+    "renameNotebook": MessageLookupByLibrary.simpleMessage("Renomear"),
+    "retrySourceDelete": MessageLookupByLibrary.simpleMessage(
+      "Tentar excluir novamente",
     ),
     "ruled": MessageLookupByLibrary.simpleMessage("Com linhas e margem"),
     "save": MessageLookupByLibrary.simpleMessage("Salvar"),

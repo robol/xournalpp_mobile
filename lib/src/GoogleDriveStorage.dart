@@ -9,7 +9,57 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NotebookMetadata.dart';
 
 /// Drive storage uses opaque Drive file IDs and a caller-supplied OAuth token.
-class GoogleDriveStorage implements NotebookStorage {
+class GoogleDriveStorage
+    implements NotebookStorage, NotebookDeletion, NotebookTransfer {
+  @override
+  Future<bool> containsNotebook(
+    NotebookFolder folder,
+    StoredNotebook notebook,
+  ) async =>
+      folder.backendId == id &&
+      notebook.backendId == id &&
+      (await parentOf(notebook))?.id == folder.id;
+
+  @override
+  bool canDelete(StoredNotebook notebook) => notebook.backendId == id;
+  @override
+  Future<void> delete(StoredNotebook notebook) async {
+    if (!canDelete(notebook)) throw ArgumentError('Wrong storage backend');
+    await _request(
+      'PATCH',
+      Uri.https(
+        'www.googleapis.com',
+        '/drive/v3/files/${Uri.encodeComponent(notebook.id)}',
+      ),
+      headers: {'Content-Type': 'application/json'},
+      body: utf8.encode(jsonEncode({'trashed': true})),
+    );
+    _manifests.remove(notebook.id);
+  }
+
+  @override
+  Future<NotebookFolder?> parentOf(StoredNotebook notebook) async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    return NotebookFolder(id, await _parentOf(notebook.id));
+  }
+
+  @override
+  Future<StoredNotebook?> createInFolder({
+    required NotebookFolder folder,
+    required String name,
+    required Uint8List bytes,
+    required List<NotebookPdfResource> pdfs,
+  }) {
+    if (folder.backendId != id) throw ArgumentError('Wrong storage backend');
+    validateNotebookName(name);
+    return save(
+      bytes: bytes,
+      name: name,
+      pdfs: pdfs,
+      destinationFolderId: folder.id,
+    );
+  }
+
   @override
   String? get iconAsset => 'assets/storage/google-drive.png';
   GoogleDriveStorage({
@@ -120,7 +170,8 @@ class GoogleDriveStorage implements NotebookStorage {
     );
     final parents =
         (jsonDecode(response.body) as Map<String, dynamic>)['parents'] as List;
-    if (parents.isEmpty) throw StateError('Notebook has no Drive folder');
+    if (parents.length != 1)
+      throw StateError('Notebook must have exactly one Drive folder');
     return parents.first as String;
   }
 

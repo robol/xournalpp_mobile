@@ -1,3 +1,4 @@
+import 'package:xournalpp/widgets/NotebookActions.dart';
 import 'package:xournalpp/src/NotebookCache.dart';
 import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
 import 'dart:async';
@@ -231,6 +232,7 @@ class _CanvasPageState extends State<CanvasPage>
   double _lastViewportWidth = 0;
 
   bool savingFile = false;
+  bool _transferring = false;
   bool _pinchZoomActive = false;
   bool _viewportPinchZooming = false;
   final Map<int, Offset> _viewportTouchPositions = {};
@@ -390,7 +392,7 @@ class _CanvasPageState extends State<CanvasPage>
               _recordDraftActivity();
             },
             child: AbsorbPointer(
-              absorbing: _erasing,
+              absorbing: _erasing || _transferring,
               child: Stack(
                 children: [
                   PdfSourceScope(
@@ -402,7 +404,7 @@ class _CanvasPageState extends State<CanvasPage>
                       ),
                     ),
                   ),
-                  if (_erasing)
+                  if (_erasing || _transferring)
                     const Positioned(
                       top: 0,
                       left: 0,
@@ -438,9 +440,9 @@ class _CanvasPageState extends State<CanvasPage>
       ),
     );
     return PopScope(
-      canPop: !_erasing && (_allowPop || !_isDirty),
+      canPop: !_transferring && !_erasing && (_allowPop || !_isDirty),
       onPopInvokedWithResult: (didPop, result) async {
-        if (didPop || _confirmingLeave) return;
+        if (didPop || _confirmingLeave || _transferring) return;
         _confirmingLeave = true;
         if (!await _confirmLeave()) {
           _confirmingLeave = false;
@@ -551,6 +553,7 @@ class _CanvasPageState extends State<CanvasPage>
             PopupMenuButton<String>(
               onSelected: (item) async {
                 if (item == S.of(context).saveAs) saveFile(saveAs: true);
+                if (item == S.of(context).moveTo) _moveNotebook();
                 if (item == S.of(context).sharePage) shareScreenshot();
                 if (item == _exportPdfMenuItem) exportPdf();
                 if (item == _sharePdfMenuItem) sharePdf();
@@ -558,13 +561,31 @@ class _CanvasPageState extends State<CanvasPage>
               itemBuilder: (BuildContext context) {
                 return {
                   S.of(context).saveAs,
+                  S.of(context).moveTo,
                   if (!kIsWeb) S.of(context).sharePage,
                   if (!kIsWeb) _exportPdfMenuItem,
                   if (_sharePdfSupported) _sharePdfMenuItem,
                 }.map((String choice) {
                   return PopupMenuItem<String>(
                     value: choice,
-                    child: Text(choice),
+                    enabled:
+                        choice != S.of(context).moveTo ||
+                        (!savingFile &&
+                            !_transferring &&
+                            _draftActivePointers.isEmpty &&
+                            _file?.openedFromCache == false &&
+                            canTransferNotebook(
+                              _file?.storage,
+                              _file?.storageNotebook,
+                            )),
+                    child:
+                        choice == S.of(context).moveTo &&
+                            _file?.openedFromCache == true
+                        ? Tooltip(
+                            message: S.of(context).moveNeedsFreshSource,
+                            child: Text(choice),
+                          )
+                        : Text(choice),
                   );
                 }).toList();
               },
@@ -1482,6 +1503,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _addContentsToPage(int pageIndex, List<XppContent> newContents) {
+    if (_transferring) return;
     if (newContents.isEmpty) return;
     _activatePageForEditing(pageIndex);
 
@@ -1521,6 +1543,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _recordDraftActivity() {
+    if (_transferring) return;
     _strokeRasterPolicy.noteActivity();
     _draftActivityGeneration++;
     _draftTimer?.cancel();
@@ -1546,6 +1569,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _checkpointDraft({int? idleGeneration}) {
+    if (_transferring) return;
     final cacheGeneration = NotebookCache.instance.generation;
     if (kIsWeb || !_isDirty || _revision == _draftRevision || _file == null)
       return;
@@ -2077,6 +2101,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _addPageAfterCurrent() {
+    if (_transferring) return;
     setState(() {
       currentPage++;
       _selectedContents = {};
@@ -2095,6 +2120,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _deletePage(int pageIndex) {
+    if (_transferring) return;
     setState(() {
       _file!.pages!.removeAt(pageIndex);
       _selectedContents = {};
@@ -2189,6 +2215,7 @@ class _CanvasPageState extends State<CanvasPage>
   bool get _canUndo => _undoStack.isNotEmpty;
 
   void _undoLastOperation() {
+    if (_transferring) return;
     if (_undoStack.isEmpty) return;
 
     final undoEntry = _undoStack.removeLast();
@@ -2286,6 +2313,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _deleteSelection() {
+    if (_transferring) return;
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
 
     final page = _file!.pages![currentPage];
@@ -2329,6 +2357,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _duplicateSelection() {
+    if (_transferring) return;
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
 
     final page = _file!.pages![currentPage];
@@ -2386,6 +2415,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _pasteSelection() {
+    if (_transferring) return;
     final page = _file!.pages![currentPage];
     final copiedContents = _copiedContents;
     if (copiedContents == null || !_canPasteSelection(page)) return;
@@ -2458,6 +2488,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _moveSelection(Offset delta, {bool done = false}) {
+    if (_transferring) return;
     if (_activeTool != EditingTool.SELECT || _selectedContents.isEmpty) return;
 
     _selectionMoveOriginals ??= _selectionMoveStartData();
@@ -2922,11 +2953,48 @@ class _CanvasPageState extends State<CanvasPage>
     } catch (_) {}
   }
 
+  Future<void> _moveNotebook() async {
+    if (savingFile ||
+        _transferring ||
+        _draftActivePointers.isNotEmpty ||
+        _file!.openedFromCache ||
+        !canTransferNotebook(_file!.storage, _file!.storageNotebook))
+      return;
+    setState(() => _transferring = true);
+    final source = _file!.storage!;
+    final original = _file!.storageNotebook!;
+    try {
+      await _pendingErase;
+      await _draftWork;
+      if (!mounted) return;
+      final result = await transferNotebook(context, _file!);
+      if (result == null) return;
+      if (result.notebook != null) {
+        // Adopt even a partial move immediately. Future saves use the copy.
+        filePath = result.notebook!.id;
+        _savedRevision = _revision;
+        await rememberTransferredNotebook(_file!, page: currentPage);
+        await _removeDraft();
+      }
+      if (mounted) showTransferResult(context, result, source, original);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) {
+        setState(() => _transferring = false);
+        if (_isDirty) _recordDraftActivity();
+      }
+    }
+  }
+
   Future<bool> saveFile({bool saveAs = false}) async {
     final cacheGeneration = NotebookCache.instance.generation;
     await _pendingErase;
     if (!mounted) return false;
-    if (savingFile) return false;
+    if (savingFile || _transferring) return false;
     setState(() {
       savingFile = true;
     });

@@ -57,12 +57,80 @@ Future<bool> persistDocumentAccess(String path, {bool writable = false}) async {
       false;
 }
 
-Future<void> deleteFile(String path) => File(path).delete();
+Future<void> deleteFile(String path) async {
+  final uri = _androidDocumentUriForPath(path);
+  if (uri != null) {
+    await _storageChannel.invokeMethod<void>('deleteDocument', {'uri': uri});
+  } else {
+    await File(
+      Uri.tryParse(path)?.scheme == 'file'
+          ? Uri.parse(path).toFilePath()
+          : path,
+    ).delete();
+  }
+}
+
+Future<String?> chooseNotebookFolder() async => Platform.isAndroid
+    ? _storageChannel.invokeMethod<String>('chooseNotebookFolder')
+    : null;
+
+Future<String?> parentFolder(String path) async {
+  final uri = _androidDocumentUriForPath(path);
+  if (uri != null) {
+    // Android providers need a tree grant. The native side verifies the selected
+    // tree contains the source as an immediate child before returning it.
+    return _storageChannel.invokeMethod<String>('chooseNotebookFolder', {
+      'source': uri,
+    });
+  }
+  return File(
+    Uri.tryParse(path)?.scheme == 'file' ? Uri.parse(path).toFilePath() : path,
+  ).absolute.parent.path;
+}
+
+Future<bool> notebookInFolder(String folder, String path) async {
+  final uri = _androidDocumentUriForPath(path);
+  if (uri != null) {
+    if (!folder.startsWith('content://')) return false;
+    return await _storageChannel.invokeMethod<bool>('notebookInFolder', {
+          'folder': folder,
+          'source': uri,
+        }) ??
+        false;
+  }
+  if (folder.startsWith('content://')) return false;
+  final file = File(
+    Uri.tryParse(path)?.scheme == 'file' ? Uri.parse(path).toFilePath() : path,
+  );
+  return file.absolute.parent.path == Directory(folder).absolute.path;
+}
+
+Future<String> createNotebook(
+  String folder,
+  String name,
+  Uint8List bytes,
+) async {
+  if (folder.startsWith('content://')) {
+    return (await _storageChannel.invokeMethod<String>(
+      'createNotebookInFolder',
+      {'folder': folder, 'name': name, 'bytes': bytes},
+    ))!;
+  }
+  final file = File('$folder/$name');
+  await file.create(exclusive: true);
+  try {
+    await file.writeAsBytes(bytes, flush: true);
+  } catch (_) {
+    await file.delete();
+    rethrow;
+  }
+  return file.path;
+}
 
 bool canDeleteFile(String path) =>
-    _androidDocumentUriForPath(path) == null &&
-    !path.contains('://') &&
-    File(path).isAbsolute;
+    _androidDocumentUriForPath(path) != null ||
+    (Uri.tryParse(path)?.scheme == 'file') ||
+    (!path.contains('://') && File(path).isAbsolute);
 
 Future<Uint8List?> readCacheFile(String key) async {
   final file = await _cacheFile(key);

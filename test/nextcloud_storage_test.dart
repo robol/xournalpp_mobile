@@ -10,6 +10,32 @@ import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 
 void main() {
+  test('delete targets only notebook in its actual nested folder', () async {
+    final requests = <http.Request>[];
+    final storage = NextcloudStorage(
+      NextcloudCredentials(
+        server: NextcloudConnection.serverUri('https://cloud.example'),
+        username: 'user',
+        password: 'secret',
+      ),
+      ['Notes'],
+      client: MockClient((request) async {
+        requests.add(request);
+        return http.Response('', 204);
+      }),
+    );
+    final notebook = StoredNotebook(
+      backendId: storage.id,
+      id: 'Class A/Notes.xopp',
+      name: 'Notes',
+    );
+    expect((await storage.parentOf(notebook))!.id, jsonEncode(['Class A']));
+    await storage.delete(notebook);
+    expect(requests, hasLength(1));
+    expect(requests.single.method, 'DELETE');
+    expect(requests.single.url.path, endsWith('/Notes/Class%20A/Notes.xopp'));
+  });
+
   test(
     'reads successful WebDAV modification dates and tolerates missing dates',
     () async {

@@ -1349,6 +1349,116 @@ class S {
       args: [date],
     );
   }
+
+  /// `Move to…`
+  String get moveTo {
+    return Intl.message('Move to…', name: 'moveTo', desc: '', args: []);
+  }
+
+  /// `Rename`
+  String get renameNotebook {
+    return Intl.message('Rename', name: 'renameNotebook', desc: '', args: []);
+  }
+
+  /// `Delete this notebook from its storage? This cannot be undone here. Recovery drafts will be kept. Google Drive notebooks will be moved to Trash.`
+  String get deleteNotebookConfirm {
+    return Intl.message(
+      'Delete this notebook from its storage? This cannot be undone here. Recovery drafts will be kept. Google Drive notebooks will be moved to Trash.',
+      name: 'deleteNotebookConfirm',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This notebook uses stored PDF backgrounds. Moving it to Local storage would leave those backgrounds dependent on the original storage. Use Save As instead.`
+  String get movePdfUnsafe {
+    return Intl.message(
+      'This notebook uses stored PDF backgrounds. Moving it to Local storage would leave those backgrounds dependent on the original storage. Use Save As instead.',
+      name: 'movePdfUnsafe',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Select the notebook’s current folder to allow renaming. Choosing a different folder will cancel the operation.`
+  String get renameFolderAccess {
+    return Intl.message(
+      'Select the notebook’s current folder to allow renaming. Choosing a different folder will cancel the operation.',
+      name: 'renameFolderAccess',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Copy saved, but the original could not be deleted. Both copies were kept. Saving now updates the destination.`
+  String get moveCopyRetained {
+    return Intl.message(
+      'Copy saved, but the original could not be deleted. Both copies were kept. Saving now updates the destination.',
+      name: 'moveCopyRetained',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Notebook moved.`
+  String get notebookMoved {
+    return Intl.message(
+      'Notebook moved.',
+      name: 'notebookMoved',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not move notebook. The original was kept. Choose another name if the destination already exists.`
+  String get moveFailed {
+    return Intl.message(
+      'Could not move notebook. The original was kept. Choose another name if the destination already exists.',
+      name: 'moveFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Retry deletion`
+  String get retrySourceDelete {
+    return Intl.message(
+      'Retry deletion',
+      name: 'retrySourceDelete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The storage provider is unavailable or does not support this action.`
+  String get notebookActionUnavailable {
+    return Intl.message(
+      'The storage provider is unavailable or does not support this action.',
+      name: 'notebookActionUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reopen the original from its storage before moving or renaming a cached notebook.`
+  String get moveNeedsFreshSource {
+    return Intl.message(
+      'Reopen the original from its storage before moving or renaming a cached notebook.',
+      name: 'moveNeedsFreshSource',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Enter a notebook name without slashes or control characters.`
+  String get invalidNotebookName {
+    return Intl.message(
+      'Enter a notebook name without slashes or control characters.',
+      name: 'invalidNotebookName',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

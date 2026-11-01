@@ -46,3 +46,10 @@ Future<String> writePersistentFile(Uint8List bytes, {String? fileName}) {
     'Writing persistent local files is not supported here.',
   );
 }
+
+Future<String?> chooseNotebookFolder() async => null;
+Future<String?> parentFolder(String path) async => null;
+Future<String> createNotebook(String folder, String name, Uint8List bytes) =>
+    throw UnsupportedError('Transfers unavailable');
+
+Future<bool> notebookInFolder(String folder, String path) async => false;

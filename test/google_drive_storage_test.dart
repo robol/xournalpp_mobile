@@ -9,6 +9,47 @@ import 'package:xournalpp/src/GoogleDriveStorage.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 
 void main() {
+  test('deletion trashes only the notebook, not shared resources', () async {
+    final requests = <http.Request>[];
+    final storage = GoogleDriveStorage(
+      accountId: 'a',
+      folderId: 'root',
+      accessToken: () async => 'token',
+      client: MockClient((request) async {
+        requests.add(request);
+        return http.Response('{}', 200);
+      }),
+    );
+    await storage.delete(
+      StoredNotebook(backendId: storage.id, id: 'file-id', name: 'Notes'),
+    );
+    expect(requests, hasLength(1));
+    expect(requests.single.method, 'PATCH');
+    expect(requests.single.url.path, '/drive/v3/files/file-id');
+    expect(jsonDecode(requests.single.body), {'trashed': true});
+  });
+  test('same-folder operations reject ambiguous Drive parents', () async {
+    final storage = GoogleDriveStorage(
+      accountId: 'a',
+      folderId: 'root',
+      accessToken: () async => 'token',
+      client: MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'parents': ['one', 'two'],
+          }),
+          200,
+        ),
+      ),
+    );
+    await expectLater(
+      storage.parentOf(
+        StoredNotebook(backendId: storage.id, id: 'file', name: 'Notes'),
+      ),
+      throwsStateError,
+    );
+  });
+
   test(
     'duplicate notebook name does not overwrite and reports its Drive ID',
     () async {

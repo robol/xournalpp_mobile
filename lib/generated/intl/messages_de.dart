@@ -112,6 +112,9 @@ class MessageLookup extends MessageLookupByLibrary {
           "Die Hintergrund-PDF konnte nicht gefunden werden. Wähle eine neue aus",
         ),
     "delete": MessageLookupByLibrary.simpleMessage("Löschen"),
+    "deleteNotebookConfirm": MessageLookupByLibrary.simpleMessage(
+      "Dieses Notizbuch aus seinem Speicher löschen? Dies kann hier nicht rückgängig gemacht werden. Wiederherstellungsentwürfe bleiben erhalten. Google-Drive-Notizbücher werden in den Papierkorb verschoben.",
+    ),
     "deletePage": MessageLookupByLibrary.simpleMessage("Seite löschen"),
     "dotted": MessageLookupByLibrary.simpleMessage("Gepunktet"),
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
@@ -152,6 +155,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Im lokalen Speicher wird nur die Notizbuchdatei gespeichert. In Intern gespeicherte PDF-Hintergründe müssen möglicherweise erneut gesucht werden. Behalte das interne Notizbuch oder die ursprünglichen PDFs separat.",
     ),
     "internalStorage": MessageLookupByLibrary.simpleMessage("Intern"),
+    "invalidNotebookName": MessageLookupByLibrary.simpleMessage(
+      "Geben Sie einen Notizbuchnamen ohne Schrägstriche oder Steuerzeichen ein.",
+    ),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (nicht implementiert)",
     ),
@@ -163,7 +169,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "offizielle Mobil-App",
     ),
     "move": MessageLookupByLibrary.simpleMessage("Bewegen"),
+    "moveCopyRetained": MessageLookupByLibrary.simpleMessage(
+      "Kopie gespeichert, aber das Original konnte nicht gelöscht werden. Beide Kopien bleiben erhalten. Speichern aktualisiert jetzt das Ziel.",
+    ),
+    "moveFailed": MessageLookupByLibrary.simpleMessage(
+      "Notizbuch konnte nicht verschoben werden. Das Original bleibt erhalten. Wählen Sie bei vorhandenem Ziel einen anderen Namen.",
+    ),
+    "moveNeedsFreshSource": MessageLookupByLibrary.simpleMessage(
+      "Öffnen Sie das Original erneut aus seinem Speicher, bevor Sie ein zwischengespeichertes Notizbuch verschieben oder umbenennen.",
+    ),
     "movePage": MessageLookupByLibrary.simpleMessage("Seite verschieben"),
+    "movePdfUnsafe": MessageLookupByLibrary.simpleMessage(
+      "Dieses Notizbuch verwendet gespeicherte PDF-Hintergründe. Beim Verschieben in den lokalen Speicher würden sie vom ursprünglichen Speicher abhängig bleiben. Verwenden Sie „Speichern unter“.",
+    ),
+    "moveTo": MessageLookupByLibrary.simpleMessage("Verschieben nach…"),
     "newDocument": MessageLookupByLibrary.simpleMessage("Neues Dokument"),
     "newFile": MessageLookupByLibrary.simpleMessage("Neu"),
     "newNotebook": MessageLookupByLibrary.simpleMessage("Neues Notizbuch"),
@@ -215,6 +234,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "notWorkingYet": MessageLookupByLibrary.simpleMessage(
       "Funktioniert noch nicht.",
     ),
+    "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Der Speicheranbieter ist nicht verfügbar oder unterstützt diese Aktion nicht.",
+    ),
+    "notebookMoved": MessageLookupByLibrary.simpleMessage(
+      "Notizbuch verschoben.",
+    ),
     "okay": MessageLookupByLibrary.simpleMessage("Okay"),
     "open": MessageLookupByLibrary.simpleMessage("Öffnen"),
     "openNavigation": MessageLookupByLibrary.simpleMessage("Navigation öffnen"),
@@ -247,6 +272,13 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
       "Aus gespeicherten Notizbüchern entfernen",
+    ),
+    "renameFolderAccess": MessageLookupByLibrary.simpleMessage(
+      "Wählen Sie zum Umbenennen den aktuellen Ordner des Notizbuchs. Ein anderer Ordner bricht den Vorgang ab.",
+    ),
+    "renameNotebook": MessageLookupByLibrary.simpleMessage("Umbenennen"),
+    "retrySourceDelete": MessageLookupByLibrary.simpleMessage(
+      "Löschen wiederholen",
     ),
     "ruled": MessageLookupByLibrary.simpleMessage("Liniert mit Rand"),
     "save": MessageLookupByLibrary.simpleMessage("Speichern"),

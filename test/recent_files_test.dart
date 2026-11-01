@@ -12,6 +12,7 @@ import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/pages/OpenPage.dart';
 import 'package:xournalpp/src/RecentFiles.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/NotebookCache.dart';
 import 'package:xournalpp/src/TransparentImage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPage.dart';
@@ -174,66 +175,84 @@ void main() {
         );
   });
   for (final deleteFile in [false, true]) {
-    testWidgets('forget recent document with deleteFile=$deleteFile', (
-      tester,
-    ) async {
-      final directory = await tester.runAsync(
-        () => Directory.systemTemp.createTemp('recent_test'),
-      );
-      expect(directory, isNotNull);
-      final tempDirectory = directory!;
-      addTearDown(() => tempDirectory.delete(recursive: true));
-      final file = File('${tempDirectory.path}/note.xopp');
-      await tester.runAsync(() => file.writeAsString('original'));
+    testWidgets(
+      'recent context menu ${deleteFile ? 'deletes' : 'forgets'} notebook',
+      (tester) async {
+        final directory = await tester.runAsync(
+          () => Directory.systemTemp.createTemp('recent_test'),
+        );
+        expect(directory, isNotNull);
+        final tempDirectory = directory!;
+        addTearDown(() => tempDirectory.delete(recursive: true));
+        final file = File('${tempDirectory.path}/note.xopp');
+        await tester.runAsync(() async {
+          await file.writeAsString('original');
+          NotebookCache.debugInstance = NotebookCache();
+        });
+        addTearDown(() => NotebookCache.debugInstance = null);
+        SharedPreferences.setMockInitialValues({
+          PreferencesKeys.kRecentFiles: jsonEncode([
+            {'path': file.path, 'name': 'Notebook'},
+          ]),
+        });
+        await tester.pumpWidget(XournalppMobile());
+        await tester.pumpAndSettle();
+        await tester.longPress(find.byType(DocumentCard));
+        await tester.pumpAndSettle();
+        expect(find.text('Delete notebook'), findsOneWidget);
+        expect(find.text('Rename'), findsOneWidget);
+        expect(find.text('Move to…'), findsOneWidget);
+        expect(find.text('Forget'), findsOneWidget);
+        await tester.tap(find.text(deleteFile ? 'Delete notebook' : 'Forget'));
+        await tester.pumpAndSettle();
+        if (deleteFile) {
+          await tester.tap(find.text('Delete notebook').last);
+          await tester.pump();
+        }
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+        for (
+          var i = 0;
+          i < 100 &&
+              find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+        await tester.pumpAndSettle();
+        expect(await tester.runAsync(() => file.exists()), !deleteFile);
+        final prefs = await SharedPreferences.getInstance();
+        expect(
+          jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!),
+          isEmpty,
+        );
+        expect(find.byType(DocumentCard), findsNothing);
+      },
+    );
+  }
+
+  testWidgets(
+    'document provider entries offer provider deletion and independent Forget',
+    (tester) async {
       SharedPreferences.setMockInitialValues({
         PreferencesKeys.kRecentFiles: jsonEncode([
-          {'path': file.path, 'name': 'Notebook'},
+          {'path': 'content://notes/42', 'name': 'Notebook'},
         ]),
       });
       await tester.pumpWidget(XournalppMobile());
       await tester.pumpAndSettle();
       await tester.longPress(find.byType(DocumentCard));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
-        false,
-      );
-      if (deleteFile) {
-        await tester.tap(find.byType(CheckboxListTile));
-        await tester.pumpAndSettle();
-      }
+      expect(find.byType(CheckboxListTile), findsNothing);
       await tester.tap(find.text('Forget'));
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
       await tester.pumpAndSettle();
-      expect(await tester.runAsync(() => file.exists()), !deleteFile);
-      final prefs = await SharedPreferences.getInstance();
-      expect(
-        jsonDecode(prefs.getString(PreferencesKeys.kRecentFiles)!),
-        isEmpty,
-      );
       expect(find.byType(DocumentCard), findsNothing);
-    });
-  }
-
-  testWidgets('document provider entries do not offer file deletion', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues({
-      PreferencesKeys.kRecentFiles: jsonEncode([
-        {'path': 'content://notes/42', 'name': 'Notebook'},
-      ]),
-    });
-    await tester.pumpWidget(XournalppMobile());
-    await tester.pumpAndSettle();
-    await tester.longPress(find.byType(DocumentCard));
-    await tester.pumpAndSettle();
-    expect(find.byType(CheckboxListTile), findsNothing);
-    await tester.tap(find.text('Forget'));
-    await tester.pumpAndSettle();
-    expect(find.byType(DocumentCard), findsNothing);
-  });
+    },
+  );
 
   test(
     'opening promotes a recent entry without changing modification metadata',

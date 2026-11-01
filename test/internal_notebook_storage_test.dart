@@ -523,6 +523,7 @@ void main() {
       addTearDown(() => NotebookCache.debugInstance = null);
       late StoredNotebook notebook;
       await tester.runAsync(() async {
+        InternalNotebookStorage.resetForTesting();
         cache = NotebookCache();
         NotebookCache.debugInstance = cache;
         await cache.setEnabled(true);
@@ -569,6 +570,17 @@ void main() {
       await tester.tap(find.text('Delete notebook').last);
       await tester.pump();
       await waitFor(find.text('No saved notebooks yet.'));
+      for (
+        var i = 0;
+        i < 400 && find.byType(CircularProgressIndicator).evaluate().isNotEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 10)),
+        );
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(await tester.runAsync(() => storage.list()), isEmpty);
       expect(await tester.runAsync(() => cache.load(notebook)), isNull);
       final prefs = await tester.runAsync(
@@ -792,7 +804,11 @@ void main() {
     final file = XppFile.empty(title: 'External');
     final path = '${directory.path}/original.xopp';
     late Uint8List initial;
+    addTearDown(() => NotebookCache.debugInstance = null);
     await tester.runAsync(() async {
+      InternalNotebookStorage.resetForTesting();
+      DraftRecovery.resetForTesting();
+      NotebookCache.debugInstance = NotebookCache();
       initial = await file.toUint8ListAsync();
       await File(path).writeAsBytes(initial);
     });

@@ -156,5 +156,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "moveTo": "Mover para…",
+  "renameNotebook": "Renomear",
+  "deleteNotebookConfirm": "Excluir este caderno do armazenamento? Esta ação não pode ser desfeita aqui. Os rascunhos de recuperação serão mantidos. No Google Drive, o caderno será movido para a lixeira.",
+  "movePdfUnsafe": "Este caderno usa fundos PDF armazenados. Mover para o armazenamento local manteria esses fundos dependentes do armazenamento original. Use Salvar como.",
+  "renameFolderAccess": "Selecione a pasta atual do caderno para permitir renomear. Selecionar outra pasta cancela a operação.",
+  "moveCopyRetained": "Cópia salva, mas não foi possível excluir o original. Ambas as cópias foram mantidas. Salvar agora atualiza o destino.",
+  "notebookMoved": "Caderno movido.",
+  "moveFailed": "Não foi possível mover o caderno. O original foi mantido. Escolha outro nome se o destino já existir.",
+  "retrySourceDelete": "Tentar excluir novamente",
+  "notebookActionUnavailable": "O provedor de armazenamento está indisponível ou não suporta esta ação.",
+  "moveNeedsFreshSource": "Reabra o original do armazenamento antes de mover ou renomear um caderno em cache.",
+  "invalidNotebookName": "Digite um nome de caderno sem barras ou caracteres de controle."
 }

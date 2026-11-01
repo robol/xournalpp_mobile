@@ -319,8 +319,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.longPress(find.byType(DocumentCard).first);
       await tester.pumpAndSettle();
-      expect(find.text('Forget recent document'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
+      expect(find.text('Forget'), findsOneWidget);
+      expect(find.text('Rename'), findsOneWidget);
+      expect(find.text('Move to…'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Forget'))).pop();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

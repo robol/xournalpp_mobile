@@ -159,5 +159,17 @@
         "type": "String"
       }
     }
-  }
+  },
+  "moveTo": "Move to…",
+  "renameNotebook": "Rename",
+  "deleteNotebookConfirm": "Delete this notebook from its storage? This cannot be undone here. Recovery drafts will be kept. Google Drive notebooks will be moved to Trash.",
+  "movePdfUnsafe": "This notebook uses stored PDF backgrounds. Moving it to Local storage would leave those backgrounds dependent on the original storage. Use Save As instead.",
+  "renameFolderAccess": "Select the notebook’s current folder to allow renaming. Choosing a different folder will cancel the operation.",
+  "moveCopyRetained": "Copy saved, but the original could not be deleted. Both copies were kept. Saving now updates the destination.",
+  "notebookMoved": "Notebook moved.",
+  "moveFailed": "Could not move notebook. The original was kept. Choose another name if the destination already exists.",
+  "retrySourceDelete": "Retry deletion",
+  "notebookActionUnavailable": "The storage provider is unavailable or does not support this action.",
+  "moveNeedsFreshSource": "Reopen the original from its storage before moving or renaming a cached notebook.",
+  "invalidNotebookName": "Enter a notebook name without slashes or control characters."
 }

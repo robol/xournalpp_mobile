@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
+import 'conditional/file_storage/file_storage_stub.dart'
+    if (dart.library.io) 'conditional/file_storage/file_storage_io.dart'
+    as disk;
 import 'package:crypto/crypto.dart';
 import 'conditional/internal_storage/internal_storage_stub.dart'
     if (dart.library.io) 'conditional/internal_storage/internal_storage_io.dart'
@@ -52,7 +55,93 @@ abstract interface class NotebookStorage {
   Future<void> forget(StoredNotebook notebook);
 }
 
-class LocalNotebookStorage implements NotebookStorage {
+/// Optional capabilities: providers without these remain readable/saveable.
+abstract interface class NotebookDeletion {
+  bool canDelete(StoredNotebook notebook);
+  Future<void> delete(StoredNotebook notebook);
+}
+
+/// Folder IDs are opaque and owned by the provider that returned them.
+class NotebookFolder {
+  const NotebookFolder(this.backendId, this.id);
+  final String backendId;
+  final String id;
+}
+
+abstract interface class NotebookTransfer {
+  Future<NotebookFolder?> parentOf(StoredNotebook notebook);
+  Future<bool> containsNotebook(NotebookFolder folder, StoredNotebook notebook);
+
+  /// Must create a distinct notebook without replacing an existing item.
+  Future<StoredNotebook?> createInFolder({
+    required NotebookFolder folder,
+    required String name,
+    required Uint8List bytes,
+    required List<NotebookPdfResource> pdfs,
+  });
+}
+
+void validateNotebookName(String name) {
+  if (name.trim().isEmpty ||
+      name == '.' ||
+      name == '..' ||
+      name.contains(RegExp(r'[/\\\x00-\x1f]'))) {
+    throw ArgumentError('Invalid notebook name');
+  }
+}
+
+class LocalNotebookStorage
+    implements NotebookStorage, NotebookDeletion, NotebookTransfer {
+  @override
+  bool canDelete(StoredNotebook notebook) =>
+      !kIsWeb && notebook.backendId == id && disk.canDeleteFile(notebook.id);
+  @override
+  Future<void> delete(StoredNotebook notebook) async {
+    if (!canDelete(notebook)) throw UnsupportedError("Deletion unavailable");
+    await disk.deleteFile(notebook.id);
+    try {
+      await forget(notebook);
+    } catch (error) {
+      debugPrint('Could not remove deleted notebook from saved list: $error');
+    }
+  }
+
+  @override
+  Future<NotebookFolder?> parentOf(StoredNotebook notebook) async {
+    if (notebook.backendId != id) throw ArgumentError("Wrong storage backend");
+    final folder = await disk.parentFolder(notebook.id);
+    return folder == null ? null : NotebookFolder(id, folder);
+  }
+
+  @override
+  Future<StoredNotebook?> createInFolder({
+    required NotebookFolder folder,
+    required String name,
+    required Uint8List bytes,
+    required List<NotebookPdfResource> pdfs,
+  }) async {
+    if (folder.backendId != id || kIsWeb)
+      throw ArgumentError("Wrong storage backend");
+    validateNotebookName(name);
+    final path = await disk.createNotebook(
+      folder.id,
+      name.toLowerCase().endsWith(".xopp") ? name : "$name.xopp",
+      bytes,
+    );
+    final result = StoredNotebook(backendId: id, id: path, name: name);
+    await _update((entries) => entries.add(result));
+    return result;
+  }
+
+  @override
+  Future<bool> containsNotebook(
+    NotebookFolder folder,
+    StoredNotebook notebook,
+  ) async {
+    if (folder.backendId != id || notebook.backendId != id) return false;
+    return disk.notebookInFolder(folder.id, notebook.id);
+  }
+
   static const _key = 'localSavedNotebooks';
   static final changes = ValueNotifier<int>(0);
   static Future<void>? _pending;
@@ -156,7 +245,37 @@ class InternalNameConflict implements Exception {
 }
 
 /// App-private notebooks. A small manifest atomically publishes immutable blobs.
-class InternalNotebookStorage implements NotebookStorage {
+class InternalNotebookStorage
+    implements NotebookStorage, NotebookDeletion, NotebookTransfer {
+  @override
+  bool canDelete(StoredNotebook notebook) =>
+      !kIsWeb && notebook.backendId == id;
+  @override
+  Future<NotebookFolder?> parentOf(StoredNotebook notebook) async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    return NotebookFolder(id, '');
+  }
+
+  @override
+  Future<StoredNotebook?> createInFolder({
+    required NotebookFolder folder,
+    required String name,
+    required Uint8List bytes,
+    required List<NotebookPdfResource> pdfs,
+  }) {
+    if (folder.backendId != id || folder.id != '')
+      throw ArgumentError('Wrong folder');
+    validateNotebookName(name);
+    return save(bytes: bytes, name: name, pdfs: pdfs);
+  }
+
+  @override
+  Future<bool> containsNotebook(
+    NotebookFolder folder,
+    StoredNotebook notebook,
+  ) async =>
+      folder.backendId == id && folder.id == '' && notebook.backendId == id;
+
   static final changes = ValueNotifier<int>(0);
   static Future<void> _pending = Future.value();
   @visibleForTesting
@@ -372,6 +491,7 @@ class InternalNotebookStorage implements NotebookStorage {
   /// Forget only removes a recent entry; deleting Internal content is explicit.
   @override
   Future<void> forget(StoredNotebook notebook) async {}
+  @override
   Future<void> delete(StoredNotebook notebook) => _enqueue(() async {
     if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
     await internal_disk.deleteInternalFile('${notebook.id}.json');

@@ -11,7 +11,55 @@ import 'package:xournalpp/src/NotebookStorage.dart';
 import 'package:xournalpp/src/NotebookMetadata.dart';
 
 /// WebDAV storage rooted at the configured folder.
-class NextcloudStorage implements NotebookStorage {
+class NextcloudStorage
+    implements NotebookStorage, NotebookDeletion, NotebookTransfer {
+  @override
+  Future<bool> containsNotebook(
+    NotebookFolder folder,
+    StoredNotebook notebook,
+  ) async =>
+      folder.backendId == id &&
+      notebook.backendId == id &&
+      (await parentOf(notebook))?.id == folder.id;
+
+  @override
+  bool canDelete(StoredNotebook notebook) => notebook.backendId == id;
+  @override
+  Future<void> delete(StoredNotebook notebook) async {
+    if (!canDelete(notebook)) throw ArgumentError('Wrong storage backend');
+    final parts = _notebookParts(notebook.id);
+    final response = await _request(
+      'DELETE',
+      _url(parts.last, folder: parts.sublist(0, parts.length - 1)),
+    );
+    _check(response, 'Could not delete notebook', [200, 204]);
+    _manifests.remove(notebook.id);
+  }
+
+  @override
+  Future<NotebookFolder?> parentOf(StoredNotebook notebook) async {
+    if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
+    final parts = _notebookParts(notebook.id);
+    return NotebookFolder(id, jsonEncode(parts.sublist(0, parts.length - 1)));
+  }
+
+  @override
+  Future<StoredNotebook?> createInFolder({
+    required NotebookFolder folder,
+    required String name,
+    required Uint8List bytes,
+    required List<NotebookPdfResource> pdfs,
+  }) {
+    if (folder.backendId != id) throw ArgumentError('Wrong storage backend');
+    validateNotebookName(name);
+    return save(
+      bytes: bytes,
+      name: name,
+      pdfs: pdfs,
+      destinationFolder: List<String>.from(jsonDecode(folder.id) as List),
+    );
+  }
+
   @override
   String? get iconAsset => 'assets/storage/nextcloud.png';
   NextcloudStorage(this.credentials, this.folder, {http.Client? client})

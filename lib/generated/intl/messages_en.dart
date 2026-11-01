@@ -104,6 +104,9 @@ class MessageLookup extends MessageLookupByLibrary {
           "Could not find the background PDF. Select a new one",
         ),
     "delete": MessageLookupByLibrary.simpleMessage("Delete"),
+    "deleteNotebookConfirm": MessageLookupByLibrary.simpleMessage(
+      "Delete this notebook from its storage? This cannot be undone here. Recovery drafts will be kept. Google Drive notebooks will be moved to Trash.",
+    ),
     "deletePage": MessageLookupByLibrary.simpleMessage("Delete page"),
     "dotted": MessageLookupByLibrary.simpleMessage("Dotted"),
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
@@ -147,6 +150,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Local storage saves the notebook file only. PDF backgrounds kept in Internal storage may need to be located again. Keep the Internal notebook or retain the original PDFs separately.",
     ),
     "internalStorage": MessageLookupByLibrary.simpleMessage("Internal"),
+    "invalidNotebookName": MessageLookupByLibrary.simpleMessage(
+      "Enter a notebook name without slashes or control characters.",
+    ),
     "latexNotImplemented": MessageLookupByLibrary.simpleMessage(
       "LaTeX (not implemented)",
     ),
@@ -158,7 +164,20 @@ class MessageLookup extends MessageLookupByLibrary {
       "official mobile app",
     ),
     "move": MessageLookupByLibrary.simpleMessage("Move"),
+    "moveCopyRetained": MessageLookupByLibrary.simpleMessage(
+      "Copy saved, but the original could not be deleted. Both copies were kept. Saving now updates the destination.",
+    ),
+    "moveFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not move notebook. The original was kept. Choose another name if the destination already exists.",
+    ),
+    "moveNeedsFreshSource": MessageLookupByLibrary.simpleMessage(
+      "Reopen the original from its storage before moving or renaming a cached notebook.",
+    ),
     "movePage": MessageLookupByLibrary.simpleMessage("Move page"),
+    "movePdfUnsafe": MessageLookupByLibrary.simpleMessage(
+      "This notebook uses stored PDF backgrounds. Moving it to Local storage would leave those backgrounds dependent on the original storage. Use Save As instead.",
+    ),
+    "moveTo": MessageLookupByLibrary.simpleMessage("Move to…"),
     "newDocument": MessageLookupByLibrary.simpleMessage("New Document"),
     "newFile": MessageLookupByLibrary.simpleMessage("New"),
     "newNotebook": MessageLookupByLibrary.simpleMessage("New notebook"),
@@ -200,6 +219,10 @@ class MessageLookup extends MessageLookupByLibrary {
       " (not implemented)",
     ),
     "notWorkingYet": MessageLookupByLibrary.simpleMessage("Not working yet."),
+    "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
+      "The storage provider is unavailable or does not support this action.",
+    ),
+    "notebookMoved": MessageLookupByLibrary.simpleMessage("Notebook moved."),
     "okay": MessageLookupByLibrary.simpleMessage("Okay"),
     "open": MessageLookupByLibrary.simpleMessage("Open"),
     "openNavigation": MessageLookupByLibrary.simpleMessage("Open navigation"),
@@ -229,6 +252,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "removeSavedNotebook": MessageLookupByLibrary.simpleMessage(
       "Remove from saved notebooks",
     ),
+    "renameFolderAccess": MessageLookupByLibrary.simpleMessage(
+      "Select the notebook’s current folder to allow renaming. Choosing a different folder will cancel the operation.",
+    ),
+    "renameNotebook": MessageLookupByLibrary.simpleMessage("Rename"),
+    "retrySourceDelete": MessageLookupByLibrary.simpleMessage("Retry deletion"),
     "ruled": MessageLookupByLibrary.simpleMessage("Ruled"),
     "save": MessageLookupByLibrary.simpleMessage("Save"),
     "saveAs": MessageLookupByLibrary.simpleMessage("Save as..."),

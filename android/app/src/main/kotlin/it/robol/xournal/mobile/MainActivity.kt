@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.DocumentsContract
 import android.view.InputDevice
 import android.view.MotionEvent
 import io.flutter.embedding.android.FlutterActivity
@@ -14,6 +15,9 @@ import java.io.FileOutputStream
 class MainActivity: FlutterActivity() {
     private val storageChannel = "it.robol.xournal.mobile/storage"
     private val intentChannel = "it.robol.xournal.mobile/intent"
+    private val folderRequestCode = 49318
+    private var pendingFolderResult: MethodChannel.Result? = null
+    private var pendingFolderSource: Uri? = null
     private val createDocumentRequestCode = 49317
     private var pendingCreateResult: MethodChannel.Result? = null
     private var pendingCreateBytes: ByteArray? = null
@@ -43,6 +47,51 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, storageChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "notebookInFolder" -> {
+                        try {
+                            result.success(notebookInFolder(Uri.parse(call.argument<String>("folder")!!), Uri.parse(call.argument<String>("source")!!)))
+                        } catch (error: Exception) { result.error("folder_failed", error.message, null) }
+                    }
+                    "deleteDocument" -> {
+                        try {
+                            val uri = Uri.parse(call.argument<String>("uri")!!)
+                            check(DocumentsContract.deleteDocument(contentResolver, uri)) { "Provider refused deletion" }
+                            result.success(null)
+                        } catch (error: Exception) { result.error("delete_failed", error.message, null) }
+                    }
+                    "chooseNotebookFolder" -> {
+                        if (pendingFolderResult != null) {
+                            result.error("already_active", "Folder selection is active", null)
+                        } else {
+                            pendingFolderResult = result
+                            pendingFolderSource = call.argument<String>("source")?.let { Uri.parse(it) }
+                            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                            }, folderRequestCode)
+                        }
+                    }
+                    "createNotebookInFolder" -> {
+                        try {
+                            val tree = Uri.parse(call.argument<String>("folder")!!)
+                            val name = call.argument<String>("name")!!
+                            require(name.isNotBlank() && !name.contains('/') && !name.contains('\\'))
+                            val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+                            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+                            contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                                while (cursor.moveToNext()) check(cursor.getString(0) != name) { "Name already exists; choose another name" }
+                            } ?: error("Could not list folder")
+                            val uri = DocumentsContract.createDocument(contentResolver, parent, "application/x-xopp", name) ?: error("Could not create notebook")
+                            try {
+                                // Providers may choose a unique name if another writer races us.
+                                check(displayName(uri) == name) { "Provider changed the name; choose another name" }
+                                contentResolver.openOutputStream(uri, "wt")?.use { it.write(call.argument<ByteArray>("bytes")!!) } ?: error("Could not write notebook")
+                                result.success(uri.toString())
+                            } catch (error: Exception) {
+                                DocumentsContract.deleteDocument(contentResolver, uri)
+                                throw error
+                            }
+                        } catch (error: Exception) { result.error("create_failed", error.message, null) }
+                    }
                     "createDocument" -> {
                         val fileName = call.argument<String>("fileName") ?: "xournalpp-export"
                         val bytes = call.argument<ByteArray>("bytes")
@@ -164,6 +213,19 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    // Document IDs are provider-owned: enumerate immediate children rather than
+    // guessing a parent by splitting an opaque ID or trusting a picked folder.
+    private fun notebookInFolder(tree: Uri, source: Uri): Boolean {
+        if (tree.authority != source.authority) return false
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val sourceId = DocumentsContract.getDocumentId(source)
+        var found = false
+        contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { cursor ->
+            while (cursor.moveToNext()) if (cursor.getString(0) == sourceId) found = true
+        } ?: error("Could not list folder")
+        return found
+    }
+
     private fun createDocument(fileName: String, bytes: ByteArray, result: MethodChannel.Result) {
         if (pendingCreateResult != null) {
             result.error("already_active", "A document save operation is already active.", null)
@@ -245,6 +307,24 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == folderRequestCode) {
+            val result = pendingFolderResult
+            val source = pendingFolderSource
+            pendingFolderResult = null
+            pendingFolderSource = null
+            val tree = data?.data
+            if (resultCode != Activity.RESULT_OK || tree == null) { result?.success(null); return }
+            try {
+                val flags = (data.flags) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                contentResolver.takePersistableUriPermission(tree, flags)
+                check(flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0) { "Folder is not writable" }
+                if (source != null) {
+                    check(notebookInFolder(tree, source)) { "Select the notebook's current folder" }
+                }
+                result?.success(tree.toString())
+            } catch (error: Exception) { result?.error("folder_failed", error.message, null) }
+            return
+        }
         if (requestCode == createDocumentRequestCode) {
             handleCreateDocumentResult(resultCode, data)
             return
