@@ -96,6 +96,7 @@ class PdfBackgroundRenderService {
        _cacheWriter = cacheWriter ?? _writeDefaultCacheFile,
        _sourceRevision = sourceRevision ?? localFileRevision,
        _sourceReader = sourceReader ?? readFileBytes,
+       _ownsDefaultSourceReader = sourceReader == null,
        _maxMemoryEntries = maxMemoryEntries,
        _maxMemoryBytes = maxMemoryBytes,
        _maxOpenDocuments = maxOpenDocuments;
@@ -106,6 +107,9 @@ class PdfBackgroundRenderService {
   final PdfBackgroundCacheWriter _cacheWriter;
   final PdfBackgroundSourceRevision _sourceRevision;
   final PdfBackgroundSourceReader _sourceReader;
+  // The platform reader allocates a fresh buffer; injected readers may hand
+  // out mutable shared arrays and still require defensive copying.
+  final bool _ownsDefaultSourceReader;
   final int _maxMemoryEntries;
   final int _maxMemoryBytes;
   int _memoryBytes = 0;
@@ -150,6 +154,9 @@ class PdfBackgroundRenderService {
       }
       checkCurrent();
       if (bytes != null) {
+        if (_ownsDefaultSourceReader) {
+          return _sourceFromOwnedBytes(bytes, path: path);
+        }
         return sourceForPickedFile(XppPickedFile(bytes, path: path));
       }
     }
@@ -165,14 +172,35 @@ class PdfBackgroundRenderService {
     final path = pdf.path;
     // Identity and native rendering must refer to exactly the same snapshot,
     // even if the path is replaced or the caller mutates its input later.
-    final bytes = Uint8List.fromList(pdf.toUint8List()).asUnmodifiableView();
+    final bytes = Uint8List.fromList(pdf.toUint8List());
+    return _sourceFromOwnedBytes(
+      bytes,
+      path: path,
+      fileName: pdf.fileName,
+      memoryIdentity: identityHashCode(pdf),
+    );
+  }
+
+  PdfBackgroundRenderSource _sourceFromOwnedBytes(
+    Uint8List bytes, {
+    String? path,
+    String? fileName,
+    int? memoryIdentity,
+  }) {
+    // asUnmodifiableView is zero-copy. Safe only for a buffer that this
+    // service exclusively owns and does not expose in mutable form.
+    final immutable = bytes.asUnmodifiableView();
     final sourceName =
-        path ?? pdf.fileName ?? 'memory:${identityHashCode(pdf)}';
+        path ??
+        fileName ??
+        'memory:${memoryIdentity ?? identityHashCode(bytes)}';
     return _registerSource(
       PdfBackgroundRenderSource(
-        id: stablePdfHash('${path ?? "memory"}:${pdfBytesSignature(bytes)}'),
+        id: stablePdfHash(
+          '${path ?? "memory"}:${pdfBytesSignature(immutable)}',
+        ),
         sourceName: sourceName,
-        bytes: bytes,
+        bytes: immutable,
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,22 @@ import 'package:xournalpp/src/PdfBackgroundRenderService.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  test('default file reader returns a frozen PDF snapshot', () async {
+    final directory = await Directory.systemTemp.createTemp('pdf-source-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/source.pdf');
+    await file.writeAsBytes([1, 2, 3]);
+    final service = _testService();
+    addTearDown(service.dispose);
+    final source = await service.sourceForPath(
+      file.path,
+      fallback: () async => throw StateError('Unexpected file picker'),
+    );
+    await file.writeAsBytes([4, 5, 6]);
+    expect(source.bytes, [1, 2, 3]);
+    expect(() => source.bytes![0] = 9, throwsUnsupportedError);
+  });
+
   test(
     'queued rendering uses immutable bytes even after the path is replaced',
     () async {

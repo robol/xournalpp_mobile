@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -35,8 +36,57 @@ Future<String> writeFileBytes(String path, Uint8List bytes) async {
   }
 
   final file = await _writableFileForPath(path);
-  await file.writeAsBytes(bytes);
+  await _replaceFileFromTemporary(file, bytes);
   return file.path;
+}
+
+/// A same-directory replacement avoids truncating a previous notebook if
+/// encoding, writing or flushing the new bytes fails. Windows additionally
+/// retains the previous file as a backup during the rename window.
+Future<void> _replaceFileFromTemporary(File target, Uint8List bytes) async {
+  if (await FileSystemEntity.type(target.path, followLinks: false) ==
+      FileSystemEntityType.link) {
+    target = File(await target.resolveSymbolicLinks());
+  }
+  final suffix = Random.secure().nextInt(0x7fffffff).toRadixString(16);
+  final temporary = File('${target.path}.xournalpp-saving-$suffix');
+  await temporary.create(exclusive: true);
+  try {
+    final original = await target.stat();
+    if (original.type != FileSystemEntityType.notFound) {
+      final temporaryStat = await temporary.stat();
+      if (original.type != FileSystemEntityType.file ||
+          (original.mode & 0x1ff) != (temporaryStat.mode & 0x1ff)) {
+        throw FileSystemException(
+          'Cannot safely replace a file with different permissions',
+          target.path,
+        );
+      }
+    }
+    await temporary.writeAsBytes(bytes, flush: true);
+    if (!Platform.isWindows || !await target.exists()) {
+      await temporary.rename(target.path);
+      return;
+    }
+
+    // On Windows rename cannot replace an existing target. Keep the backup
+    // if either rename fails; never delete the only remaining good copy.
+    final backup = File('${target.path}.xournalpp-backup-$suffix');
+    await target.rename(backup.path);
+    try {
+      await temporary.rename(target.path);
+    } catch (_) {
+      if (!await target.exists()) await backup.rename(target.path);
+      rethrow;
+    }
+    try {
+      await backup.delete();
+    } catch (_) {
+      // A leftover backup is safer than failing a successful save.
+    }
+  } finally {
+    if (await temporary.exists()) await temporary.delete();
+  }
 }
 
 Future<String?> saveDocumentBytes(Uint8List bytes, {String? fileName}) async {

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,10 +55,10 @@ void main() {
     },
   );
 
-  test('cancelled import retains the no-file-selected error', () async {
+  test('U4: cancelled import is distinguishable from file errors', () async {
     await expectLater(
       XppPickedFile.importFromStorage(type: XppFilePickType.custom),
-      throwsUnsupportedError,
+      throwsA(isA<XppFilePickerCancelled>()),
     );
   });
 
@@ -81,6 +82,49 @@ void main() {
     expect(await file.exportToStorage(), picker.savedUri.toString());
     picker.savedUri = null;
     expect(await file.exportToStorage(), isNull);
+  });
+
+  test(
+    'R2: replacing a local notebook leaves only a complete destination',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('xpp-replace-');
+      addTearDown(() => dir.delete(recursive: true));
+      final path = '${dir.path}/notes.xopp';
+      await File(path).writeAsBytes([1, 2, 3]);
+      final saved = XppPickedFile(Uint8List.fromList([4, 5, 6, 7]));
+      expect(await saved.saveToPath(path: path), path);
+      expect(await File(path).readAsBytes(), [4, 5, 6, 7]);
+      expect(await dir.list().length, 1);
+    },
+  );
+  test(
+    'replacement follows symbolic links without replacing the link',
+    () async {
+      if (Platform.isWindows) return;
+      final dir = await Directory.systemTemp.createTemp('xpp-link-');
+      addTearDown(() => dir.delete(recursive: true));
+      final target = File('${dir.path}/target.xopp');
+      await target.writeAsBytes([1]);
+      final link = Link('${dir.path}/link.xopp');
+      await link.create(target.path);
+      await XppPickedFile(Uint8List.fromList([2])).saveToPath(path: link.path);
+      expect(await link.exists(), isTrue);
+      expect(await target.readAsBytes(), [2]);
+    },
+  );
+  test('replacement refuses to weaken restrictive permissions', () async {
+    if (Platform.isWindows) return;
+    final dir = await Directory.systemTemp.createTemp('xpp-mode-');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/private.xopp');
+    await file.writeAsBytes([1]);
+    final chmod = await Process.run('chmod', ['600', file.path]);
+    expect(chmod.exitCode, 0);
+    await expectLater(
+      XppPickedFile(Uint8List.fromList([2])).saveToPath(path: file.path),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(await file.readAsBytes(), [1]);
   });
 }
 

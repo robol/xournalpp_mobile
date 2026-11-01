@@ -18,6 +18,8 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Verify localization catalogs
+        run: python3 tool/check_l10n.py
       - name: Install dependencies
         run: flutter pub get
       - name: Static analysis

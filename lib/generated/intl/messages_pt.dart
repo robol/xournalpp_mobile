@@ -62,6 +62,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
       "Faltam alguns fundos PDF.",
     ),
+    "cacheLimit": MessageLookupByLibrary.simpleMessage(
+      "Limite de armazenamento da cache",
+    ),
+    "cacheLimitDescription": MessageLookupByLibrary.simpleMessage(
+      "As cópias confirmadas mais antigas são removidas primeiro. As cópias de trabalho não guardadas são excluídas da limpeza automática da cache.",
+    ),
     "cacheOpen": MessageLookupByLibrary.simpleMessage("Abrir cópia em cache"),
     "cacheOpenTitle": MessageLookupByLibrary.simpleMessage(
       "Abrir cópia em cache?",
@@ -85,6 +91,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
       "A cache local não está disponível.",
     ),
+    "cacheUnlimited": MessageLookupByLibrary.simpleMessage("Sem limite"),
     "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
       "Inclui alterações não guardadas",
     ),
@@ -116,6 +123,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
       "Clique duplo para mudar.",
     ),
+    "drawStylusOnly": MessageLookupByLibrary.simpleMessage(
+      "Desenhar apenas com caneta",
+    ),
     "dropFilesToOpen": MessageLookupByLibrary.simpleMessage(
       "Arraste arquivos para abrir",
     ),
@@ -127,7 +137,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Erro abrindo arquivo",
     ),
+    "exportingPdf": MessageLookupByLibrary.simpleMessage("A exportar PDF..."),
+    "fingerPanHint": MessageLookupByLibrary.simpleMessage(
+      "O toque com o dedo desloca a página em vez de desenhar.",
+    ),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Esquecer"),
+    "forkedBy": MessageLookupByLibrary.simpleMessage(
+      "Este código foi derivado por xournalpp_mobile do trabalho de @TheOneWithTheBraid e baseia-se sobretudo nele.",
+    ),
     "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
       "Conectar ao Google Drive",
     ),
@@ -231,9 +248,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
       "O provedor de armazenamento está indisponível ou não suporta esta ação.",
     ),
+    "notebookEditConflict": MessageLookupByLibrary.simpleMessage(
+      "O caderno foi alterado no armazenamento. Guarde uma cópia separada para preservar ambas as versões.",
+    ),
     "notebookMoved": MessageLookupByLibrary.simpleMessage("Caderno movido."),
     "okay": MessageLookupByLibrary.simpleMessage("Okay"),
     "open": MessageLookupByLibrary.simpleMessage("Abrir"),
+    "openNavigation": MessageLookupByLibrary.simpleMessage("Abrir navegação"),
     "opening": MessageLookupByLibrary.simpleMessage("Abrindo"),
     "openingFile": MessageLookupByLibrary.simpleMessage("Abrindo arquivo"),
     "pageBackground": MessageLookupByLibrary.simpleMessage(
@@ -283,6 +304,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Definir título do documento.",
     ),
+    "settingsTitle": MessageLookupByLibrary.simpleMessage("Configurações"),
     "shapeCircle": MessageLookupByLibrary.simpleMessage("Círculo"),
     "shapeEllipse": MessageLookupByLibrary.simpleMessage("Elipse"),
     "shapeLine": MessageLookupByLibrary.simpleMessage("Linha"),
@@ -300,6 +322,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Reduzir pontos em novos traços para poupar espaço.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Código Fonte"),
+    "stillSaving": MessageLookupByLibrary.simpleMessage(
+      "Ainda a guardar. Mantenha o caderno aberto até a operação terminar.",
+    ),
     "storageBackend": MessageLookupByLibrary.simpleMessage(
       "Local de armazenamento",
     ),
@@ -339,6 +364,9 @@ class MessageLookup extends MessageLookupByLibrary {
           "Infelizmente houve um erro ao salvar este arquivo.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("utilizado"),
+    "whiteoutEraserNotImplemented": MessageLookupByLibrary.simpleMessage(
+      "Borracha branca (ainda não implementada)",
+    ),
     "workspaceCreate": MessageLookupByLibrary.simpleMessage("Criar caderno"),
     "workspaceEmptyDescription": MessageLookupByLibrary.simpleMessage(
       "Crie seu primeiro caderno ou abra um documento existente para começar.",

@@ -68,6 +68,8 @@ class NextcloudStorage
   final List<String> folder;
   final http.Client _client;
   final Map<String, Map<String, String>> _manifests = {};
+  final Map<String, String> _readDigests = {};
+  final Map<String, String> _readEtags = {};
 
   @override
   String get id =>
@@ -213,6 +215,14 @@ class NextcloudStorage
     }
     xml.rootElement.setAttribute('xournalpp-mobile-pdf-map', manifestName);
     final updated = const GZipEncoder().encode(utf8.encode(xml.toXmlString()));
+    if (existing != null && _readDigests.containsKey(existing.id)) {
+      final remote = await _request('GET', _url(filename, folder: parent));
+      _check(remote, 'Could not verify current notebook', [200]);
+      if (sha256.convert(remote.bodyBytes).toString() !=
+          _readDigests[existing.id]) {
+        throw NotebookEditConflict(existing.id);
+      }
+    }
     final temporary = '.xournalpp-upload-${sha256.convert(updated)}.tmp';
     final upload = await _request(
       'PUT',
@@ -220,19 +230,27 @@ class NextcloudStorage
       body: updated,
     );
     _check(upload, 'Could not upload notebook', [200, 201, 204]);
+    final destinationUri = _url(filename, folder: parent);
+    final knownEtag = existing == null ? null : _readEtags[existing.id];
     final move = await _request(
       'MOVE',
       _url(temporary, folder: parent),
       headers: {
-        'Destination': _url(filename, folder: parent).toString(),
+        'Destination': destinationUri.toString(),
         'Overwrite': existing == null ? 'F' : 'T',
+        if (knownEtag != null) 'If': '<$destinationUri> ([$knownEtag])',
       },
     );
     if (move.statusCode == 412 && existing == null) {
       throw NextcloudNameConflict(filename, notebookId);
     }
+    if (move.statusCode == 412 && existing != null) {
+      throw NotebookEditConflict(existing.id);
+    }
     _check(move, 'Could not publish notebook', [201, 204]);
     _manifests[notebookId] = mappings;
+    _readDigests[notebookId] = sha256.convert(updated).toString();
+    _readEtags.remove(notebookId);
     return StoredNotebook(backendId: id, id: notebookId, name: name);
   }
 
@@ -244,6 +262,9 @@ class NextcloudStorage
     final response = await _request('GET', _url(parts.last, folder: parent));
     _check(response, 'Could not read notebook', [200]);
     final bytes = response.bodyBytes;
+    _readDigests[notebook.id] = sha256.convert(bytes).toString();
+    final etag = response.headers['etag'];
+    if (etag != null) _readEtags[notebook.id] = etag;
     final name = notebookRootAttribute(bytes, 'xournalpp-mobile-pdf-map');
     if (name != null) {
       if (!RegExp(r'^\.xournalpp-map-[0-9a-f]{64}\.json$').hasMatch(name))

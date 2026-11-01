@@ -53,7 +53,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       checkRouteTheme(find.byType(SettingsPage));
-      expect(find.byType(SwitchListTile), findsNWidgets(4));
+      await tester.scrollUntilVisible(
+        find.widgetWithText(SwitchListTile, 'Simplify strokes'),
+        200,
+      );
+      expect(
+        find.widgetWithText(SwitchListTile, 'Simplify strokes'),
+        findsOneWidget,
+      );
       navigator.pop();
       await tester.pumpAndSettle();
       navigator.push(

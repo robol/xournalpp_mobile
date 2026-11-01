@@ -141,6 +141,31 @@ void main() {
     expect((await cache.load(notebook))!.bytes, [2]);
   });
   test(
+    'cache budget evicts clean baselines but retains working edits',
+    () async {
+      const old = StoredNotebook(backendId: 'remote', id: 'old', name: 'Old');
+      const dirty = StoredNotebook(
+        backendId: 'remote',
+        id: 'dirty',
+        name: 'Draft',
+      );
+      await record(1, ref: old);
+      await record(3, ref: dirty);
+      await record(2, ref: dirty, dirty: true);
+      await cache.setLimitMb(1);
+      await cache.record(
+        notebook: notebook,
+        bytes: Uint8List(1024 * 1024),
+        pdfs: {},
+        references: [],
+        dirty: false,
+      );
+      expect(await cache.load(old), isNull);
+      expect((await cache.load(dirty))!.bytes, [2]);
+      expect(await cache.load(notebook), isNull);
+    },
+  );
+  test(
     'failed manifest publication preserves previous complete snapshot',
     () async {
       await record(1);

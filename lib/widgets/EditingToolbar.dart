@@ -47,6 +47,7 @@ class EditingToolBar extends StatefulWidget {
 
 class EditingToolBarState extends State<EditingToolBar> {
   PointerDeviceKind? currentDevice;
+  final ScrollController _scrollController = ScrollController();
 
   double width = 2.5;
 
@@ -144,13 +145,27 @@ class EditingToolBarState extends State<EditingToolBar> {
 
   Widget _buildToolLayout(List<Widget> tools) {
     if (widget.compact) {
-      return Row(mainAxisSize: MainAxisSize.min, children: tools);
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(mainAxisSize: MainAxisSize.min, children: tools),
+      );
     }
-    return ListView(
-      shrinkWrap: true,
-      scrollDirection: Axis.horizontal,
-      children: tools,
+    return Scrollbar(
+      controller: _scrollController,
+      thumbVisibility: true,
+      child: ListView(
+        controller: _scrollController,
+        shrinkWrap: true,
+        scrollDirection: Axis.horizontal,
+        children: tools,
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void saveDeviceTable() => widget.onNewDeviceMap!(widget.deviceMap);
@@ -245,7 +260,22 @@ class EditingToolBarState extends State<EditingToolBar> {
       );
     }
     return InkWell(
-      onLongPress: () {},
+      onLongPress: enableSettings
+          ? () {
+              setState(() => setTool(tool));
+              saveDeviceTable();
+              showCustomDialog(context);
+            }
+          : tool == EditingTool.SHAPE
+          ? () => showDialog(
+              context: context,
+              builder: (_) => ShapeSettingsDialog(
+                settings: widget.shapeSettings,
+                onChanged: (settings) =>
+                    widget.onShapeSettingsChanged?.call(settings),
+              ),
+            )
+          : null,
       child: FloatingActionButton(
         heroTag: tool,
         onPressed: selectTool,

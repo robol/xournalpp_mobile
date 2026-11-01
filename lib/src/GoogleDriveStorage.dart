@@ -73,6 +73,7 @@ class GoogleDriveStorage
   final Future<String> Function() accessToken;
   final http.Client _client;
   final Map<String, Map<String, String>> _manifests = {};
+  final Map<String, String> _readDigests = {};
   static const _folderMime = 'application/vnd.google-apps.folder';
   static const _manifestAttribute = 'xournalpp-mobile-drive-map';
 
@@ -306,6 +307,12 @@ class GoogleDriveStorage
     final updated = Uint8List.fromList(
       const GZipEncoder().encode(utf8.encode(xml.toXmlString())),
     );
+    if (existing != null && _readDigests.containsKey(existing.id)) {
+      final remote = await _download(existing.id);
+      if (sha256.convert(remote).toString() != _readDigests[existing.id]) {
+        throw NotebookEditConflict(existing.id);
+      }
+    }
     final fileId = await _upload(
       filename,
       parent,
@@ -313,6 +320,7 @@ class GoogleDriveStorage
       existingId: existing?.id,
     );
     _manifests[fileId] = mapping;
+    _readDigests[fileId] = sha256.convert(updated).toString();
     return StoredNotebook(backendId: id, id: fileId, name: name);
   }
 
@@ -320,6 +328,7 @@ class GoogleDriveStorage
   Future<Uint8List> readNotebook(StoredNotebook notebook) async {
     if (notebook.backendId != id) throw ArgumentError('Wrong storage backend');
     final bytes = await _download(notebook.id);
+    _readDigests[notebook.id] = sha256.convert(bytes).toString();
     final manifestId = notebookRootAttribute(bytes, _manifestAttribute);
     _manifests[notebook.id] = manifestId == null
         ? {}

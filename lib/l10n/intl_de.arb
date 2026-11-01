@@ -169,5 +169,16 @@
   "retrySourceDelete": "Löschen wiederholen",
   "notebookActionUnavailable": "Der Speicheranbieter ist nicht verfügbar oder unterstützt diese Aktion nicht.",
   "moveNeedsFreshSource": "Öffnen Sie das Original erneut aus seinem Speicher, bevor Sie ein zwischengespeichertes Notizbuch verschieben oder umbenennen.",
-  "invalidNotebookName": "Geben Sie einen Notizbuchnamen ohne Schrägstriche oder Steuerzeichen ein."
+  "invalidNotebookName": "Geben Sie einen Notizbuchnamen ohne Schrägstriche oder Steuerzeichen ein.",
+  "settingsTitle": "Einstellungen",
+  "drawStylusOnly": "Nur mit Stift zeichnen",
+  "fingerPanHint": "Mit dem Finger wird die Seite verschoben statt gezeichnet.",
+  "cacheLimit": "Speicherlimit für den Cache",
+  "cacheLimitDescription": "Alte bestätigte Kopien werden zuerst entfernt. Ungespeicherte Arbeitskopien sind von der automatischen Cache-Bereinigung ausgenommen.",
+  "cacheUnlimited": "Unbegrenzt",
+  "exportingPdf": "PDF wird exportiert...",
+  "stillSaving": "Speichern läuft noch. Lassen Sie das Notizbuch geöffnet, bis der Vorgang abgeschlossen ist.",
+  "notebookEditConflict": "Das Notizbuch wurde im Speicher geändert. Speichern Sie eine separate Kopie, um beide Versionen zu bewahren.",
+  "forkedBy": "Dieser Code wurde von xournalpp_mobile aus der Arbeit von @TheOneWithTheBraid abgeleitet und basiert weitgehend darauf.",
+  "whiteoutEraserNotImplemented": "Weißer Radierer (noch nicht implementiert)"
 }

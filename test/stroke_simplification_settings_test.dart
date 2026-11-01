@@ -26,6 +26,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     final tile = find.widgetWithText(SwitchListTile, 'Simplify strokes');
+    await tester.scrollUntilVisible(tile, 200);
     expect(tester.widget<SwitchListTile>(tile).value, isTrue);
     await tester.tap(tile);
     await tester.pumpAndSettle();
@@ -48,6 +49,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(tile, 200);
     expect(tester.widget<SwitchListTile>(tile).value, isFalse);
   });
 

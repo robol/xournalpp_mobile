@@ -430,18 +430,38 @@ class _CanvasPageState extends State<CanvasPage>
 
   Widget _buildEditor(BuildContext context, {required bool embedToolbar}) {
     final editingToolbar = _buildEditingToolbar(compact: embedToolbar);
-    final documentTitle = Tooltip(
-      message:
-          '${widget.file?.title ?? S.of(context).newDocument}\n'
-          '${S.of(context).doubleTapToChange}',
-      child: GestureDetector(
-        onDoubleTap: _showTitleDialog,
-        child: Text(
-          widget.file?.title ?? S.of(context).newDocument,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+    final documentTitle = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Tooltip(
+            message:
+                '${_file?.title ?? S.of(context).newDocument}\n'
+                '${S.of(context).doubleTapToChange}',
+            child: GestureDetector(
+              onDoubleTap: _showTitleDialog,
+              child: Text(
+                _file?.title ?? S.of(context).newDocument,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
         ),
-      ),
+        if (_isDirty)
+          Tooltip(
+            message: S.of(context).cacheUnsaved,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.circle, color: Colors.orange, size: 8),
+            ),
+          ),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          tooltip: S.of(context).renameNotebook,
+          onPressed: _showTitleDialog,
+        ),
+      ],
     );
     return PopScope(
       canPop:
@@ -531,7 +551,7 @@ class _CanvasPageState extends State<CanvasPage>
                   children: [
                     Expanded(child: documentTitle),
                     const SizedBox(width: 16),
-                    editingToolbar,
+                    Expanded(flex: 3, child: editingToolbar),
                   ],
                 )
               : documentTitle,
@@ -2128,9 +2148,13 @@ class _CanvasPageState extends State<CanvasPage>
       currentPage++;
       _selectedContents = {};
       _invalidateEraserIndex();
-      _file!.pages!.insert(
-        currentPage,
-        XppPage.empty(background: Colors.white),
+      final inserted = XppPage.empty(background: Colors.white);
+      _file!.pages!.insert(currentPage, inserted);
+      _undoStack.add(
+        _UndoEntry.custom(inserted, () {
+          _file!.pages!.remove(inserted);
+          currentPage = currentPage.clamp(0, _file!.pages!.length - 1).toInt();
+        }),
       );
       _clearPageWidgetKeys();
       _markDirty();
@@ -2141,23 +2165,56 @@ class _CanvasPageState extends State<CanvasPage>
     });
   }
 
-  void _deletePage(int pageIndex) {
+  Future<void> _deletePage(int pageIndex) async {
     if (_transferring) return;
+    final target = _file!.pages![pageIndex];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(S.of(dialogContext).deletePage),
+        content: Text(
+          'Delete page ${pageIndex + 1}? You can undo this action.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(S.of(dialogContext).cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(S.of(dialogContext).deletePage),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true || _transferring) return;
+    pageIndex = _file!.pages!.indexOf(target);
+    if (pageIndex < 0) return;
     setState(() {
-      _file!.pages!.removeAt(pageIndex);
+      final pages = _file!.pages!;
+      final removed = pages.removeAt(pageIndex);
+      XppPage? placeholder;
       _selectedContents = {};
       _invalidateEraserIndex();
-      if (currentPage >= _file!.pages!.length) {
-        currentPage = _file!.pages!.length - 1;
+      if (currentPage >= pages.length) {
+        currentPage = pages.length - 1;
       }
-      if (_file!.pages!.isEmpty) {
-        _file!.pages!.add(XppPage.empty(background: Colors.white));
+      if (pages.isEmpty) {
+        placeholder = XppPage.empty(background: Colors.white);
+        pages.add(placeholder);
         currentPage = 0;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(S.of(context).thereWereNoMorePagesWeAddedOne)),
         );
       }
+      _undoStack.add(
+        _UndoEntry.custom(removed, () {
+          if (placeholder != null) pages.remove(placeholder);
+          pages.insert(pageIndex.clamp(0, pages.length).toInt(), removed);
+          currentPage = pageIndex;
+        }),
+      );
       _clearPageWidgetKeys();
       _markDirty();
     });
@@ -2181,9 +2238,16 @@ class _CanvasPageState extends State<CanvasPage>
       builder: (context) => ToolBoxBottomSheet(
         onPdfBackgroundChange: _changeBackgroundWithPdf,
         onBackgroundChange: (newBackground) {
-          newBackground.size = _file!.pages![currentPage].pageSize;
+          final page = _file!.pages![currentPage];
+          final oldBackground = page.background;
+          newBackground.size = page.pageSize;
           setState(() {
-            _file!.pages![currentPage].background = newBackground;
+            page.background = newBackground;
+            _undoStack.add(
+              _UndoEntry.custom(page, () {
+                page.background = oldBackground;
+              }),
+            );
             _markDirty();
           });
         },
@@ -2192,22 +2256,78 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   Future<void> _changeBackgroundWithPdf() async {
-    final pdf = await XppPickedFile.importFromStorage(
-      type: XppFilePickType.custom,
-      fileExtension: 'pdf',
+    final targetPage = _file!.pages![currentPage];
+    final placement = await showDialog<_PdfBackgroundPlacement>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Import PDF backgrounds'),
+        content: const Text(
+          'Insert the PDF as new pages, or replace existing page backgrounds '
+          'starting at the current page?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(S.of(dialogContext).cancel),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _PdfBackgroundPlacement.replace),
+            child: const Text('Replace backgrounds'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _PdfBackgroundPlacement.insert),
+            child: const Text('Insert new pages'),
+          ),
+        ],
+      ),
     );
+    if (!mounted || placement == null) return;
+    late final XppPickedFile pdf;
+    try {
+      pdf = await XppPickedFile.importFromStorage(
+        type: XppFilePickType.custom,
+        fileExtension: 'pdf',
+      );
+    } on XppFilePickerCancelled {
+      return;
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
+      );
+      return;
+    }
     if (!mounted) return;
 
     await runWithLoadingFileDialog(context, () async {
       final pageSizes = await pdfPageSizes(pdf);
       final pdfPath = pdf.path ?? await pdf.saveToTemporaryPath();
       if (!mounted) return;
+      final targetIndex = _file!.pages!.indexOf(targetPage);
+      if (targetIndex < 0 || _transferring) return;
 
       setState(() {
+        final pages = _file!.pages!;
+        final previousPage = targetIndex;
+        final previousBackgrounds = <XppPage, XppBackground?>{};
+        final previousSizes = <XppPage, XppPageSize?>{};
+        final insertedPages = <XppPage>[];
         for (var i = 0; i < pageSizes.length; i++) {
-          final page = i < _file!.pages!.length
-              ? _file!.pages![i]
+          final index = placement == _PdfBackgroundPlacement.insert
+              ? previousPage + 1 + i
+              : previousPage + i;
+          final reuse =
+              placement == _PdfBackgroundPlacement.replace &&
+              index < pages.length;
+          final page = reuse
+              ? pages[index]
               : XppPage.empty(background: Colors.white);
+          if (reuse) {
+            previousBackgrounds[page] = page.background;
+            previousSizes[page] = page.pageSize;
+          }
           resizePageForPdfIfEmpty(page, pageSizes[i]);
           page.background = XppBackgroundPdf(
             onUnavailable: (context, String? path) async =>
@@ -2215,9 +2335,25 @@ class _CanvasPageState extends State<CanvasPage>
             filename: pdfPath,
             page: i + 1,
           );
-          if (i >= _file!.pages!.length) {
-            _file!.pages!.add(page);
+          if (!reuse) {
+            pages.insert(index.clamp(0, pages.length).toInt(), page);
+            insertedPages.add(page);
           }
+        }
+
+        _undoStack.add(
+          _UndoEntry.custom(pages[previousPage], () {
+            for (final entry in previousBackgrounds.entries) {
+              entry.key.background = entry.value;
+              entry.key.pageSize = previousSizes[entry.key];
+            }
+            for (final page in insertedPages) pages.remove(page);
+            currentPage = previousPage;
+          }),
+        );
+        if (placement == _PdfBackgroundPlacement.insert &&
+            insertedPages.isNotEmpty) {
+          currentPage = previousPage + 1;
         }
 
         if (currentPage >= _file!.pages!.length) {
@@ -2241,6 +2377,20 @@ class _CanvasPageState extends State<CanvasPage>
     if (_undoStack.isEmpty) return;
 
     final undoEntry = _undoStack.removeLast();
+    if (undoEntry.customUndo != null) {
+      setState(() {
+        undoEntry.customUndo!();
+        _selectedContents = {};
+        _invalidateEraserIndex();
+        _clearPageWidgetKeys();
+        _markDirty();
+      });
+      _rememberCurrentPage();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollToPage(currentPage, animated: false);
+      });
+      return;
+    }
     setState(() {
       for (final operation in undoEntry.operations.reversed) {
         operation.undo();
@@ -2806,7 +2956,7 @@ class _CanvasPageState extends State<CanvasPage>
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 16),
-            Text('Exporting PDF...'),
+            Text(S.of(context).exportingPdf),
           ],
         ),
         duration: Duration(days: 999),
@@ -2876,7 +3026,7 @@ class _CanvasPageState extends State<CanvasPage>
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 16),
-            Text('Exporting PDF...'),
+            Text(S.of(context).exportingPdf),
           ],
         ),
         duration: Duration(days: 999),
@@ -3161,6 +3311,29 @@ class _CanvasPageState extends State<CanvasPage>
       }
       final bytes = await _file!.toUint8ListAsync();
       if (!mounted) return false;
+      if (!kIsWeb &&
+          !saveAs &&
+          storage is LocalNotebookStorage &&
+          filePath != null) {
+        final draft = RecoveryDraft(
+          id: _draftId,
+          bytes: bytes,
+          page: currentPage,
+          title: _file!.title,
+          originalPath: filePath,
+          backendId: storage.id,
+          cachedOrigin: _file!.openedFromCache,
+        );
+        final checkpoint = _draftWork.then((_) async {
+          if (_draftRevision > savedRevision) return;
+          await DraftRecovery.save(draft);
+          _hasRecoveryDraft = true;
+          _draftRevision = savedRevision;
+        });
+        _draftWork = checkpoint.catchError((Object _) {});
+        await checkpoint;
+        if (!mounted) return false;
+      }
       if (cacheToken != null)
         unawaited(
           _file!.cacheSnapshot(
@@ -3231,11 +3404,9 @@ class _CanvasPageState extends State<CanvasPage>
             if (!mounted || !savingFile) return;
             savingSnackBar.close();
             savingSnackBar = scaffoldMessenger.showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Still saving. Keep this notebook open until the operation finishes.',
-                ),
-                duration: Duration(days: 999),
+              SnackBar(
+                content: Text(S.of(context).stillSaving),
+                duration: const Duration(days: 999),
               ),
             );
           });
@@ -3380,7 +3551,9 @@ class _CanvasPageState extends State<CanvasPage>
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
+            error is NotebookEditConflict
+                ? S.of(context).notebookEditConflict
+                : S.of(context).unfortunatelyThereWasAnErrorSavingThisFile,
           ),
         ),
       );
@@ -3505,13 +3678,19 @@ class _CanvasPageState extends State<CanvasPage>
 
 class _UndoEntry {
   final List<_LayerOperation> operations;
+  final VoidCallback? customUndo;
+  final XppPage page;
 
-  _UndoEntry(this.operations);
+  _UndoEntry(this.operations) : customUndo = null, page = operations.first.page;
 
-  XppPage get page => operations.first.page;
+  _UndoEntry.custom(this.page, VoidCallback undo)
+    : operations = const [],
+      customUndo = undo;
 }
 
 enum _UnsavedChangesAction { save, discard, cancel }
+
+enum _PdfBackgroundPlacement { insert, replace }
 
 class _TopScrollPosition {
   const _TopScrollPosition({required this.pageIndex, required this.pageY});

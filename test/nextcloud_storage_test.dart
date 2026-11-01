@@ -216,4 +216,65 @@ void main() {
       expect(objects['Example.xopp'], previous);
     },
   );
+
+  test(
+    'rejects a cloud overwrite after another editor changed the file',
+    () async {
+      final initial = Uint8List.fromList(
+        const GZipEncoder().encode(utf8.encode('<xournal/>')),
+      );
+      final changed = Uint8List.fromList(
+        const GZipEncoder().encode(
+          utf8.encode('<xournal><title>other</title></xournal>'),
+        ),
+      );
+      final files = <String, Uint8List>{'Notes.xopp': initial};
+      var moves = 0;
+      final storage = NextcloudStorage(
+        NextcloudCredentials(
+          server: NextcloudConnection.serverUri('https://cloud.example'),
+          username: 'user',
+          password: 'secret',
+        ),
+        ['Notes'],
+        client: MockClient((request) async {
+          final name = request.url.pathSegments.last;
+          if (request.method == 'GET') {
+            return http.Response.bytes(
+              files[name]!,
+              200,
+              headers: {'etag': '"v1"'},
+            );
+          }
+          if (request.method == 'PUT') {
+            files[name] = request.bodyBytes;
+            return http.Response('', 201);
+          }
+          if (request.method == 'MOVE') {
+            moves++;
+            return http.Response('', 201);
+          }
+          throw StateError('Unexpected ${request.method}');
+        }),
+      );
+      final notebook = StoredNotebook(
+        backendId: storage.id,
+        id: 'Notes.xopp',
+        name: 'Notes',
+      );
+      await storage.readNotebook(notebook);
+      files['Notes.xopp'] = changed;
+      await expectLater(
+        storage.save(
+          bytes: initial,
+          name: 'Notes',
+          existing: notebook,
+          pdfs: [],
+        ),
+        throwsA(isA<NotebookEditConflict>()),
+      );
+      expect(files['Notes.xopp'], changed);
+      expect(moves, 0);
+    },
+  );
 }

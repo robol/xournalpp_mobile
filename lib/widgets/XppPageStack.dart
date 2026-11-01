@@ -200,8 +200,8 @@ class XppPageStackState extends State<XppPageStack>
     );
 
     final pageSize = page!.pageSize!.toSize();
-    const buttonSize = 32.0;
-    const buttonGap = 6.0;
+    const buttonSize = 48.0;
+    const buttonGap = 8.0;
     final actionCount = [
       widget.onDuplicateSelection,
       widget.onDeleteSelection,
@@ -253,14 +253,14 @@ class XppPageStackState extends State<XppPageStack>
     required VoidCallback onPressed,
   }) {
     return SizedBox.square(
-      dimension: 32,
+      dimension: 48,
       child: Material(
         color: color,
         shape: const CircleBorder(),
         elevation: 3,
         child: IconButton(
           padding: EdgeInsets.zero,
-          iconSize: 18,
+          iconSize: 24,
           color: Colors.white,
           tooltip: tooltip,
           icon: Icon(icon),

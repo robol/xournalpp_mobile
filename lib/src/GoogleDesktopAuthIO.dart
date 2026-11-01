@@ -20,9 +20,6 @@ class GoogleDesktopAuth {
     http.Client? client,
     FlutterSecureStorage? storage,
     this.clientId = const String.fromEnvironment('GOOGLE_DESKTOP_CLIENT_ID'),
-    this.clientSecret = const String.fromEnvironment(
-      'GOOGLE_DESKTOP_CLIENT_SECRET',
-    ),
     Future<bool> Function(Uri)? launch,
   }) : _client = client ?? http.Client(),
        _storage = storage ?? const FlutterSecureStorage(),
@@ -34,7 +31,6 @@ class GoogleDesktopAuth {
   final FlutterSecureStorage _storage;
   final Future<bool> Function(Uri) _launch;
   final String clientId;
-  final String clientSecret;
   String? _token;
   DateTime? _expires;
   String? _tokenAccount;
@@ -51,7 +47,7 @@ class GoogleDesktopAuth {
   }
 
   Future<DesktopGoogleAccount> connect() async {
-    if (clientId.isEmpty || clientSecret.isEmpty) {
+    if (clientId.isEmpty) {
       throw StateError(
         'Google desktop OAuth configuration is missing from this build.',
       );
@@ -181,7 +177,7 @@ class GoogleDesktopAuth {
   Future<Map<String, dynamic>> _exchange(Map<String, String> fields) async {
     final response = await _client.post(
       Uri.parse(_tokenUrl),
-      body: {...fields, 'client_id': clientId, 'client_secret': clientSecret},
+      body: {...fields, 'client_id': clientId},
     );
     if (response.statusCode != 200)
       throw StateError(

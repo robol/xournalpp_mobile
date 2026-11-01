@@ -28,6 +28,9 @@ void main() {
       SwitchListTile,
       'Stylus pressure sensitivity',
     );
+    await tester.scrollUntilVisible(tile, 200);
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
+    await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(tile).value, isTrue);
     await tester.tap(tile);
     await tester.pumpAndSettle();
@@ -39,6 +42,9 @@ void main() {
     );
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(settings());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(tile, 200);
+    await tester.drag(find.byType(ListView), const Offset(0, -200));
     await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(tile).value, isFalse);
   });

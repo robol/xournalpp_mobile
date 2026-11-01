@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic interoperability sample, not exported by desktop Xournal++. -->
+<xournal creator="Xournal++ Mobile fixture" fileversion="4">
+  <title>Interoperability sample</title>
+  <page width="595" height="842">
+    <background type="pixmap" domain="attach" filename="background.png" custom="preserve-this"/>
+    <layer>
+      <text font="Sans" size="12" x="20" y="40" color="#000000">A &amp; B &amp;amp; &lt; C Ω</text>
+      <stroke tool="pen" color="#000000" width="1 2">10 20 30 40</stroke>
+    </layer>
+    <layer>
+      <text font="Sans" size="12" x="25" y="60" color="#ff0000">Second layer</text>
+    </layer>
+  </page>
+  <page width="595" height="842">
+    <background type="pdf" domain="attach" filename="source.pdf" pageno="1"/>
+    <layer/>
+  </page>
+  <page width="595" height="842">
+    <background type="pdf" domain="clone" pageno="2"/>
+    <layer/>
+  </page>
+</xournal>

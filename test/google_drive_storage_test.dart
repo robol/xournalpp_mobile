@@ -263,4 +263,57 @@ void main() {
     await reopened.readNotebook(saved);
     expect(await reopened.readPdf(saved, 'source.pdf'), pdf);
   });
+
+  test('rejects a Drive overwrite after the opened revision changed', () async {
+    final initial = Uint8List.fromList(
+      const GZipEncoder().encode(utf8.encode('<xournal/>')),
+    );
+    final changed = Uint8List.fromList(
+      const GZipEncoder().encode(
+        utf8.encode('<xournal><title>other</title></xournal>'),
+      ),
+    );
+    var remote = initial;
+    var patches = 0;
+    final storage = GoogleDriveStorage(
+      accountId: 'account',
+      folderId: 'root',
+      accessToken: () async => 'token',
+      client: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.queryParameters['alt'] == 'media') {
+          return http.Response.bytes(remote, 200);
+        }
+        if (request.method == 'GET' &&
+            request.url.path == '/drive/v3/files/file-id') {
+          return http.Response('{"parents":["root"]}', 200);
+        }
+        if (request.method == 'GET' && request.url.path == '/drive/v3/files') {
+          return http.Response('{"files":[]}', 200);
+        }
+        if (request.method == 'POST' &&
+            request.url.path == '/upload/drive/v3/files') {
+          return http.Response('{"id":"manifest-id"}', 200);
+        }
+        if (request.method == 'PATCH') {
+          patches++;
+          return http.Response('{}', 200);
+        }
+        throw StateError('Unexpected ${request.method} ${request.url}');
+      }),
+    );
+    final notebook = StoredNotebook(
+      backendId: storage.id,
+      id: 'file-id',
+      name: 'Notes',
+    );
+    await storage.readNotebook(notebook);
+    remote = changed;
+    await expectLater(
+      storage.save(bytes: initial, name: 'Notes', existing: notebook, pdfs: []),
+      throwsA(isA<NotebookEditConflict>()),
+    );
+    expect(remote, changed);
+    expect(patches, 0);
+  });
 }

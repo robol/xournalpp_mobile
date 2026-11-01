@@ -64,6 +64,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
       "Einige PDF-Hintergründe fehlen.",
     ),
+    "cacheLimit": MessageLookupByLibrary.simpleMessage(
+      "Speicherlimit für den Cache",
+    ),
+    "cacheLimitDescription": MessageLookupByLibrary.simpleMessage(
+      "Alte bestätigte Kopien werden zuerst entfernt. Ungespeicherte Arbeitskopien sind von der automatischen Cache-Bereinigung ausgenommen.",
+    ),
     "cacheOpen": MessageLookupByLibrary.simpleMessage(
       "Zwischengespeicherte Kopie öffnen",
     ),
@@ -89,6 +95,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
       "Der lokale Cache ist nicht verfügbar.",
     ),
+    "cacheUnlimited": MessageLookupByLibrary.simpleMessage("Unbegrenzt"),
     "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
       "Enthält ungespeicherte Änderungen",
     ),
@@ -120,6 +127,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
       "Doppelt tippen zum Ändern.",
     ),
+    "drawStylusOnly": MessageLookupByLibrary.simpleMessage(
+      "Nur mit Stift zeichnen",
+    ),
     "dropFilesToOpen": MessageLookupByLibrary.simpleMessage(
       "Dateien zum Öffnen hier hinschieben",
     ),
@@ -131,7 +141,16 @@ class MessageLookup extends MessageLookupByLibrary {
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Fehler beim Öffnen der Datei",
     ),
+    "exportingPdf": MessageLookupByLibrary.simpleMessage(
+      "PDF wird exportiert...",
+    ),
+    "fingerPanHint": MessageLookupByLibrary.simpleMessage(
+      "Mit dem Finger wird die Seite verschoben statt gezeichnet.",
+    ),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Entfernen"),
+    "forkedBy": MessageLookupByLibrary.simpleMessage(
+      "Dieser Code wurde von xournalpp_mobile aus der Arbeit von @TheOneWithTheBraid abgeleitet und basiert weitgehend darauf.",
+    ),
     "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
       "Google Drive verbinden",
     ),
@@ -237,6 +256,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
       "Der Speicheranbieter ist nicht verfügbar oder unterstützt diese Aktion nicht.",
     ),
+    "notebookEditConflict": MessageLookupByLibrary.simpleMessage(
+      "Das Notizbuch wurde im Speicher geändert. Speichern Sie eine separate Kopie, um beide Versionen zu bewahren.",
+    ),
     "notebookMoved": MessageLookupByLibrary.simpleMessage(
       "Notizbuch verschoben.",
     ),
@@ -294,6 +316,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Titel des Dokuments ändern",
     ),
+    "settingsTitle": MessageLookupByLibrary.simpleMessage("Einstellungen"),
     "shapeCircle": MessageLookupByLibrary.simpleMessage("Kreis"),
     "shapeEllipse": MessageLookupByLibrary.simpleMessage("Ellipse"),
     "shapeLine": MessageLookupByLibrary.simpleMessage("Linie"),
@@ -309,6 +332,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Punkte in neuen Stiftstrichen reduzieren, um Speicherplatz zu sparen.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Quellcode"),
+    "stillSaving": MessageLookupByLibrary.simpleMessage(
+      "Speichern läuft noch. Lassen Sie das Notizbuch geöffnet, bis der Vorgang abgeschlossen ist.",
+    ),
     "storageBackend": MessageLookupByLibrary.simpleMessage("Speicherort"),
     "storageFolderOnboarding": MessageLookupByLibrary.simpleMessage(
       "Nach dem Verbinden wählen Sie einen Ordner aus. Dokumente müssen sich in diesem Ordner oder seinen Unterordnern befinden.",
@@ -346,6 +372,9 @@ class MessageLookup extends MessageLookupByLibrary {
           "Leider gab es ein Problem beim Speichern dieser Datei.",
         ),
     "used": MessageLookupByLibrary.simpleMessage("verwendet"),
+    "whiteoutEraserNotImplemented": MessageLookupByLibrary.simpleMessage(
+      "Weißer Radierer (noch nicht implementiert)",
+    ),
     "workspaceCreate": MessageLookupByLibrary.simpleMessage(
       "Notizbuch erstellen",
     ),

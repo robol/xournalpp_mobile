@@ -68,6 +68,41 @@ The tests cover document parsing, drawing and input, PDF export and rendering, s
 - PDF export does not support every source PDF or notebook configuration, including encrypted or rotated source pages, repeated source pages, and notebooks backed by multiple source PDFs.
 - Some editing features and platform integrations remain incomplete or differ between platforms.
 
+### Feature availability (current beta)
+
+| Feature | Android | iOS | Web | Linux/Windows | macOS |
+| --- | --- | --- | --- | --- | --- |
+| Xournal notebook editor | Yes | Yes | Yes | Yes | Yes |
+| Internal app-private notebook storage | Yes | Yes | No | Yes | Yes |
+| Android Storage Access Framework document providers | Yes | N/A | N/A | N/A | N/A |
+| Nextcloud WebDAV settings | Yes | Yes | No | Yes | Yes |
+| Google Drive sign-in | Yes | Not yet | Not yet | Yes | Not yet |
+| PDF background import/export | Yes | Yes | Platform-dependent | Yes | Yes |
+
+The desktop runners and storage-provider behavior are not yet tested equally on
+every target. For important notes, keep an independently accessible `.xopp`
+backup until you have verified opening and saving on your own device/provider.
+
+### Important storage and recovery behavior
+
+- **Internal** notebooks and copied PDF resources are app-private. Removing the
+  app's data also removes those originals. Use **Save As → Local storage** to
+  create a separate notebook file, and keep any referenced PDFs separately.
+- **Local storage** notebooks may contain external PDF background paths; moving
+  just the `.xopp` does not necessarily transfer the PDF. Relink it if asked.
+- **Cloud storage** is not a collaborative real-time editor. Avoid editing the
+  same notebook on two devices at once until version conflict handling is
+  available. To protect a divergent version, save under a new filename.
+- The recovery dialog restores a recent unsaved notebook checkpoint after a
+  restart. If a destination fails while saving, keep the recovery draft and
+  save a second copy before discarding it.
+
+For contributors, run `flutter analyze` and `flutter test` locally and test
+Android document providers with cancellation, revoked permissions, and
+interrupted writes. See [AGENTS.md](AGENTS.md) for code ownership and test
+targets. Cloud access requires configuring the corresponding OAuth or
+Nextcloud account in Settings; never commit app passwords or client secrets.
+
 ## Contributing
 
 Contributions are welcome, especially for compatibility, reliability, performance, accessibility, platform integrations, tests, and documentation. Before making large changes, please open an issue or discussion so the direction can be coordinated.

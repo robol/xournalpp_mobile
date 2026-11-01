@@ -301,17 +301,26 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   );
 
   Future<void> _importPdf() async {
-    final _file = await runWithLoadingFileDialog(context, () async {
-      final pdf = await XppPickedFile.importFromStorage(
-        type: XppFilePickType.custom,
-        fileExtension: 'pdf',
+    try {
+      final file = await runWithLoadingFileDialog(context, () async {
+        final pdf = await XppPickedFile.importFromStorage(
+          type: XppFilePickType.custom,
+          fileExtension: 'pdf',
+        );
+        return XppFile.importPdf(pdf: pdf);
+      });
+      if (!context.mounted) return;
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (c) => CanvasPage(file: file)));
+    } on XppFilePickerCancelled {
+      // Closing the system picker is not an application error.
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
       );
-      return XppFile.importPdf(pdf: pdf);
-    }); // TODO `.pdf`
-    if (!context.mounted) return;
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (c) => CanvasPage(file: _file)));
+    }
   }
 
   @override

@@ -13,6 +13,44 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 
 void main() {
+  testWidgets('U1: deleted pages can be restored with Undo', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(800, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final first = XppPage.empty();
+    final second = XppPage.empty();
+    final document = XppFile(title: 'Pages', pages: [first, second]);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.delegate.supportedLocales,
+        home: CanvasPage(file: document),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_forever).first);
+    await tester.pumpAndSettle();
+    expect(document.pages, [first, second]);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(TextButton),
+          )
+          .last,
+    );
+    await tester.pumpAndSettle();
+    expect(document.pages, [second]);
+    await tester.tap(find.byTooltip('Undo last operation'));
+    await tester.pumpAndSettle();
+    expect(document.pages, [first, second]);
+  });
+
   testWidgets('new marks go to the last layer', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.binding.setSurfaceSize(const Size(800, 700));

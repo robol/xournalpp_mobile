@@ -168,5 +168,17 @@
   "retrySourceDelete": "Tentar excluir novamente",
   "notebookActionUnavailable": "O provedor de armazenamento está indisponível ou não suporta esta ação.",
   "moveNeedsFreshSource": "Reabra o original do armazenamento antes de mover ou renomear um caderno em cache.",
-  "invalidNotebookName": "Digite um nome de caderno sem barras ou caracteres de controle."
+  "invalidNotebookName": "Digite um nome de caderno sem barras ou caracteres de controle.",
+  "settingsTitle": "Configurações",
+  "drawStylusOnly": "Desenhar apenas com caneta",
+  "fingerPanHint": "O toque com o dedo desloca a página em vez de desenhar.",
+  "cacheLimit": "Limite de armazenamento da cache",
+  "cacheLimitDescription": "As cópias confirmadas mais antigas são removidas primeiro. As cópias de trabalho não guardadas são excluídas da limpeza automática da cache.",
+  "cacheUnlimited": "Sem limite",
+  "exportingPdf": "A exportar PDF...",
+  "stillSaving": "Ainda a guardar. Mantenha o caderno aberto até a operação terminar.",
+  "notebookEditConflict": "O caderno foi alterado no armazenamento. Guarde uma cópia separada para preservar ambas as versões.",
+  "forkedBy": "Este código foi derivado por xournalpp_mobile do trabalho de @TheOneWithTheBraid e baseia-se sobretudo nele.",
+  "whiteoutEraserNotImplemented": "Borracha branca (ainda não implementada)",
+  "openNavigation": "Abrir navegação"
 }

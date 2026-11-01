@@ -32,7 +32,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: MainDrawer(),
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(S.of(context).settingsTitle)),
       body: ListView(
         children: [
           if (!kIsWeb) const NotebookCacheSettings(),
@@ -107,13 +107,13 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
           SwitchListTile(
-            title: const Text(
-              'Draw with stylus only',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            title: Text(
+              S.of(context).drawStylusOnly,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: const Text(
-              'Finger touches pan the page instead of drawing.',
-              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 14),
+            subtitle: Text(
+              S.of(context).fingerPanHint,
+              style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14),
             ),
             value: _drawWithStylusOnly,
             onChanged: _setDrawWithStylusOnly,

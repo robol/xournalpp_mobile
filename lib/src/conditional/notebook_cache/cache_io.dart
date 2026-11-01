@@ -32,3 +32,8 @@ Future<void> deleteCacheFile(String key) async {
   final file = File('${(await _root()).path}/$key');
   if (await file.exists()) await file.delete();
 }
+
+Future<int> cacheFileSize(String key) async {
+  final file = File('${(await _root()).path}/$key');
+  return await file.exists() ? file.length() : 0;
+}

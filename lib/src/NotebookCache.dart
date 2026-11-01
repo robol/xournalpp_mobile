@@ -19,7 +19,12 @@ abstract interface class NotebookCachePersistence {
   Future<void> delete(String key);
 }
 
-class FileNotebookCachePersistence implements NotebookCachePersistence {
+abstract interface class SizedNotebookCachePersistence {
+  Future<int> fileSize(String key);
+}
+
+class FileNotebookCachePersistence
+    implements NotebookCachePersistence, SizedNotebookCachePersistence {
   @override
   Future<Uint8List?> read(String key) => disk.readCacheFile(key);
   @override
@@ -29,6 +34,8 @@ class FileNotebookCachePersistence implements NotebookCachePersistence {
   Future<List<String>> list() => disk.cacheFiles();
   @override
   Future<void> delete(String key) => disk.deleteCacheFile(key);
+  @override
+  Future<int> fileSize(String key) => disk.cacheFileSize(key);
 }
 
 class CachedNotebook {
@@ -85,6 +92,24 @@ class NotebookCache {
   int get removalSerial => _removalSerial;
   int get generation => _generation;
   static const _setting = 'notebookCache.enabled.v1';
+  static const _limitSetting = 'notebookCache.limitMb.v1';
+  static const defaultLimitMb = 512;
+  Future<int> get limitMb async =>
+      (await SharedPreferences.getInstance()).getInt(_limitSetting) ??
+      defaultLimitMb;
+  Future<void> setLimitMb(int value) async {
+    if (value < 0) throw ArgumentError.value(value, 'value');
+    if (!await (await SharedPreferences.getInstance()).setInt(
+      _limitSetting,
+      value,
+    ))
+      throw StateError('Could not save cache limit');
+    await _queue(() async {
+      await _trimCleanBaselines(value);
+      changes.value++;
+    });
+  }
+
   Future<bool> get enabled async =>
       !kIsWeb &&
       ((await SharedPreferences.getInstance()).getBool(_setting) ?? true);
@@ -211,6 +236,7 @@ class NotebookCache {
         Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
       );
       await _collect();
+      await _trimCleanBaselines(await limitMb);
       changes.value++;
     });
   }
@@ -255,6 +281,7 @@ class NotebookCache {
         Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
       );
       await _collect();
+      await _trimCleanBaselines(await limitMb);
       changes.value++;
     });
   }
@@ -337,13 +364,7 @@ class NotebookCache {
     result.sort((a, b) => b.modified!.compareTo(a.modified!));
     return result;
   });
-  Future<int> size() => _queue(() async {
-    var size = 0;
-    for (final key in await persistence.list()) {
-      size += (await persistence.read(key))?.length ?? 0;
-    }
-    return size;
-  });
+  Future<int> size() => _queue(_physicalSize);
   Future<void> remove(StoredNotebook notebook) {
     _removalSerial++;
     final key = _key(notebook);
@@ -387,6 +408,53 @@ class NotebookCache {
     for (final key in await persistence.list()) {
       if (key.endsWith('.blob') && !used.contains(key))
         await persistence.delete(key);
+    }
+  }
+
+  Future<int> _physicalSize() async {
+    var total = 0;
+    for (final key in await persistence.list()) {
+      final store = persistence;
+      total += store is SizedNotebookCachePersistence
+          ? await (store as SizedNotebookCachePersistence).fileSize(key)
+          : (await store.read(key))?.length ?? 0;
+    }
+    return total;
+  }
+
+  Future<void> _trimCleanBaselines(int maximumMb) async {
+    if (maximumMb == 0) return;
+    final maximumBytes = maximumMb * 1024 * 1024;
+    if (await _physicalSize() <= maximumBytes) return;
+    final candidates = <({String key, DateTime checkpoint, Map manifest})>[];
+    for (final key in await persistence.list()) {
+      if (!key.endsWith('.json')) continue;
+      try {
+        final bytes = await persistence.read(key);
+        if (bytes == null) continue;
+        final manifest = jsonDecode(utf8.decode(bytes)) as Map;
+        if (manifest['version'] != 1 || manifest['baseline'] is! Map) continue;
+        final baseline = manifest['baseline'] as Map;
+        final date = DateTime.tryParse(baseline['checkpoint'] as String? ?? '');
+        if (date != null)
+          candidates.add((key: key, checkpoint: date, manifest: manifest));
+      } catch (_) {
+        /* Preserve unrecognized manifests. */
+      }
+    }
+    candidates.sort((a, b) => a.checkpoint.compareTo(b.checkpoint));
+    for (final candidate in candidates) {
+      final manifest = candidate.manifest..remove('baseline');
+      if (manifest['working'] is Map) {
+        await persistence.write(
+          candidate.key,
+          Uint8List.fromList(utf8.encode(jsonEncode(manifest))),
+        );
+      } else {
+        await persistence.delete(candidate.key);
+      }
+      await _collect();
+      if (await _physicalSize() <= maximumBytes) return;
     }
   }
 }

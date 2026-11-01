@@ -12,6 +12,8 @@ import 'package:xournalpp/generated/l10n.dart';
 import 'package:xournalpp/pages/CanvasPage.dart';
 import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
+import 'package:xournalpp/src/conditional/draft_storage/draft_storage_io.dart'
+    as draft_storage;
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 
 class _BlockingRecentStore extends InMemorySharedPreferencesStore {
@@ -235,6 +237,8 @@ void main() {
     final directory = (await tester.runAsync(
       () => Directory.systemTemp.createTemp('xpp-save-test-'),
     ))!;
+    draft_storage.debugDraftDirectory = directory.path;
+    addTearDown(() => draft_storage.debugDraftDirectory = null);
     addTearDown(() => tester.runAsync(() => directory.delete(recursive: true)));
     final path = '${directory.path}/notes.xopp';
     await tester.pumpWidget(
@@ -260,10 +264,12 @@ void main() {
     await tester.runAsync(() async {
       saving = canvas.saveFile();
     });
-    await tester.pump();
-    await tester.runAsync(
-      () => store.started.future.timeout(const Duration(seconds: 10)),
-    );
+    for (var i = 0; i < 300 && !store.started.isCompleted; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
     expect(store.started.isCompleted, isTrue);
 
     await tester.tap(

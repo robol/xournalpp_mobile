@@ -171,5 +171,14 @@
   "retrySourceDelete": "Retry deletion",
   "notebookActionUnavailable": "The storage provider is unavailable or does not support this action.",
   "moveNeedsFreshSource": "Reopen the original from its storage before moving or renaming a cached notebook.",
-  "invalidNotebookName": "Enter a notebook name without slashes or control characters."
+  "invalidNotebookName": "Enter a notebook name without slashes or control characters.",
+  "settingsTitle": "Settings",
+  "drawStylusOnly": "Draw with stylus only",
+  "fingerPanHint": "Finger touches pan the page instead of drawing.",
+  "cacheLimit": "Cache storage limit",
+  "cacheLimitDescription": "Old confirmed copies are removed first. Unsaved working copies are excluded from automatic cache trimming.",
+  "cacheUnlimited": "Unlimited",
+  "exportingPdf": "Exporting PDF...",
+  "stillSaving": "Still saving. Keep this notebook open until the operation finishes.",
+  "notebookEditConflict": "The notebook changed in storage. Save a separate copy to protect both versions."
 }

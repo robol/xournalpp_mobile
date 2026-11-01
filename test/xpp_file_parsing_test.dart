@@ -135,6 +135,32 @@ void main() {
     );
   });
 
+  test('F6: malformed geometry and incomplete strokes fail on import', () async {
+    await expectLater(
+      parseNotebook(
+        XppPickedFile(
+          Uint8List.fromList(
+            GZipEncoder().encode(
+              utf8.encode(
+                '<xournal><page width="NaN" height="300">'
+                '<background type="solid" style="plain"/><layer/></page></xournal>',
+              ),
+            ),
+          ),
+        ),
+      ),
+      throwsFormatException,
+    );
+    await expectLater(
+      parseNotebook(
+        notebook(
+          '<stroke tool="pen" color="#000000" width="1">10 20 30</stroke>',
+        ),
+      ),
+      throwsFormatException,
+    );
+  });
+
   test('accepts an extensionless display name', () async {
     final file = await parseNotebook(notebook('', fileName: 'notes'));
     expect(file.title, 'notes');
@@ -157,7 +183,9 @@ void main() {
     expect(encoded, contains('D &amp;amp; &amp;lt; Ω'));
     expect(encoded, isNot(contains('&amp;amp;amp;')));
     final reloaded = await parseNotebook(
-      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(encoded)))),
+      XppPickedFile(
+        Uint8List.fromList(GZipEncoder().encode(utf8.encode(encoded))),
+      ),
     );
     expect(
       (reloaded.pages!.single.layers!.single.content!.single as XppText).text,
@@ -166,12 +194,17 @@ void main() {
   });
 
   test('unsupported image background survives an edit and save', () async {
-    const background = '<background type="pixmap" domain="attach" filename="background.png" custom="keep-me"/>';
+    const background =
+        '<background type="pixmap" domain="attach" filename="background.png" custom="keep-me"/>';
     final file = await parseNotebook(
       XppPickedFile(
-        Uint8List.fromList(GZipEncoder().encode(utf8.encode(
-          '<xournal><page width="200" height="300">$background<layer/></page></xournal>',
-        ))),
+        Uint8List.fromList(
+          GZipEncoder().encode(
+            utf8.encode(
+              '<xournal><page width="200" height="300">$background<layer/></page></xournal>',
+            ),
+          ),
+        ),
       ),
     );
     expect(file.pages!.single.background, isA<XppBackgroundPreserved>());
@@ -181,21 +214,33 @@ void main() {
 
   test('F2: dotted and attached PDF background attributes survive', () async {
     final dotted = await parseNotebook(
-      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(
-        '<xournal><page width="200" height="300">'
-        '<background type="solid" style="dotted" color="#ffffff"/>'
-        '<layer/></page></xournal>',
-      )))),
+      XppPickedFile(
+        Uint8List.fromList(
+          GZipEncoder().encode(
+            utf8.encode(
+              '<xournal><page width="200" height="300">'
+              '<background type="solid" style="dotted" color="#ffffff"/>'
+              '<layer/></page></xournal>',
+            ),
+          ),
+        ),
+      ),
     );
     expect(dotted.pages!.single.background, isA<XppBackgroundSolidDot>());
     expect(dotted.toXmlString(), contains('style="dotted"'));
 
     final attached = await parseNotebook(
-      XppPickedFile(Uint8List.fromList(GZipEncoder().encode(utf8.encode(
-        '<xournal><page width="200" height="300">'
-        '<background type="pdf" domain="attach" filename="file.pdf" pageno="1"/>'
-        '<layer/></page></xournal>',
-      )))),
+      XppPickedFile(
+        Uint8List.fromList(
+          GZipEncoder().encode(
+            utf8.encode(
+              '<xournal><page width="200" height="300">'
+              '<background type="pdf" domain="attach" filename="file.pdf" pageno="1"/>'
+              '<layer/></page></xournal>',
+            ),
+          ),
+        ),
+      ),
     );
     expect(
       (attached.pages!.single.background as XppBackgroundPdf).domain,

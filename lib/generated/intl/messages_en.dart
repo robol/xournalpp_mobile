@@ -60,6 +60,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheIncomplete": MessageLookupByLibrary.simpleMessage(
       "Some PDF backgrounds are missing.",
     ),
+    "cacheLimit": MessageLookupByLibrary.simpleMessage("Cache storage limit"),
+    "cacheLimitDescription": MessageLookupByLibrary.simpleMessage(
+      "Old confirmed copies are removed first. Unsaved working copies are excluded from automatic cache trimming.",
+    ),
     "cacheOpen": MessageLookupByLibrary.simpleMessage("Open cached copy"),
     "cacheOpenTitle": MessageLookupByLibrary.simpleMessage("Open cached copy?"),
     "cacheOverwrite": MessageLookupByLibrary.simpleMessage(
@@ -81,6 +85,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cacheUnavailable": MessageLookupByLibrary.simpleMessage(
       "The local cache is unavailable.",
     ),
+    "cacheUnlimited": MessageLookupByLibrary.simpleMessage("Unlimited"),
     "cacheUnsaved": MessageLookupByLibrary.simpleMessage(
       "Includes unsaved edits",
     ),
@@ -112,6 +117,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "doubleTapToChange": MessageLookupByLibrary.simpleMessage(
       "Double tap to change.",
     ),
+    "drawStylusOnly": MessageLookupByLibrary.simpleMessage(
+      "Draw with stylus only",
+    ),
     "dropFilesToOpen": MessageLookupByLibrary.simpleMessage(
       "Drop files to open",
     ),
@@ -122,6 +130,10 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "errorOpeningFile": MessageLookupByLibrary.simpleMessage(
       "Error opening file",
+    ),
+    "exportingPdf": MessageLookupByLibrary.simpleMessage("Exporting PDF..."),
+    "fingerPanHint": MessageLookupByLibrary.simpleMessage(
+      "Finger touches pan the page instead of drawing.",
     ),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Forget"),
     "forkedBy": MessageLookupByLibrary.simpleMessage(
@@ -222,6 +234,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "notebookActionUnavailable": MessageLookupByLibrary.simpleMessage(
       "The storage provider is unavailable or does not support this action.",
     ),
+    "notebookEditConflict": MessageLookupByLibrary.simpleMessage(
+      "The notebook changed in storage. Save a separate copy to protect both versions.",
+    ),
     "notebookMoved": MessageLookupByLibrary.simpleMessage("Notebook moved."),
     "okay": MessageLookupByLibrary.simpleMessage("Okay"),
     "open": MessageLookupByLibrary.simpleMessage("Open"),
@@ -269,6 +284,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Set document title",
     ),
+    "settingsTitle": MessageLookupByLibrary.simpleMessage("Settings"),
     "shapeCircle": MessageLookupByLibrary.simpleMessage("Circle"),
     "shapeEllipse": MessageLookupByLibrary.simpleMessage("Ellipse"),
     "shapeLine": MessageLookupByLibrary.simpleMessage("Line"),
@@ -282,6 +298,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Reduce points in newly drawn strokes to save space.",
     ),
     "sourceCode": MessageLookupByLibrary.simpleMessage("Source Code"),
+    "stillSaving": MessageLookupByLibrary.simpleMessage(
+      "Still saving. Keep this notebook open until the operation finishes.",
+    ),
     "storageBackend": MessageLookupByLibrary.simpleMessage("Storage location"),
     "storageFolderOnboarding": MessageLookupByLibrary.simpleMessage(
       "After connecting, you will choose a folder. Documents must be in that folder or its subfolders.",

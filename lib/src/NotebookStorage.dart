@@ -244,6 +244,15 @@ class InternalNameConflict implements Exception {
   final StoredNotebook notebook;
 }
 
+/// The provider's remote version changed after the notebook was opened.
+class NotebookEditConflict implements Exception {
+  const NotebookEditConflict(this.notebookId);
+  final String notebookId;
+  @override
+  String toString() =>
+      'The notebook changed in storage. Save a separate copy to protect both versions.';
+}
+
 /// App-private notebooks. A small manifest atomically publishes immutable blobs.
 class InternalNotebookStorage
     implements NotebookStorage, NotebookDeletion, NotebookTransfer {

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart';
 import 'NotebookStorage.dart';
 import 'NotebookCache.dart';
 import 'RecentFiles.dart';
@@ -13,10 +14,18 @@ enum NotebookTransferStatus {
 }
 
 class NotebookTransferResult {
-  const NotebookTransferResult(this.status, {this.notebook, this.error});
+  const NotebookTransferResult(
+    this.status, {
+    this.notebook,
+    this.error,
+    this.sourceDigest,
+  });
   final NotebookTransferStatus status;
   final StoredNotebook? notebook;
   final Object? error;
+
+  /// Version copied from the source; retrying deletion must verify it again.
+  final String? sourceDigest;
 }
 
 class UnsafeNotebookTransfer implements Exception {}
@@ -52,6 +61,7 @@ class NotebookTransferCoordinator {
     bool cachedOrigin = false,
   }) async {
     StoredNotebook? copy;
+    String? sourceDigest;
     try {
       if (kIsWeb ||
           cachedOrigin ||
@@ -81,7 +91,9 @@ class NotebookTransferCoordinator {
       }
       // Resolve every resource before creating anything or deleting the source.
       // This also ensures the source is accessible, even for an editor snapshot.
-      await source.readNotebook(original);
+      sourceDigest = sha256
+          .convert(await source.readNotebook(original))
+          .toString();
       final resources = <NotebookPdfResource>[];
       for (final pdf in pdfs) {
         final data = await pdf.read();
@@ -108,12 +120,16 @@ class NotebookTransferCoordinator {
       );
     }
     try {
+      // A second client may have edited the source while resources and the
+      // destination copy were being written. Never delete that newer version.
+      await _verifySourceUnchanged(source, original, sourceDigest);
       await (source as NotebookDeletion).delete(original);
     } catch (error) {
       return NotebookTransferResult(
         NotebookTransferStatus.copiedSourceRetained,
         notebook: copy,
         error: error,
+        sourceDigest: sourceDigest,
       );
     }
     await _afterMove(original, copy);
@@ -124,15 +140,28 @@ class NotebookTransferCoordinator {
   Future<void> retrySourceDeletion(
     NotebookStorage source,
     StoredNotebook original,
-    StoredNotebook destination,
-  ) async {
+    StoredNotebook destination, {
+    required String sourceDigest,
+  }) async {
     if (kIsWeb ||
         source is! NotebookDeletion ||
         !(source as NotebookDeletion).canDelete(original)) {
       throw UnsupportedError('Deletion unavailable');
     }
+    await _verifySourceUnchanged(source, original, sourceDigest);
     await (source as NotebookDeletion).delete(original);
     await _afterMove(original, destination);
+  }
+
+  Future<void> _verifySourceUnchanged(
+    NotebookStorage source,
+    StoredNotebook original,
+    String expectedDigest,
+  ) async {
+    final current = await source.readNotebook(original);
+    if (sha256.convert(current).toString() != expectedDigest) {
+      throw NotebookEditConflict(original.id);
+    }
   }
 
   Future<void> _afterMove(

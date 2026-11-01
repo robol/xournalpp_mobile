@@ -80,7 +80,6 @@ jobs:
           DRIVE_IOS_CLIENT: ${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
           DRIVE_MACOS_CLIENT: ${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
           DRIVE_DESKTOP_CLIENT: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID || secrets.GOOGLE_DESKTOP_CLIENT_ID }}
-          DRIVE_DESKTOP_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
           BUILD_TYPE: ${{ matrix.build-type }}
         run: |
           for client in "$DRIVE_WEB_CLIENT" "$DRIVE_IOS_CLIENT" "$DRIVE_MACOS_CLIENT" "$DRIVE_DESKTOP_CLIENT"; do
@@ -90,8 +89,8 @@ jobs:
             fi
           done
           if [[ "$BUILD_TYPE" == linux || "$BUILD_TYPE" == debian || "$BUILD_TYPE" == windows ]]; then
-            if [[ -z "$DRIVE_DESKTOP_CLIENT" || -z "$DRIVE_DESKTOP_SECRET" ]]; then
-              echo "Set GOOGLE_DESKTOP_CLIENT_ID (variable or secret) and GOOGLE_DESKTOP_CLIENT_SECRET (secret) for desktop builds." >&2
+            if [[ -z "$DRIVE_DESKTOP_CLIENT" ]]; then
+              echo "Set GOOGLE_DESKTOP_CLIENT_ID (variable or secret) for desktop builds." >&2
               exit 1
             fi
           fi
@@ -111,7 +110,6 @@ jobs:
             --dart-define=GOOGLE_IOS_CLIENT_ID=${{ vars.GOOGLE_IOS_CLIENT_ID || secrets.GOOGLE_IOS_CLIENT_ID }}
             --dart-define=GOOGLE_MACOS_CLIENT_ID=${{ vars.GOOGLE_MACOS_CLIENT_ID || secrets.GOOGLE_MACOS_CLIENT_ID }}
             --dart-define=GOOGLE_DESKTOP_CLIENT_ID=${{ vars.GOOGLE_DESKTOP_CLIENT_ID || secrets.GOOGLE_DESKTOP_CLIENT_ID }}
-            --dart-define=GOOGLE_DESKTOP_CLIENT_SECRET=${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
 
       - name: Build and upload signed APK release artifact
         if: matrix.build-type == 'apk'

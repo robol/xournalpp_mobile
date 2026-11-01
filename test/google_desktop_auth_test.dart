@@ -21,7 +21,6 @@ void main() {
       final calls = <http.Request>[];
       final auth = GoogleDesktopAuth(
         clientId: 'desktop-id',
-        clientSecret: 'desktop-secret',
         client: MockClient((request) async {
           calls.add(request);
           if (request.url.path == '/token') {
@@ -63,6 +62,7 @@ void main() {
       expect(account.id, 'account');
       expect(authorization!.queryParameters['code_challenge_method'], 'S256');
       expect(calls.first.bodyFields['code_verifier'], isNotEmpty);
+      expect(calls.first.bodyFields, isNot(contains('client_secret')));
       expect(await auth.accessToken(account), 'access');
       expect(
         await const FlutterSecureStorage().read(
@@ -82,7 +82,6 @@ void main() {
     var count = 0;
     final auth = GoogleDesktopAuth(
       clientId: 'id',
-      clientSecret: 'secret',
       client: MockClient((request) async {
         count++;
         expect(request.bodyFields['refresh_token'], 'refresh');
@@ -106,7 +105,6 @@ void main() {
     });
     final auth = GoogleDesktopAuth(
       clientId: 'id',
-      clientSecret: 'secret',
       client: MockClient((_) async => http.Response('{}', 400)),
     );
     final account = (await auth.restore('account'))!;

@@ -291,6 +291,7 @@ void showTransferResult(
                     source,
                     original,
                     result.notebook!,
+                    sourceDigest: result.sourceDigest!,
                   );
                   if (context.mounted)
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -304,6 +305,7 @@ void showTransferResult(
                         NotebookTransferStatus.copiedSourceRetained,
                         notebook: result.notebook,
                         error: error,
+                        sourceDigest: result.sourceDigest,
                       ),
                       source,
                       original,

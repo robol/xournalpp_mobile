@@ -25,6 +25,8 @@ class MemoryStorage
       failRead = false,
       permitted = true,
       cancel = false;
+  Uint8List sourceBytes = Uint8List.fromList([1]);
+  void Function()? onCopy;
   Uint8List? copied;
   @override
   String? get iconAsset => null;
@@ -40,7 +42,7 @@ class MemoryStorage
   Future<Uint8List> readNotebook(StoredNotebook notebook) async {
     events.add('read');
     if (failRead) throw StateError('offline');
-    return Uint8List.fromList([1]);
+    return Uint8List.fromList(sourceBytes);
   }
 
   @override
@@ -51,6 +53,7 @@ class MemoryStorage
     required List<NotebookPdfResource> pdfs,
   }) async {
     events.add('copy');
+    onCopy?.call();
     if (failCopy) throw StateError('conflict');
     for (final pdf in pdfs) {
       expect(await pdf.read(), [9]);
@@ -127,7 +130,7 @@ void main() {
         ],
       );
       expect(result.status, NotebookTransferStatus.moved);
-      expect(events, ['read', 'pdf', 'copy', 'delete']);
+      expect(events, ['read', 'pdf', 'copy', 'read', 'delete']);
       expect(target.copied, [5, 6]);
       expect(result.notebook!.id, 'new');
       final prefs = await SharedPreferences.getInstance();
@@ -207,10 +210,35 @@ void main() {
         source,
         original,
         result.notebook!,
+        sourceDigest: result.sourceDigest!,
       );
-      expect(events, ['read', 'copy', 'delete', 'delete']);
+      expect(events, ['read', 'copy', 'read', 'delete', 'read', 'delete']);
     },
   );
+  test('retains source if it changes while destination is created', () async {
+    target.onCopy = () => source.sourceBytes = Uint8List.fromList([9]);
+    final result = await move();
+    expect(result.status, NotebookTransferStatus.copiedSourceRetained);
+    expect(result.error, isA<NotebookEditConflict>());
+    expect(events, ['read', 'copy', 'read']);
+    expect(target.copied, [5, 6]);
+  });
+  test('retry never deletes a source that changed after copying', () async {
+    source.failDelete = true;
+    final result = await move();
+    source.failDelete = false;
+    source.sourceBytes = Uint8List.fromList([8]);
+    await expectLater(
+      NotebookTransferCoordinator().retrySourceDeletion(
+        source,
+        original,
+        result.notebook!,
+        sourceDigest: result.sourceDigest!,
+      ),
+      throwsA(isA<NotebookEditConflict>()),
+    );
+    expect(events.where((event) => event == 'delete'), hasLength(1));
+  });
   test('Local destination blocks provider-owned PDFs before IO', () async {
     final result = await NotebookTransferCoordinator().move(
       source: source,

@@ -1459,6 +1459,91 @@ class S {
       args: [],
     );
   }
+
+  /// `Settings`
+  String get settingsTitle {
+    return Intl.message('Settings', name: 'settingsTitle', desc: '', args: []);
+  }
+
+  /// `Draw with stylus only`
+  String get drawStylusOnly {
+    return Intl.message(
+      'Draw with stylus only',
+      name: 'drawStylusOnly',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Finger touches pan the page instead of drawing.`
+  String get fingerPanHint {
+    return Intl.message(
+      'Finger touches pan the page instead of drawing.',
+      name: 'fingerPanHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cache storage limit`
+  String get cacheLimit {
+    return Intl.message(
+      'Cache storage limit',
+      name: 'cacheLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Old confirmed copies are removed first. Unsaved working copies are excluded from automatic cache trimming.`
+  String get cacheLimitDescription {
+    return Intl.message(
+      'Old confirmed copies are removed first. Unsaved working copies are excluded from automatic cache trimming.',
+      name: 'cacheLimitDescription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unlimited`
+  String get cacheUnlimited {
+    return Intl.message(
+      'Unlimited',
+      name: 'cacheUnlimited',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Exporting PDF...`
+  String get exportingPdf {
+    return Intl.message(
+      'Exporting PDF...',
+      name: 'exportingPdf',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Still saving. Keep this notebook open until the operation finishes.`
+  String get stillSaving {
+    return Intl.message(
+      'Still saving. Keep this notebook open until the operation finishes.',
+      name: 'stillSaving',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The notebook changed in storage. Save a separate copy to protect both versions.`
+  String get notebookEditConflict {
+    return Intl.message(
+      'The notebook changed in storage. Save a separate copy to protect both versions.',
+      name: 'notebookEditConflict',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

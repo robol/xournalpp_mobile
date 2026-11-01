@@ -115,7 +115,7 @@ class _MainDrawerState extends State<MainDrawer> {
                         child: OutlinedButton(
                           onPressed: () => launchUrl(
                             Uri.parse(
-                              'https://gitlab.com/robol/xournalpp_mobile',
+                              'https://github.com/robol/xournalpp_mobile',
                             ),
                           ),
                           child: Text(S.of(context).sourceCode),
@@ -172,17 +172,25 @@ class _MainDrawerState extends State<MainDrawer> {
 
   Future<void> _importPdf() async {
     if (!await _canLeave() || !context.mounted) return;
-    final file = await runWithLoadingFileDialog(context, () async {
-      final pdf = await XppPickedFile.importFromStorage(
-        type: XppFilePickType.custom,
-        fileExtension: 'pdf',
+    try {
+      final file = await runWithLoadingFileDialog(context, () async {
+        final pdf = await XppPickedFile.importFromStorage(
+          type: XppFilePickType.custom,
+          fileExtension: 'pdf',
+        );
+        return XppFile.importPdf(pdf: pdf);
+      });
+      if (!context.mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
       );
-      return XppFile.importPdf(pdf: pdf);
-    });
-
-    if (!context.mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => CanvasPage(file: file)),
-    );
+    } on XppFilePickerCancelled {
+      // User cancelled the picker.
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${S.of(context).errorOpeningFile}$error')),
+      );
+    }
   }
 }

@@ -7,6 +7,11 @@ import 'conditional/file_storage/file_storage_stub.dart'
 
 enum XppFilePickType { custom, image }
 
+/// Normal user cancellation, distinct from an IO or parsing failure.
+class XppFilePickerCancelled implements Exception {
+  const XppFilePickerCancelled();
+}
+
 class XppPickedFile {
   XppPickedFile(this.bytes, {this.path, this.fileExtension, String? fileName})
     : fileName = fileName ?? _basename(path);
@@ -28,7 +33,7 @@ class XppPickedFile {
           ? [fileExtension.replaceFirst('.', '')]
           : null,
     );
-    if (file == null) throw UnsupportedError('No file selected.');
+    if (file == null) throw const XppFilePickerCancelled();
     final path =
         file.path ??
         (file.uri.scheme == 'content' ? file.uri.toString() : null);
@@ -73,10 +78,7 @@ class XppPickedFile {
     // Android's native document picker returning null means the user cancelled.
     // Falling through to a second picker would turn one cancellation into two.
     if (hasNativeDocumentSave) {
-      return saveDocumentBytes(
-        bytes,
-        fileName: fileName ?? 'xournalpp-export',
-      );
+      return saveDocumentBytes(bytes, fileName: fileName ?? 'xournalpp-export');
     }
 
     final savedPath = await FilePicker.saveFile(

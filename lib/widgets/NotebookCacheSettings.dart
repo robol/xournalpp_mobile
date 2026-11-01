@@ -11,6 +11,7 @@ class NotebookCacheSettings extends StatefulWidget {
 class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
   bool? enabled;
   int? size;
+  int? limitMb;
   bool busy = false;
   @override
   void initState() {
@@ -23,10 +24,12 @@ class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
       final value = await NotebookCache.instance.enabled;
       if (mounted) setState(() => enabled = value);
       final bytes = await NotebookCache.instance.size();
+      final limit = await NotebookCache.instance.limitMb;
       if (mounted)
         setState(() {
           enabled = value;
           size = bytes;
+          limitMb = limit;
         });
     } catch (_) {
       _error();
@@ -60,6 +63,37 @@ class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
                   if (mounted) setState(() => busy = false);
                 }
               },
+      ),
+      ListTile(
+        title: Text(S.of(context).cacheLimit),
+        subtitle: Text(S.of(context).cacheLimitDescription),
+        trailing: DropdownButton<int>(
+          value: limitMb ?? NotebookCache.defaultLimitMb,
+          onChanged: busy || limitMb == null
+              ? null
+              : (value) async {
+                  if (value == null) return;
+                  setState(() => busy = true);
+                  try {
+                    await NotebookCache.instance.setLimitMb(value);
+                    await _refresh();
+                  } catch (_) {
+                    _error();
+                  } finally {
+                    if (mounted) setState(() => busy = false);
+                  }
+                },
+          items: [0, 64, 256, 512, 1024]
+              .map(
+                (value) => DropdownMenuItem<int>(
+                  value: value,
+                  child: Text(
+                    value == 0 ? S.of(context).cacheUnlimited : '$value MB',
+                  ),
+                ),
+              )
+              .toList(),
+        ),
       ),
       ListTile(
         title: Text(S.of(context).cacheClear),

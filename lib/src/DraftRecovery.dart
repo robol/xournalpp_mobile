@@ -62,6 +62,7 @@ class RecoveryDraft {
 /// Operations are serialized so an older checkpoint cannot replace a newer one.
 class DraftRecovery {
   static Future<void> _pending = Future.value();
+  static const _isolateThresholdBytes = 1024 * 1024;
 
   @visibleForTesting
   static void resetForTesting() => _pending = Future.value();
@@ -69,8 +70,15 @@ class DraftRecovery {
   static String newId() =>
       '${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
 
-  static Future<void> save(RecoveryDraft draft) =>
-      _enqueue(() => writeDraft(draft.id, jsonEncode(draft.toJson())));
+  static String _encode(RecoveryDraft draft) => jsonEncode(draft.toJson());
+
+  static Future<void> save(RecoveryDraft draft) => _enqueue(() async {
+    // Large base64 and JSON conversions should not stall stylus input.
+    final encoded = draft.bytes.length >= _isolateThresholdBytes
+        ? await compute(_encode, draft, debugLabel: 'encode recovery draft')
+        : _encode(draft);
+    await writeDraft(draft.id, encoded);
+  });
 
   /// Keep recoverable edits associated with a successfully moved original.
   /// Draft bytes and cached-origin status are preserved.

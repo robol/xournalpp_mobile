@@ -454,13 +454,15 @@ class XppFile {
           ),
         ),
       );
+    } on XppFilePickerCancelled {
+      return;
     } catch (e) {
       if (!context.mounted) return;
       showDialog(
         context: context,
         builder: (c) => AlertDialog(
-          title: Text(S.of(context).noFileSelected),
-          content: Text(S.of(context).youDidNotSelectAnyFile + e.toString()),
+          title: Text(S.of(context).errorOpeningFile),
+          content: SelectableText(e.toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -557,9 +559,11 @@ class XppFile {
     //Clipboard.setData(ClipboardData(text: fileText));
 
     /// parsing the [String] to a [XmlDocument]
-    XmlElement documentTree = XmlDocument.parse(
-      fileText,
-    ).findElements('xournal').toList()[0];
+    final roots = XmlDocument.parse(fileText).findElements('xournal').toList();
+    if (roots.length != 1) {
+      throw const FormatException('Notebook must contain a xournal root.');
+    }
+    final XmlElement documentTree = roots.single;
 
     /// decoding the preview image from base64 [String] to [Uint8List] of bytes
     Uint8List previewImage;
@@ -574,10 +578,21 @@ class XppFile {
     List<XppPage> pages = [];
     String? lastPdfBackgroundFilename;
     Iterable<XmlElement> pageElements = documentTree.findElements('page');
+    if (pageElements.isEmpty) {
+      throw const FormatException('Notebook contains no pages.');
+    }
     pageElements.forEach((XmlElement pageElement) {
       XppPageSize pageSize = XppPageSize(
-        width: double.parse(pageElement.getAttribute('width')!),
-        height: double.parse(pageElement.getAttribute('height')!),
+        width: _finiteNumber(
+          pageElement.getAttribute('width'),
+          'page width',
+          positive: true,
+        ),
+        height: _finiteNumber(
+          pageElement.getAttribute('height'),
+          'page height',
+          positive: true,
+        ),
       );
       XppBackground? background;
       if (pageElement.findElements('background').isNotEmpty) {
@@ -653,8 +668,14 @@ class XppFile {
             break;
         }
       }
+      if (background == null) {
+        throw const FormatException('Page has no background.');
+      }
       List<XppLayer> layers = [];
       Iterable<XmlElement> layerElements = pageElement.findElements('layer');
+      if (layerElements.isEmpty) {
+        throw const FormatException('Page has no layers.');
+      }
       layerElements.forEach((XmlElement layer) {
         Map<int, XppContent?> content = {};
         for (final child in layer.children.whereType<XmlElement>()) {
@@ -698,12 +719,15 @@ class XppFile {
           content[int.parse(imageElement.getAttribute('counter')!)] = XppImage(
             data: base64Decode(imageElement.innerText.trim()),
             topLeft: Offset(
-              double.parse(imageElement.getAttribute('left')!),
-              double.parse(imageElement.getAttribute('top')!),
+              _finiteNumber(imageElement.getAttribute('left'), 'image left'),
+              _finiteNumber(imageElement.getAttribute('top'), 'image top'),
             ),
             bottomRight: Offset(
-              double.parse(imageElement.getAttribute('right')!),
-              double.parse(imageElement.getAttribute('bottom')!),
+              _finiteNumber(imageElement.getAttribute('right'), 'image right'),
+              _finiteNumber(
+                imageElement.getAttribute('bottom'),
+                'image bottom',
+              ),
             ),
           );
         });
@@ -715,11 +739,15 @@ class XppFile {
             color: color,
             // note: not trimming
             text: textElement.innerText,
-            size: double.parse(textElement.getAttribute('size')!),
+            size: _finiteNumber(
+              textElement.getAttribute('size'),
+              'text size',
+              positive: true,
+            ),
             fontFamily: textElement.getAttribute('font'),
             offset: Offset(
-              double.parse(textElement.getAttribute('x')!),
-              double.parse(textElement.getAttribute('y')!),
+              _finiteNumber(textElement.getAttribute('x'), 'text x'),
+              _finiteNumber(textElement.getAttribute('y'), 'text y'),
             ),
           );
         });
@@ -730,12 +758,12 @@ class XppFile {
             text: texElement.getAttribute('text')!.trim(),
             color: parseColor(texElement.getAttribute('color')!.trim()),
             topLeft: Offset(
-              double.parse(texElement.getAttribute('left')!),
-              double.parse(texElement.getAttribute('top')!),
+              _finiteNumber(texElement.getAttribute('left'), 'LaTeX left'),
+              _finiteNumber(texElement.getAttribute('top'), 'LaTeX top'),
             ),
             bottomRight: Offset(
-              double.parse(texElement.getAttribute('right')!),
-              double.parse(texElement.getAttribute('bottom')!),
+              _finiteNumber(texElement.getAttribute('right'), 'LaTeX right'),
+              _finiteNumber(texElement.getAttribute('bottom'), 'LaTeX bottom'),
             ),
           );
         });
@@ -767,14 +795,18 @@ class XppFile {
           List<String> rawPoints = strokeElement.innerText.trim().split(
             RegExp(r'\s+'),
           );
-          for (int i = 0; i < rawPoints.length / 2; i++) {
+          if (rawPoints.length.isOdd || rawPoints.first.isEmpty) {
+            throw const FormatException('Stroke needs coordinate pairs.');
+          }
+          for (int i = 0; i < rawPoints.length ~/ 2; i++) {
             points.add(
               XppStrokePoint(
-                width: double.parse(
+                width: _finiteNumber(
                   (rawWidth.length > i) ? rawWidth[i] : rawWidth[0],
+                  'stroke width',
                 ),
-                x: double.parse(rawPoints[i * 2]),
-                y: double.parse(rawPoints[i * 2 + 1]),
+                x: _finiteNumber(rawPoints[i * 2], 'stroke x'),
+                y: _finiteNumber(rawPoints[i * 2 + 1], 'stroke y'),
               ),
             );
           }
@@ -825,6 +857,18 @@ class XppFile {
     });*/
 
     return file;
+  }
+
+  static double _finiteNumber(
+    String? raw,
+    String field, {
+    bool positive = false,
+  }) {
+    final value = double.tryParse(raw ?? '');
+    if (value == null || !value.isFinite || (positive && value <= 0)) {
+      throw FormatException('Invalid $field: $raw');
+    }
+    return value;
   }
 
   static Future<int> lastOpenedPageForPath(String? path) async {

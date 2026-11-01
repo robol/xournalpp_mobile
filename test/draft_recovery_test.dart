@@ -71,6 +71,24 @@ void main() {
     },
   );
 
+  test('large isolate-encoded snapshots preserve ordering and data', () async {
+    final bytes = Uint8List(1024 * 1024)..[0] = 42;
+    final large = RecoveryDraft(id: '123_456', bytes: bytes, page: 3);
+    final newer = RecoveryDraft(
+      id: '123_456',
+      bytes: Uint8List.fromList([7, 8]),
+      page: 4,
+    );
+    await DraftRecovery.save(large);
+    final restored = (await DraftRecovery.list()).single;
+    expect(restored.bytes, bytes);
+    expect(restored.page, 3);
+    await Future.wait([DraftRecovery.save(large), DraftRecovery.save(newer)]);
+    final latest = (await DraftRecovery.list()).single;
+    expect(latest.bytes, [7, 8]);
+    expect(latest.page, 4);
+  });
+
   testWidgets('a successful save removes the corresponding recovery draft', (
     tester,
   ) async {
