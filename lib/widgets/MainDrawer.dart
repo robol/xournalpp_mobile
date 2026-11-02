@@ -146,15 +146,19 @@ class _MainDrawerState extends State<MainDrawer> {
     final separator = label.indexOf(' · ');
     final name = separator < 0 ? label : label.substring(0, separator);
     final details = separator < 0 ? null : label.substring(separator + 3);
+    final folderSeparator = details?.lastIndexOf(' · ') ?? -1;
+    final displayDetails = folderSeparator < 0
+        ? details
+        : '${details!.substring(0, folderSeparator)}\n${details.substring(folderSeparator + 3)}';
     return ListTile(
       leading: backend.iconAsset == null
           ? const Icon(Icons.cloud_outlined)
           : Image.asset(backend.iconAsset!, width: 24, height: 24),
       title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: details == null
+      subtitle: displayDetails == null
           ? null
           : Text(
-              details,
+              displayDetails,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
