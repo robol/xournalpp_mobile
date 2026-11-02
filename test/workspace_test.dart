@@ -50,6 +50,41 @@ class _LoadingStorage implements NotebookStorage {
 
 void main() {
   testWidgets(
+    'preview bytes survive a sidebar layout rebuild and update when changed',
+    (tester) async {
+      const first =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      const second =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a9sAAAAASUVORK5CYII=';
+      Future<void> showCover(String preview, double width) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: width,
+              height: 100,
+              child: NotebookCover(name: 'Note', preview: preview),
+            ),
+          ),
+        ),
+      );
+      await showCover(first, 100);
+      final original =
+          (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
+      await showCover(first, 200);
+      final rebuilt =
+          (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
+      expect(identical(original, rebuilt), isTrue);
+      await showCover(second, 200);
+      final changed =
+          (tester.widget<Image>(find.byType(Image)).image as MemoryImage).bytes;
+      expect(identical(original, changed), isFalse);
+      expect(changed, base64Decode(second));
+      await showCover('invalid!', 200);
+      expect(find.byType(Image), findsNothing);
+    },
+  );
+
+  testWidgets(
     'tablet portrait keeps the sidebar visible; phone uses a drawer',
     (tester) async {
       SharedPreferences.setMockInitialValues({});

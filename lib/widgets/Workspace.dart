@@ -215,13 +215,44 @@ class DocumentCard extends StatelessWidget {
   );
 }
 
-class NotebookCover extends StatelessWidget {
+class NotebookCover extends StatefulWidget {
   final String name;
   final String? preview;
   const NotebookCover({super.key, required this.name, this.preview});
 
   @override
+  State<NotebookCover> createState() => _NotebookCoverState();
+}
+
+class _NotebookCoverState extends State<NotebookCover> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _decodePreview();
+  }
+
+  @override
+  void didUpdateWidget(NotebookCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preview != widget.preview) _decodePreview();
+  }
+
+  void _decodePreview() {
+    try {
+      final preview = widget.preview;
+      _bytes = preview == null || preview.isEmpty
+          ? null
+          : base64Decode(preview);
+    } on FormatException {
+      _bytes = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final name = widget.name;
     // Explicit hash keeps cover colors stable across processes and platforms.
     var hash = 0;
     for (final unit in name.codeUnits) {
@@ -235,13 +266,6 @@ class NotebookCover extends StatelessWidget {
       Color(0xff686c91),
     ];
     final color = colors[hash % colors.length];
-    Uint8List? bytes;
-    try {
-      if (preview != null && preview!.isNotEmpty)
-        bytes = base64Decode(preview!);
-    } on FormatException {
-      /* Older recents may not contain a usable preview. */
-    }
     final fallback = Center(
       child: Icon(
         name.toLowerCase().endsWith('.pdf')
@@ -272,11 +296,12 @@ class NotebookCover extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(10),
-                child: bytes == null
+                child: _bytes == null
                     ? fallback
                     : Image.memory(
-                        bytes,
+                        _bytes!,
                         fit: BoxFit.contain,
+                        gaplessPlayback: true,
                         excludeFromSemantics: true,
                         errorBuilder: (_, __, ___) => fallback,
                       ),
