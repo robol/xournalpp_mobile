@@ -706,7 +706,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       ),
     ];
 
-    if (remaining > 0 && bounded && _complete) {
+    if (remaining > 0 && bounded) {
       children.add(
         CustomPaint(
           painter: _StrokeRunVectorPainter(widget.strokes, start: start),
@@ -715,7 +715,7 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
       );
     }
 
-    if (remaining > 0 && (!bounded || !_complete))
+    if (remaining > 0 && !bounded)
       children.add(
         _StrokeLoading(progress: start / _commandCount(widget.strokes)),
       );
@@ -906,8 +906,6 @@ class _RasterizedStrokeRunState extends State<_RasterizedStrokeRun> {
 
   int? _cachedPrefixLength({Size? pageSize, double? pixelRatio}) {
     if (_cachedSignature == null || _image == null) return null;
-    if (!_complete && _cachedStrokeIdentities.length != widget.strokes.length)
-      return null;
     if (pageSize != null && _imagePageSize != pageSize) return null;
     if (pixelRatio != null &&
         (_imagePixelRatio != pixelRatio || _imageBounds != widget.bounds))
