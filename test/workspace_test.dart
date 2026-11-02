@@ -62,6 +62,15 @@ void main() {
       expect(find.text('Library'), findsOneWidget);
       expect(find.text('Local Device'), findsOneWidget);
       expect(find.text('Recent files'), findsOneWidget);
+      expect(find.text('Xournal++'), findsOneWidget);
+      expect(find.text('mobile'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.menu_open));
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsNothing);
+      await tester.tap(find.byTooltip('Open navigation'));
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsOneWidget);
+
       tester.view.physicalSize = const Size(390, 800);
       await tester.pumpAndSettle();
       expect(find.text('Library'), findsNothing);

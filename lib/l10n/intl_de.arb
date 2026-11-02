@@ -212,5 +212,8 @@
   "sidebarLibrary": "Bibliothek",
   "sidebarRecent": "Zuletzt geöffnet",
   "sidebarStorage": "Speicher",
-  "sidebarLocalDevice": "Lokales Gerät"
+  "sidebarLocalDevice": "Lokales Gerät",
+  "settingsCacheSection": "Cache",
+  "settingsCloudSection": "Cloud-Anbieter",
+  "settingsDrawingSection": "Zeichnen"
 }

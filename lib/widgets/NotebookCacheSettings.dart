@@ -47,7 +47,10 @@ class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
   Widget build(BuildContext context) => Column(
     children: [
       SwitchListTile(
-        title: Text(S.of(context).cacheSetting),
+        title: Text(
+          S.of(context).cacheSetting,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text(S.of(context).cacheSettingDescription),
         value: enabled ?? true,
         onChanged: enabled == null || busy
@@ -65,7 +68,10 @@ class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
               },
       ),
       ListTile(
-        title: Text(S.of(context).cacheLimit),
+        title: Text(
+          S.of(context).cacheLimit,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text(S.of(context).cacheLimitDescription),
         trailing: DropdownButton<int>(
           value: limitMb ?? NotebookCache.defaultLimitMb,
@@ -96,7 +102,10 @@ class _NotebookCacheSettingsState extends State<NotebookCacheSettings> {
         ),
       ),
       ListTile(
-        title: Text(S.of(context).cacheClear),
+        title: Text(
+          S.of(context).cacheClear,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text(
           '${size == null ? '…' : (size! / (1024 * 1024)).toStringAsFixed(1)} MB',
         ),

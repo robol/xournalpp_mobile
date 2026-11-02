@@ -355,6 +355,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "setDocumentTitle": MessageLookupByLibrary.simpleMessage(
       "Titel des Dokuments ändern",
     ),
+    "settingsCacheSection": MessageLookupByLibrary.simpleMessage("Cache"),
+    "settingsCloudSection": MessageLookupByLibrary.simpleMessage(
+      "Cloud-Anbieter",
+    ),
+    "settingsDrawingSection": MessageLookupByLibrary.simpleMessage("Zeichnen"),
     "settingsTitle": MessageLookupByLibrary.simpleMessage("Einstellungen"),
     "shapeCircle": MessageLookupByLibrary.simpleMessage("Kreis"),
     "shapeEllipse": MessageLookupByLibrary.simpleMessage("Ellipse"),

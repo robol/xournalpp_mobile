@@ -1759,6 +1759,36 @@ class S {
       args: [],
     );
   }
+
+  /// `Cache`
+  String get settingsCacheSection {
+    return Intl.message(
+      'Cache',
+      name: 'settingsCacheSection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cloud providers`
+  String get settingsCloudSection {
+    return Intl.message(
+      'Cloud providers',
+      name: 'settingsCloudSection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Drawing`
+  String get settingsDrawingSection {
+    return Intl.message(
+      'Drawing',
+      name: 'settingsDrawingSection',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

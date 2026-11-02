@@ -50,10 +50,31 @@ class _MainDrawerState extends State<MainDrawer> {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         children: [
-          Image.asset(
-            'assets/xournalpp_horizontal_icon.png',
-            height: 64,
-            fit: BoxFit.contain,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                Image.asset('assets/xournalpp.png', width: 52, height: 52),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Xournal++',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        'mobile',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(

@@ -35,7 +35,12 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(title: Text(S.of(context).settingsTitle)),
       body: ListView(
         children: [
-          if (!kIsWeb) const NotebookCacheSettings(),
+          if (!kIsWeb) ...[
+            _sectionTitle(context, S.of(context).settingsCacheSection),
+            const NotebookCacheSettings(),
+          ],
+          if (!kIsWeb || GoogleDriveManager.supported)
+            _sectionTitle(context, S.of(context).settingsCloudSection),
           if (GoogleDriveManager.supported)
             ValueListenableBuilder<int>(
               valueListenable: GoogleDriveManager.changes,
@@ -106,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
               ),
             ),
+          _sectionTitle(context, S.of(context).settingsDrawingSection),
           SwitchListTile(
             title: Text(
               S.of(context).drawStylusOnly,
@@ -146,6 +152,17 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
+
+  Widget _sectionTitle(BuildContext context, String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+    child: Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();

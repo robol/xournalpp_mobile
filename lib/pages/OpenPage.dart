@@ -49,6 +49,7 @@ class OpenPage extends StatefulWidget {
 
 class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   bool _loadedRecent = false;
+  bool _sidebarExpanded = true;
   Set recentFiles = Set();
   final _recentSearchController = TextEditingController();
   String _recentQuery = '';
@@ -355,8 +356,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     final media = MediaQuery.of(context);
     final persistentSidebar =
         media.orientation == Orientation.portrait &&
-        media.size.shortestSide >= 600 &&
-        media.size.width >= 600;
+        media.size.shortestSide >= 600;
     void openStorage(NotebookStorage storage) {
       if (!persistentSidebar) Navigator.of(context).pop();
       _showSavedNotebooks(initialBackend: storage);
@@ -389,9 +389,16 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             onPressed: _showSavedNotebooks,
           ),
         ],
-        automaticallyImplyLeading: !persistentSidebar,
+        automaticallyImplyLeading: false,
         leading: persistentSidebar
-            ? null
+            ? IconButton(
+                tooltip: _sidebarExpanded
+                    ? MaterialLocalizations.of(context).closeButtonTooltip
+                    : S.of(context).openNavigation,
+                icon: Icon(_sidebarExpanded ? Icons.menu_open : Icons.menu),
+                onPressed: () =>
+                    setState(() => _sidebarExpanded = !_sidebarExpanded),
+              )
             : Builder(
                 builder: (context) => IconButton(
                   tooltip: S.of(context).openNavigation,
@@ -405,7 +412,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       ),
       body: Row(
         children: [
-          if (persistentSidebar) SizedBox(width: 280, child: sidebar),
+          if (persistentSidebar && _sidebarExpanded)
+            SizedBox(width: 280, child: sidebar),
           Expanded(
             child: SafeArea(
               child: Center(
