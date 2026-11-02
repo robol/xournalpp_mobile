@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,6 +89,13 @@ void main() {
     'tablet portrait keeps the sidebar visible; phone uses a drawer',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
+      PackageInfo.setMockInitialValues(
+        appName: 'Xournal++ Mobile',
+        packageName: 'test',
+        version: '4.2.51',
+        buildNumber: '92',
+        buildSignature: '',
+      );
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -97,8 +105,8 @@ void main() {
       expect(find.text('Library'), findsOneWidget);
       expect(find.text('Local Device'), findsOneWidget);
       expect(find.text('Recent files'), findsOneWidget);
-      expect(find.text('Xournal++'), findsOneWidget);
-      expect(find.text('mobile'), findsOneWidget);
+      expect(find.text('Xournal++ Mobile'), findsWidgets);
+      expect(find.text('4.2.51'), findsOneWidget);
       await tester.tap(find.byIcon(Icons.menu_open));
       await tester.pumpAndSettle();
       expect(find.text('Library'), findsNothing);

@@ -61,11 +61,11 @@ class _MainDrawerState extends State<MainDrawer> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Xournal++',
+                        'Xournal++ Mobile',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'mobile',
+                        info?.version ?? '',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
