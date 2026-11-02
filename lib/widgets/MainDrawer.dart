@@ -118,21 +118,7 @@ class _MainDrawerState extends State<MainDrawer> {
                   (b) =>
                       b != internalNotebookStorage && b != localNotebookStorage,
                 ))
-                  ListTile(
-                    leading: backend.iconAsset == null
-                        ? const Icon(Icons.cloud_outlined)
-                        : Image.asset(
-                            backend.iconAsset!,
-                            width: 24,
-                            height: 24,
-                          ),
-                    title: Text(
-                      recentProviderLabel(backend) ?? backend.id,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () => _openStorage(backend),
-                  ),
+                  _providerTile(backend),
               ],
             ),
           ),
@@ -153,6 +139,30 @@ class _MainDrawerState extends State<MainDrawer> {
     return widget.persistent
         ? Material(child: content)
         : Drawer(child: content);
+  }
+
+  Widget _providerTile(NotebookStorage backend) {
+    final label = recentProviderLabel(backend) ?? backend.id;
+    final separator = label.indexOf(' · ');
+    final name = separator < 0 ? label : label.substring(0, separator);
+    final details = separator < 0 ? null : label.substring(separator + 3);
+    return ListTile(
+      leading: backend.iconAsset == null
+          ? const Icon(Icons.cloud_outlined)
+          : Image.asset(backend.iconAsset!, width: 24, height: 24),
+      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: details == null
+          ? null
+          : Text(
+              details,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+      onTap: () => _openStorage(backend),
+    );
   }
 
   Widget _heading(String title) => Padding(
