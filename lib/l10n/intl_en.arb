@@ -46,7 +46,13 @@
   "recoverySaveFailed": "Could not save a recovery draft. Save your work manually.",
   "recoveryTitle": "Recover unsaved work?",
   "recoveryMessage": "An unsaved draft of {name} was found. Recover it?",
-  "@recoveryMessage": {"placeholders": {"name": {"type": "String"}}},
+  "@recoveryMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryLater": "Later",
   "recoveryDiscard": "Discard draft",
   "recoveryOpen": "Recover",
@@ -189,5 +195,22 @@
   "zoomOut": "Zoom out",
   "fitWidth": "Fit width",
   "zoomIn": "Zoom in",
-  "undoLastOperation": "Undo last operation"
+  "undoLastOperation": "Undo last operation",
+  "recentSearch": "Search title, path, or PDF background",
+  "recentClearSearch": "Clear search",
+  "recentProviderFilter": "Storage provider",
+  "recentAllProviders": "All storage",
+  "recentSortLabel": "Sort by",
+  "recentSortOpened": "Recently opened",
+  "recentSortNewest": "Modified: newest first",
+  "recentSortOldest": "Modified: oldest first",
+  "recentSortAZ": "Title: A–Z",
+  "recentSortZA": "Title: Z–A",
+  "recentNoMatches": "No recent documents match these filters.",
+  "recentClearFilters": "Clear filters",
+  "recentProviderUnavailable": "Unavailable",
+  "sidebarLibrary": "Library",
+  "sidebarRecent": "Recent files",
+  "sidebarStorage": "Storage",
+  "sidebarLocalDevice": "Local Device"
 }

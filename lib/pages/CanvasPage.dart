@@ -1,3 +1,4 @@
+import 'package:xournalpp/src/RecentProvider.dart';
 import 'package:xournalpp/widgets/NotebookActions.dart';
 import 'package:xournalpp/src/NotebookCache.dart';
 import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
@@ -340,12 +341,27 @@ class _CanvasPageState extends State<CanvasPage>
     final file = _file;
     if (path == null || path.isEmpty || file == null) return;
     try {
+      file.recentFolderPath ??= recentKnownFolderPath(
+        file.storage,
+        file.storageNotebook,
+      );
+      file.recentFileName ??= recentKnownFileName(
+        file.storage,
+        file.storageNotebook,
+      );
       await RecentFiles.remember(
         path: path,
         name: file.title ?? Uri.tryParse(path)?.pathSegments.lastOrNull ?? path,
         preview: file.previewImage,
         currentPage: currentPage,
-        backendId: file.storage?.id,
+        backendId: file.storage?.id ?? file.storageNotebook?.backendId,
+        knownModified: file.openedFromCache
+            ? null
+            : file.storageNotebook?.modified,
+        pdfReferences: file.pages == null ? null : file.pdfReferences,
+        readablePath: file.recentFolderPath,
+        readableName: file.recentFileName,
+        providerLabel: recentProviderLabel(file.storage),
       );
     } catch (error) {
       // History storage is optional; failure must not prevent editing.
@@ -3334,11 +3350,15 @@ class _CanvasPageState extends State<CanvasPage>
         storage = selected;
       }
       List<String>? destination;
+      List<String>? destinationNames;
       if ((saveAs || filePath == null) &&
           (storage is NextcloudStorage || storage is GoogleDriveStorage)) {
         destination = await showDialog<List<String>>(
           context: context,
-          builder: (_) => CloudSaveFolderDialog(storage: storage),
+          builder: (_) => CloudSaveFolderDialog(
+            storage: storage,
+            onFolderNames: (names) => destinationNames = names,
+          ),
         );
         if (destination == null || !mounted) {
           if (mounted) {
@@ -3576,6 +3596,18 @@ class _CanvasPageState extends State<CanvasPage>
       final savedPath = saved.id;
       _file!.storage = storage;
       _file!.storageNotebook = saved;
+      if (destinationNames != null) {
+        _file!.recentFolderPath = recentFolderPathFor(
+          storage,
+          destinationNames!,
+        );
+        _file!.recentFileName = recentNotebookFileName(_file!.title!);
+      } else if (saveAs) {
+        _file!.recentFolderPath = null;
+        _file!.recentFileName = null;
+      }
+      _file!.recentFolderPath ??= recentKnownFolderPath(storage, saved);
+      _file!.recentFileName ??= recentKnownFileName(storage, saved);
       _file!.captureCloudSourceDigest();
       _file!.requiresSeparateCopy = false;
       filePath = savedPath;
@@ -3614,6 +3646,10 @@ class _CanvasPageState extends State<CanvasPage>
         modified: DateTime.now(),
         currentPage: currentPage,
         backendId: storage.id,
+        pdfReferences: backgrounds.keys.toList(),
+        readablePath: _file!.recentFolderPath,
+        readableName: _file!.recentFileName,
+        providerLabel: recentProviderLabel(storage),
       );
 
       if (_revision == savedRevision) {

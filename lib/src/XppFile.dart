@@ -33,6 +33,9 @@ int _cacheSessionCounter = 0;
 class XppFile {
   XppFile({this.title, this.pages, this.previewImage});
 
+  /// A locally observed, human-readable provider folder; never used for I/O.
+  String? recentFolderPath;
+  String? recentFileName;
   NotebookStorage? storage;
   StoredNotebook? storageNotebook;
   bool openedFromCache = false;

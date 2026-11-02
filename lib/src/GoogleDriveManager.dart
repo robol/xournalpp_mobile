@@ -105,8 +105,12 @@ class GoogleDriveManager {
 
   static Future<void> configure(
     GoogleDriveStorage storage,
-    String folderName,
-  ) async {
+    String folderName, {
+    List<String>? folderPath,
+  }) async {
+    final pathSnapshot = folderPath == null
+        ? null
+        : List<String>.unmodifiable(folderPath);
     final accountId = _desktop ? _desktopAccount?.id : _account?.id;
     final email = _desktop ? _desktopAccount?.email : _account?.email;
     if (accountId == null || accountId != storage.accountId)
@@ -119,14 +123,36 @@ class GoogleDriveManager {
         'email': email,
         'folderId': storage.folderId,
         'folderName': folderName,
+        if (pathSnapshot != null) 'folderPath': pathSnapshot,
       }),
     ))
       throw StateError('Could not save Google Drive settings.');
+    storage.setDisplayMetadata(
+      email: email,
+      rootFolderNames: _displayFolderPath({
+        'folderName': folderName,
+        if (pathSnapshot != null) 'folderPath': pathSnapshot,
+      }),
+    );
     notebookStorageBackends.removeWhere(
       (backend) => backend is GoogleDriveStorage,
     );
     notebookStorageBackends.add(storage);
     changes.value++;
+  }
+
+  @visibleForTesting
+  static List<String>? displayFolderPathFromConfig(
+    Map<String, dynamic> config,
+  ) => _displayFolderPath(config);
+
+  static List<String>? _displayFolderPath(Map<String, dynamic> config) {
+    final path = config['folderPath'];
+    if (path is List && path.every((part) => part is String))
+      return path.cast<String>().toList();
+    final name = config['folderName'];
+    if (name is! String || name.isEmpty) return null;
+    return name == '/' ? <String>[] : <String>[name];
   }
 
   static Future<void> restore() async {
@@ -139,9 +165,12 @@ class GoogleDriveManager {
       final account = await _desktopAuth.restore(config['accountId'] as String);
       if (account == null || current != null) return;
       _desktopAccount = account;
-      notebookStorageBackends.add(
-        _desktopStorage(account, config['folderId'] as String),
+      final backend = _desktopStorage(account, config['folderId'] as String);
+      backend.setDisplayMetadata(
+        email: account.email,
+        rootFolderNames: _displayFolderPath(config),
       );
+      notebookStorageBackends.add(backend);
       changes.value++;
       return;
     }
@@ -156,9 +185,12 @@ class GoogleDriveManager {
       return;
     _account = account;
     if (current != null) return;
-    notebookStorageBackends.add(
-      _storage(account, config['folderId'] as String),
+    final backend = _storage(account, config['folderId'] as String);
+    backend.setDisplayMetadata(
+      email: account.email,
+      rootFolderNames: _displayFolderPath(config),
     );
+    notebookStorageBackends.add(backend);
     changes.value++;
   }
 

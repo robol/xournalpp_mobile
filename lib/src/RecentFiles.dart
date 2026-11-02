@@ -55,13 +55,21 @@ class RecentFiles {
     changes.value++;
   });
 
+  /// Optional metadata is preserved when omitted. An empty [pdfReferences]
+  /// list explicitly clears previous references. [knownModified] fills an
+  /// unknown timestamp without replacing one recorded by a successful save.
   static Future<void> remember({
     required String path,
     required String name,
     Uint8List? preview,
     required int currentPage,
     DateTime? modified,
+    DateTime? knownModified,
     String? backendId,
+    List<String>? pdfReferences,
+    String? readablePath,
+    String? readableName,
+    String? providerLabel,
   }) {
     // Opening and saving can overlap. Serialize their read/modify/write cycles.
     Future<void> write() async {
@@ -81,7 +89,19 @@ class RecentFiles {
         'path': path,
         if (backendId != null && backendId != 'local') 'backendId': backendId,
         if (preview != null) 'preview': base64Encode(preview),
-        if (modified != null) 'modified': modified.toIso8601String(),
+        if (modified != null)
+          'modified': modified.toIso8601String()
+        else if (knownModified != null &&
+            DateTime.tryParse(previous?['modified']?.toString() ?? '') == null)
+          'modified': knownModified.toIso8601String(),
+        if (pdfReferences != null)
+          'pdfReferences': pdfReferences
+              .where((reference) => reference.isNotEmpty)
+              .toSet()
+              .toList(),
+        if (readablePath != null) 'readablePath': readablePath,
+        if (readableName != null) 'readableName': readableName,
+        if (providerLabel != null) 'providerLabel': providerLabel,
         'currentPage': currentPage,
       });
       if (!await prefs.setString(

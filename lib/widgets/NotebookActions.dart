@@ -1,3 +1,4 @@
+import 'package:xournalpp/src/RecentProvider.dart';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -171,6 +172,7 @@ Future<NotebookTransferResult?> transferNotebook(
   if (name == null || !context.mounted || (rename && name == original.name))
     return null;
   NotebookFolder? folder;
+  List<String>? destinationNames;
   if (rename) {
     if (source is LocalNotebookStorage &&
         original.id.startsWith('content://')) {
@@ -198,7 +200,10 @@ Future<NotebookTransferResult?> transferNotebook(
   } else {
     final path = await showDialog<List<String>>(
       context: context,
-      builder: (_) => CloudSaveFolderDialog(storage: destination),
+      builder: (_) => CloudSaveFolderDialog(
+        storage: destination,
+        onFolderNames: (names) => destinationNames = names,
+      ),
     );
     if (path != null)
       folder = NotebookFolder(
@@ -235,7 +240,23 @@ Future<NotebookTransferResult?> transferNotebook(
   );
   if (result.notebook != null) {
     file.storage = destination;
+    if (destinationNames != null) {
+      file.recentFolderPath = recentFolderPathFor(
+        destination,
+        destinationNames!,
+      );
+    } else if (!rename) {
+      file.recentFolderPath = null;
+    }
     file.storageNotebook = result.notebook;
+    file.recentFileName =
+        destination is NextcloudStorage || destination is GoogleDriveStorage
+        ? recentNotebookFileName(result.notebook!.name)
+        : null;
+    file.recentFolderPath ??= recentKnownFolderPath(
+      destination,
+      result.notebook,
+    );
     file.captureCloudSourceDigest();
     file.title = result.notebook!.name;
     file.openedFromCache = false;
@@ -253,6 +274,10 @@ Future<void> rememberTransferredNotebook(XppFile file, {int page = 0}) async {
     backendId: notebook.backendId,
     preview: file.previewImage,
     modified: DateTime.now(),
+    pdfReferences: file.pdfReferences,
+    readablePath: file.recentFolderPath,
+    readableName: file.recentFileName,
+    providerLabel: recentProviderLabel(file.storage),
   );
   await file.cacheSnapshot(
     await file.toUint8ListAsync(),

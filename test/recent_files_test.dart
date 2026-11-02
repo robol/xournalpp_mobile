@@ -125,6 +125,8 @@ void main() {
     });
     await tester.pumpWidget(XournalppMobile());
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Cloud notebook'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Cloud notebook'));
     await tester.pump();
     for (var i = 0; i < 30 && find.byType(CanvasPage).evaluate().isEmpty; i++) {

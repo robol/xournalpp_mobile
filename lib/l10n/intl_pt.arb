@@ -46,7 +46,13 @@
   "recoverySaveFailed": "Não foi possível salvar o rascunho de recuperação. Salve seu trabalho manualmente.",
   "recoveryTitle": "Recuperar trabalho não salvo?",
   "recoveryMessage": "Foi encontrado um rascunho não salvo de {name}. Recuperá-lo?",
-  "@recoveryMessage": {"placeholders": {"name": {"type": "String"}}},
+  "@recoveryMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryLater": "Depois",
   "recoveryDiscard": "Descartar rascunho",
   "recoveryOpen": "Recuperar",
@@ -189,5 +195,22 @@
   "zoomOut": "Diminuir zoom",
   "fitWidth": "Ajustar à largura",
   "zoomIn": "Aumentar zoom",
-  "undoLastOperation": "Desfazer última operação"
+  "undoLastOperation": "Desfazer última operação",
+  "recentSearch": "Pesquisar título, caminho ou PDF de fundo",
+  "recentClearSearch": "Limpar pesquisa",
+  "recentProviderFilter": "Provedor de armazenamento",
+  "recentAllProviders": "Todos os armazenamentos",
+  "recentSortLabel": "Ordenar por",
+  "recentSortOpened": "Abertos recentemente",
+  "recentSortNewest": "Modificação: mais recentes",
+  "recentSortOldest": "Modificação: mais antigos",
+  "recentSortAZ": "Título: A–Z",
+  "recentSortZA": "Título: Z–A",
+  "recentNoMatches": "Nenhum documento recente corresponde aos filtros.",
+  "recentClearFilters": "Limpar filtros",
+  "recentProviderUnavailable": "Indisponível",
+  "sidebarLibrary": "Biblioteca",
+  "sidebarRecent": "Arquivos recentes",
+  "sidebarStorage": "Armazenamento",
+  "sidebarLocalDevice": "Dispositivo local"
 }

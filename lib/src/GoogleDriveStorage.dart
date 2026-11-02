@@ -78,6 +78,20 @@ class GoogleDriveStorage
   }) : _client = client ?? http.Client();
   final String accountId;
   final String folderId;
+
+  // Optional non-secret display metadata. It never participates in provider I/O
+  // or backend identity and can be absent for legacy or direct connections.
+  String? _displayEmail;
+  List<String>? _displayRootFolderNames;
+  String? get displayEmail => _displayEmail;
+  List<String>? get displayRootFolderNames => _displayRootFolderNames;
+  void setDisplayMetadata({String? email, List<String>? rootFolderNames}) {
+    _displayEmail = email == null || email.trim().isEmpty ? null : email;
+    _displayRootFolderNames = rootFolderNames == null
+        ? null
+        : List.unmodifiable(rootFolderNames);
+  }
+
   final Future<String> Function() accessToken;
   final http.Client _client;
   final Map<String, Map<String, String>> _manifests = {};

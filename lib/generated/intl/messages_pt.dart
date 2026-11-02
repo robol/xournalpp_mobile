@@ -264,10 +264,43 @@ class MessageLookup extends MessageLookupByLibrary {
     "pdf": MessageLookupByLibrary.simpleMessage("PDF"),
     "pen": MessageLookupByLibrary.simpleMessage("Caneta"),
     "quota": MessageLookupByLibrary.simpleMessage("Cota"),
+    "recentAllProviders": MessageLookupByLibrary.simpleMessage(
+      "Todos os armazenamentos",
+    ),
     "recentBackendUnavailable": MessageLookupByLibrary.simpleMessage(
       "O armazenamento não está disponível. Reconecte a conta e a pasta originais.",
     ),
+    "recentClearFilters": MessageLookupByLibrary.simpleMessage(
+      "Limpar filtros",
+    ),
+    "recentClearSearch": MessageLookupByLibrary.simpleMessage(
+      "Limpar pesquisa",
+    ),
     "recentFiles": MessageLookupByLibrary.simpleMessage("Arquivos recentes"),
+    "recentNoMatches": MessageLookupByLibrary.simpleMessage(
+      "Nenhum documento recente corresponde aos filtros.",
+    ),
+    "recentProviderFilter": MessageLookupByLibrary.simpleMessage(
+      "Provedor de armazenamento",
+    ),
+    "recentProviderUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Indisponível",
+    ),
+    "recentSearch": MessageLookupByLibrary.simpleMessage(
+      "Pesquisar título, caminho ou PDF de fundo",
+    ),
+    "recentSortAZ": MessageLookupByLibrary.simpleMessage("Título: A–Z"),
+    "recentSortLabel": MessageLookupByLibrary.simpleMessage("Ordenar por"),
+    "recentSortNewest": MessageLookupByLibrary.simpleMessage(
+      "Modificação: mais recentes",
+    ),
+    "recentSortOldest": MessageLookupByLibrary.simpleMessage(
+      "Modificação: mais antigos",
+    ),
+    "recentSortOpened": MessageLookupByLibrary.simpleMessage(
+      "Abertos recentemente",
+    ),
+    "recentSortZA": MessageLookupByLibrary.simpleMessage("Título: Z–A"),
     "recoveryDiscard": MessageLookupByLibrary.simpleMessage(
       "Descartar rascunho",
     ),
@@ -325,6 +358,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "shapeSquare": MessageLookupByLibrary.simpleMessage("Quadrado"),
     "shapes": MessageLookupByLibrary.simpleMessage("Formas"),
     "sharePage": MessageLookupByLibrary.simpleMessage("Compartilhar página..."),
+    "sidebarLibrary": MessageLookupByLibrary.simpleMessage("Biblioteca"),
+    "sidebarLocalDevice": MessageLookupByLibrary.simpleMessage(
+      "Dispositivo local",
+    ),
+    "sidebarRecent": MessageLookupByLibrary.simpleMessage("Arquivos recentes"),
+    "sidebarStorage": MessageLookupByLibrary.simpleMessage("Armazenamento"),
     "simplifyStrokes": MessageLookupByLibrary.simpleMessage(
       "Simplificar traços",
     ),

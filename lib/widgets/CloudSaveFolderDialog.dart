@@ -5,8 +5,13 @@ import 'package:xournalpp/src/NextcloudStorage.dart';
 import 'package:xournalpp/src/NotebookStorage.dart';
 
 class CloudSaveFolderDialog extends StatefulWidget {
-  const CloudSaveFolderDialog({super.key, required this.storage});
+  const CloudSaveFolderDialog({
+    super.key,
+    required this.storage,
+    this.onFolderNames,
+  });
   final NotebookStorage storage;
+  final ValueChanged<List<String>>? onFolderNames;
   @override
   State<CloudSaveFolderDialog> createState() => _CloudSaveFolderDialogState();
 }
@@ -96,8 +101,10 @@ class _CloudSaveFolderDialogState extends State<CloudSaveFolderDialog> {
         child: Text(S.of(context).cancel),
       ),
       TextButton(
-        onPressed: () =>
-            Navigator.pop(context, path.map((item) => item.id).toList()),
+        onPressed: () {
+          widget.onFolderNames?.call(path.map((item) => item.name).toList());
+          Navigator.pop(context, path.map((item) => item.id).toList());
+        },
         child: Text(S.of(context).nextcloudUseFolder),
       ),
     ],

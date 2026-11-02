@@ -46,7 +46,13 @@
   "recoverySaveFailed": "Der Wiederherstellungsentwurf konnte nicht gespeichert werden. Bitte speichern Sie Ihre Arbeit manuell.",
   "recoveryTitle": "Ungespeicherte Arbeit wiederherstellen?",
   "recoveryMessage": "Ein ungespeicherter Entwurf von {name} wurde gefunden. Wiederherstellen?",
-  "@recoveryMessage": {"placeholders": {"name": {"type": "String"}}},
+  "@recoveryMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "recoveryLater": "Später",
   "recoveryDiscard": "Entwurf verwerfen",
   "recoveryOpen": "Wiederherstellen",
@@ -189,5 +195,22 @@
   "zoomOut": "Verkleinern",
   "fitWidth": "An Breite anpassen",
   "zoomIn": "Vergrößern",
-  "undoLastOperation": "Letzten Vorgang rückgängig machen"
+  "undoLastOperation": "Letzten Vorgang rückgängig machen",
+  "recentSearch": "Titel, Pfad oder PDF-Hintergrund suchen",
+  "recentClearSearch": "Suche löschen",
+  "recentProviderFilter": "Speicheranbieter",
+  "recentAllProviders": "Alle Speicher",
+  "recentSortLabel": "Sortieren nach",
+  "recentSortOpened": "Zuletzt geöffnet",
+  "recentSortNewest": "Änderung: neueste zuerst",
+  "recentSortOldest": "Änderung: älteste zuerst",
+  "recentSortAZ": "Titel: A–Z",
+  "recentSortZA": "Titel: Z–A",
+  "recentNoMatches": "Keine zuletzt geöffneten Dokumente entsprechen diesen Filtern.",
+  "recentClearFilters": "Filter zurücksetzen",
+  "recentProviderUnavailable": "Nicht verfügbar",
+  "sidebarLibrary": "Bibliothek",
+  "sidebarRecent": "Zuletzt geöffnet",
+  "sidebarStorage": "Speicher",
+  "sidebarLocalDevice": "Lokales Gerät"
 }

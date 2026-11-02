@@ -106,6 +106,7 @@ class _GoogleDriveSettingsPageState extends State<GoogleDriveSettingsPage> {
                       await GoogleDriveManager.configure(
                         target,
                         path.isEmpty ? '/' : path.last.name,
+                        folderPath: path.map((folder) => folder.name).toList(),
                       );
                       if (context.mounted) Navigator.pop(context);
                     } catch (e) {

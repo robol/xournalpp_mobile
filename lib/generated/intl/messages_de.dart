@@ -272,12 +272,41 @@ class MessageLookup extends MessageLookupByLibrary {
     "pdf": MessageLookupByLibrary.simpleMessage("PDF"),
     "pen": MessageLookupByLibrary.simpleMessage("Stift"),
     "quota": MessageLookupByLibrary.simpleMessage("Speicher"),
+    "recentAllProviders": MessageLookupByLibrary.simpleMessage("Alle Speicher"),
     "recentBackendUnavailable": MessageLookupByLibrary.simpleMessage(
       "Der Speicher ist nicht verfügbar. Verbinden Sie das ursprüngliche Konto und den Ordner erneut.",
     ),
+    "recentClearFilters": MessageLookupByLibrary.simpleMessage(
+      "Filter zurücksetzen",
+    ),
+    "recentClearSearch": MessageLookupByLibrary.simpleMessage("Suche löschen"),
     "recentFiles": MessageLookupByLibrary.simpleMessage(
       "Zuletzt verwendete Dokumente",
     ),
+    "recentNoMatches": MessageLookupByLibrary.simpleMessage(
+      "Keine zuletzt geöffneten Dokumente entsprechen diesen Filtern.",
+    ),
+    "recentProviderFilter": MessageLookupByLibrary.simpleMessage(
+      "Speicheranbieter",
+    ),
+    "recentProviderUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Nicht verfügbar",
+    ),
+    "recentSearch": MessageLookupByLibrary.simpleMessage(
+      "Titel, Pfad oder PDF-Hintergrund suchen",
+    ),
+    "recentSortAZ": MessageLookupByLibrary.simpleMessage("Titel: A–Z"),
+    "recentSortLabel": MessageLookupByLibrary.simpleMessage("Sortieren nach"),
+    "recentSortNewest": MessageLookupByLibrary.simpleMessage(
+      "Änderung: neueste zuerst",
+    ),
+    "recentSortOldest": MessageLookupByLibrary.simpleMessage(
+      "Änderung: älteste zuerst",
+    ),
+    "recentSortOpened": MessageLookupByLibrary.simpleMessage(
+      "Zuletzt geöffnet",
+    ),
+    "recentSortZA": MessageLookupByLibrary.simpleMessage("Titel: Z–A"),
     "recoveryDiscard": MessageLookupByLibrary.simpleMessage(
       "Entwurf verwerfen",
     ),
@@ -335,6 +364,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "shapeSquare": MessageLookupByLibrary.simpleMessage("Quadrat"),
     "shapes": MessageLookupByLibrary.simpleMessage("Formen"),
     "sharePage": MessageLookupByLibrary.simpleMessage("Seite teilen..."),
+    "sidebarLibrary": MessageLookupByLibrary.simpleMessage("Bibliothek"),
+    "sidebarLocalDevice": MessageLookupByLibrary.simpleMessage("Lokales Gerät"),
+    "sidebarRecent": MessageLookupByLibrary.simpleMessage("Zuletzt geöffnet"),
+    "sidebarStorage": MessageLookupByLibrary.simpleMessage("Speicher"),
     "simplifyStrokes": MessageLookupByLibrary.simpleMessage(
       "Stiftstriche vereinfachen",
     ),

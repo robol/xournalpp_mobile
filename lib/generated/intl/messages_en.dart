@@ -248,10 +248,35 @@ class MessageLookup extends MessageLookupByLibrary {
     "pdf": MessageLookupByLibrary.simpleMessage("PDF"),
     "pen": MessageLookupByLibrary.simpleMessage("Pen"),
     "quota": MessageLookupByLibrary.simpleMessage("Storage"),
+    "recentAllProviders": MessageLookupByLibrary.simpleMessage("All storage"),
     "recentBackendUnavailable": MessageLookupByLibrary.simpleMessage(
       "Storage is unavailable. Reconnect the original account and folder.",
     ),
+    "recentClearFilters": MessageLookupByLibrary.simpleMessage("Clear filters"),
+    "recentClearSearch": MessageLookupByLibrary.simpleMessage("Clear search"),
     "recentFiles": MessageLookupByLibrary.simpleMessage("Recent files"),
+    "recentNoMatches": MessageLookupByLibrary.simpleMessage(
+      "No recent documents match these filters.",
+    ),
+    "recentProviderFilter": MessageLookupByLibrary.simpleMessage(
+      "Storage provider",
+    ),
+    "recentProviderUnavailable": MessageLookupByLibrary.simpleMessage(
+      "Unavailable",
+    ),
+    "recentSearch": MessageLookupByLibrary.simpleMessage(
+      "Search title, path, or PDF background",
+    ),
+    "recentSortAZ": MessageLookupByLibrary.simpleMessage("Title: A–Z"),
+    "recentSortLabel": MessageLookupByLibrary.simpleMessage("Sort by"),
+    "recentSortNewest": MessageLookupByLibrary.simpleMessage(
+      "Modified: newest first",
+    ),
+    "recentSortOldest": MessageLookupByLibrary.simpleMessage(
+      "Modified: oldest first",
+    ),
+    "recentSortOpened": MessageLookupByLibrary.simpleMessage("Recently opened"),
+    "recentSortZA": MessageLookupByLibrary.simpleMessage("Title: Z–A"),
     "recoveryDiscard": MessageLookupByLibrary.simpleMessage("Discard draft"),
     "recoveryLater": MessageLookupByLibrary.simpleMessage("Later"),
     "recoveryLoadFailed": MessageLookupByLibrary.simpleMessage(
@@ -301,6 +326,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "shapeSquare": MessageLookupByLibrary.simpleMessage("Square"),
     "shapes": MessageLookupByLibrary.simpleMessage("Shapes"),
     "sharePage": MessageLookupByLibrary.simpleMessage("Share page..."),
+    "sidebarLibrary": MessageLookupByLibrary.simpleMessage("Library"),
+    "sidebarLocalDevice": MessageLookupByLibrary.simpleMessage("Local Device"),
+    "sidebarRecent": MessageLookupByLibrary.simpleMessage("Recent files"),
+    "sidebarStorage": MessageLookupByLibrary.simpleMessage("Storage"),
     "simplifyStrokes": MessageLookupByLibrary.simpleMessage("Simplify strokes"),
     "simplifyStrokesDescription": MessageLookupByLibrary.simpleMessage(
       "Reduce points in newly drawn strokes to save space.",

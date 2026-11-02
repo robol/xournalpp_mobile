@@ -611,6 +611,8 @@ void main() {
     await tester.pumpWidget(XournalppMobile());
     await tester.pumpAndSettle();
     expect(find.text('Restarted.v1'), findsOneWidget);
+    await tester.ensureVisible(find.text('Restarted.v1'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Restarted.v1'));
     for (
       var i = 0;

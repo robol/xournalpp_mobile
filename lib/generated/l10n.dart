@@ -1614,6 +1614,151 @@ class S {
       args: [],
     );
   }
+
+  /// `Search title, path, or PDF background`
+  String get recentSearch {
+    return Intl.message(
+      'Search title, path, or PDF background',
+      name: 'recentSearch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Clear search`
+  String get recentClearSearch {
+    return Intl.message(
+      'Clear search',
+      name: 'recentClearSearch',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Storage provider`
+  String get recentProviderFilter {
+    return Intl.message(
+      'Storage provider',
+      name: 'recentProviderFilter',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `All storage`
+  String get recentAllProviders {
+    return Intl.message(
+      'All storage',
+      name: 'recentAllProviders',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sort by`
+  String get recentSortLabel {
+    return Intl.message('Sort by', name: 'recentSortLabel', desc: '', args: []);
+  }
+
+  /// `Recently opened`
+  String get recentSortOpened {
+    return Intl.message(
+      'Recently opened',
+      name: 'recentSortOpened',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Modified: newest first`
+  String get recentSortNewest {
+    return Intl.message(
+      'Modified: newest first',
+      name: 'recentSortNewest',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Modified: oldest first`
+  String get recentSortOldest {
+    return Intl.message(
+      'Modified: oldest first',
+      name: 'recentSortOldest',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Title: A–Z`
+  String get recentSortAZ {
+    return Intl.message('Title: A–Z', name: 'recentSortAZ', desc: '', args: []);
+  }
+
+  /// `Title: Z–A`
+  String get recentSortZA {
+    return Intl.message('Title: Z–A', name: 'recentSortZA', desc: '', args: []);
+  }
+
+  /// `No recent documents match these filters.`
+  String get recentNoMatches {
+    return Intl.message(
+      'No recent documents match these filters.',
+      name: 'recentNoMatches',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Clear filters`
+  String get recentClearFilters {
+    return Intl.message(
+      'Clear filters',
+      name: 'recentClearFilters',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unavailable`
+  String get recentProviderUnavailable {
+    return Intl.message(
+      'Unavailable',
+      name: 'recentProviderUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Library`
+  String get sidebarLibrary {
+    return Intl.message('Library', name: 'sidebarLibrary', desc: '', args: []);
+  }
+
+  /// `Recent files`
+  String get sidebarRecent {
+    return Intl.message(
+      'Recent files',
+      name: 'sidebarRecent',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Storage`
+  String get sidebarStorage {
+    return Intl.message('Storage', name: 'sidebarStorage', desc: '', args: []);
+  }
+
+  /// `Local Device`
+  String get sidebarLocalDevice {
+    return Intl.message(
+      'Local Device',
+      name: 'sidebarLocalDevice',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

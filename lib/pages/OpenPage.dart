@@ -1,3 +1,5 @@
+import 'package:xournalpp/src/RecentSearch.dart';
+import 'package:xournalpp/src/RecentProvider.dart';
 import 'package:xournalpp/widgets/NotebookActions.dart';
 import 'package:xournalpp/src/NotebookCache.dart';
 import 'package:xournalpp/widgets/CachedNotebookDialogs.dart';
@@ -37,8 +39,9 @@ class _StorageListing {
 
 class OpenPage extends StatefulWidget {
   final dynamic initialExternalIntent;
+  final NotebookStorage? initialStorage;
 
-  const OpenPage({super.key, this.initialExternalIntent});
+  const OpenPage({super.key, this.initialExternalIntent, this.initialStorage});
 
   @override
   _OpenPageState createState() => _OpenPageState();
@@ -47,12 +50,19 @@ class OpenPage extends StatefulWidget {
 class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   bool _loadedRecent = false;
   Set recentFiles = Set();
+  final _recentSearchController = TextEditingController();
+  String _recentQuery = '';
+  String? _recentBackend;
+  RecentSort _recentSort = RecentSort.recent;
 
   late AnimationController _animationController;
   StreamSubscription<List<SharedMediaFile>>? _mediaSubscription;
 
   @override
   void dispose() {
+    _recentSearchController.dispose();
+    NextcloudManager.changes.removeListener(_loadRecentFiles);
+    GoogleDriveManager.changes.removeListener(_loadRecentFiles);
     RecentFiles.changes.removeListener(_loadRecentFiles);
     LocalNotebookStorage.changes.removeListener(_loadRecentFiles);
     _mediaSubscription?.cancel();
@@ -69,6 +79,9 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     )..addListener((() => setState(() {})));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (widget.initialStorage != null) {
+        unawaited(_showSavedNotebooks(initialBackend: widget.initialStorage));
+      }
       if (widget.initialExternalIntent != null) {
         unawaited(receivedShareNotification(widget.initialExternalIntent));
       } else {
@@ -77,6 +90,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
       }
     });
 
+    NextcloudManager.changes.addListener(_loadRecentFiles);
+    GoogleDriveManager.changes.addListener(_loadRecentFiles);
     RecentFiles.changes.addListener(_loadRecentFiles);
     LocalNotebookStorage.changes.addListener(_loadRecentFiles);
     unawaited(
@@ -331,11 +346,34 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final files = recentFiles.toList();
+    final files = selectRecentFiles(
+      recentFiles.cast<Map>(),
+      query: _recentQuery,
+      backendId: _recentBackend,
+      sort: _recentSort,
+    );
+    final media = MediaQuery.of(context);
+    final persistentSidebar =
+        media.orientation == Orientation.portrait &&
+        media.size.shortestSide >= 600 &&
+        media.size.width >= 600;
+    void openStorage(NotebookStorage storage) {
+      if (!persistentSidebar) Navigator.of(context).pop();
+      _showSavedNotebooks(initialBackend: storage);
+    }
+
+    final sidebar = MainDrawer(
+      persistent: persistentSidebar,
+      home: true,
+      onStorage: openStorage,
+      onRecent: () {
+        if (!persistentSidebar) Navigator.of(context).pop();
+      },
+    );
     return Scaffold(
       onDrawerChanged: (opened) =>
           _animationController.animateTo(opened ? 1 : 0),
-      drawer: MainDrawer(),
+      drawer: persistentSidebar ? null : sidebar,
       appBar: AppBar(
         title: const Text('Xournal++ Mobile'),
         actions: [
@@ -351,107 +389,161 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             onPressed: _showSavedNotebooks,
           ),
         ],
-        leading: Builder(
-          builder: (context) => IconButton(
-            tooltip: S.of(context).openNavigation,
-            icon: AnimatedIcon(
-              icon: AnimatedIcons.menu_arrow,
-              progress: _animationController,
-            ),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
+        automaticallyImplyLeading: !persistentSidebar,
+        leading: persistentSidebar
+            ? null
+            : Builder(
+                builder: (context) => IconButton(
+                  tooltip: S.of(context).openNavigation,
+                  icon: AnimatedIcon(
+                    icon: AnimatedIcons.menu_arrow,
+                    progress: _animationController,
+                  ),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1240),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final padding = constraints.maxWidth < 600 ? 16.0 : 32.0;
-                final width = constraints.maxWidth - padding * 2;
-                final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-                final columns =
-                    (width / ((constraints.maxWidth < 600 ? 160 : 220) * scale))
-                        .floor()
-                        .clamp(1, 5);
-                return CustomScrollView(
-                  slivers: [
-                    SliverPadding(
-                      padding: EdgeInsets.fromLTRB(padding, 20, padding, 24),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              S.of(context).workspaceTitle,
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).colorScheme.onSurface,
+      body: Row(
+        children: [
+          if (persistentSidebar) SizedBox(width: 280, child: sidebar),
+          Expanded(
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1240),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final padding = constraints.maxWidth < 600 ? 16.0 : 32.0;
+                      final width = constraints.maxWidth - padding * 2;
+                      final scale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      final columns =
+                          (width /
+                                  ((constraints.maxWidth < 600 ? 160 : 220) *
+                                      scale))
+                              .floor()
+                              .clamp(1, 5);
+                      return CustomScrollView(
+                        slivers: [
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              padding,
+                              20,
+                              padding,
+                              24,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    S.of(context).workspaceTitle,
+                                    style: TextStyle(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w800,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    S.of(context).workspaceSubtitle,
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  WorkspaceActions(
+                                    onNew: _newNotebook,
+                                    onOpen: _openNotebook,
+                                    onImport: _importPdf,
+                                  ),
+                                  if (kIsWeb) DropFile(),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    S.of(context).workspaceRecents,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  if (_loadedRecent &&
+                                      recentFiles.isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    _recentControls(width),
+                                  ],
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              S.of(context).workspaceSubtitle,
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 28),
-                            WorkspaceActions(
-                              onNew: _newNotebook,
-                              onOpen: _openNotebook,
-                              onImport: _importPdf,
-                            ),
-                            if (kIsWeb) DropFile(),
-                            const SizedBox(height: 32),
-                            Text(
-                              S.of(context).workspaceRecents,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (!_loadedRecent)
-                      const SliverToBoxAdapter(
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (files.isEmpty)
-                      SliverToBoxAdapter(
-                        child: EmptyDocumentsState(onNew: _newNotebook),
-                      )
-                    else
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(padding, 0, padding, 32),
-                        sliver: SliverGrid(
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: columns,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                mainAxisExtent: 184 + 112 * scale,
-                              ),
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) =>
-                                _documentCard(files[index], context),
-                            childCount: files.length,
                           ),
-                        ),
-                      ),
-                  ],
-                );
-              },
+                          if (!_loadedRecent)
+                            const SliverToBoxAdapter(
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (recentFiles.isEmpty)
+                            SliverToBoxAdapter(
+                              child: EmptyDocumentsState(onNew: _newNotebook),
+                            )
+                          else if (files.isEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  padding,
+                                  8,
+                                  padding,
+                                  32,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(S.of(context).recentNoMatches),
+                                    TextButton(
+                                      onPressed: _clearRecentControls,
+                                      child: Text(
+                                        S.of(context).recentClearFilters,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(
+                                padding,
+                                0,
+                                padding,
+                                32,
+                              ),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: columns,
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      mainAxisExtent: 184 + 112 * scale,
+                                    ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) =>
+                                      _documentCard(files[index], context),
+                                  childCount: files.length,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -653,6 +745,202 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return 'xopp';
   }
 
+  void _clearRecentControls() {
+    _recentSearchController.clear();
+    setState(() {
+      _recentQuery = '';
+      _recentBackend = null;
+      _recentSort = RecentSort.recent;
+    });
+  }
+
+  String _recentProviderName(String id, Map<String, String> savedLabels) {
+    if (id == 'local') return S.of(context).localStorage;
+    if (id == 'internal') return S.of(context).internalStorage;
+    final backend = notebookStorageBackends
+        .where((item) => item.id == id)
+        .firstOrNull;
+    final observed = recentProviderLabel(backend);
+    final saved = savedLabels[id];
+    final shortId = id.length > 8 ? id.substring(id.length - 8) : id;
+    final availability = backend == null
+        ? ' · ${S.of(context).recentProviderUnavailable}'
+        : '';
+    if (observed != null || saved != null)
+      return '${observed ?? saved}$availability · $shortId';
+    final kind = id.startsWith('gdrive:')
+        ? 'Google Drive'
+        : id.startsWith('nextcloud:')
+        ? 'Nextcloud'
+        : id;
+    return '$kind$availability · $shortId';
+  }
+
+  Widget _recentControls(double availableWidth) {
+    final providers = <String>{};
+    final savedLabels = <String, String>{};
+    for (final entry in recentFiles.cast<Map>()) {
+      final rawId = entry['backendId'];
+      final id = rawId is String ? rawId : 'local';
+      providers.add(id);
+      final label = entry['providerLabel'];
+      if (label is String && label.isNotEmpty)
+        savedLabels.putIfAbsent(id, () => label);
+    }
+    if (_recentBackend != null) providers.add(_recentBackend!);
+    final baseLabels = {
+      for (final id in providers) id: _recentProviderName(id, savedLabels),
+    };
+    final sorted = providers.toList()
+      ..sort((a, b) {
+        final order = baseLabels[a]!.toLowerCase().compareTo(
+          baseLabels[b]!.toLowerCase(),
+        );
+        return order == 0 ? a.compareTo(b) : order;
+      });
+    final counts = <String, int>{};
+    for (final id in sorted) {
+      final label = baseLabels[id]!;
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    final occurrences = <String, int>{};
+    final providerLabels = <String, String>{};
+    for (final id in sorted) {
+      final label = baseLabels[id]!;
+      final occurrence = (occurrences[label] ?? 0) + 1;
+      occurrences[label] = occurrence;
+      providerLabels[id] = counts[label]! > 1 ? '$label #$occurrence' : label;
+    }
+    final labels = {
+      RecentSort.recent: S.of(context).recentSortOpened,
+      RecentSort.modifiedNewest: S.of(context).recentSortNewest,
+      RecentSort.modifiedOldest: S.of(context).recentSortOldest,
+      RecentSort.titleAscending: S.of(context).recentSortAZ,
+      RecentSort.titleDescending: S.of(context).recentSortZA,
+    };
+    final search = TextField(
+      controller: _recentSearchController,
+      decoration: InputDecoration(
+        labelText: S.of(context).recentSearch,
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _recentQuery.isEmpty
+            ? null
+            : IconButton(
+                tooltip: S.of(context).recentClearSearch,
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _recentSearchController.clear();
+                  setState(() => _recentQuery = '');
+                },
+              ),
+        border: const OutlineInputBorder(),
+      ),
+      onChanged: (value) => setState(() => _recentQuery = value),
+    );
+    final provider = DropdownButtonFormField<String>(
+      initialValue: _recentBackend ?? '',
+      isExpanded: true,
+      itemHeight: null,
+      selectedItemBuilder: (context) => [
+        Text(
+          S.of(context).recentAllProviders,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        for (final id in sorted)
+          Text(
+            providerLabels[id]!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+      ],
+      decoration: InputDecoration(
+        labelText: S.of(context).recentProviderFilter,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        DropdownMenuItem(
+          value: '',
+          child: Text(
+            S.of(context).recentAllProviders,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        for (final id in sorted)
+          DropdownMenuItem(
+            value: id,
+            child: Tooltip(
+              message: providerLabels[id]!,
+              child: Text(
+                providerLabels[id]!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+      ],
+      onChanged: (value) => setState(
+        () => _recentBackend = value == null || value.isEmpty ? null : value,
+      ),
+    );
+    final sorting = DropdownButtonFormField<RecentSort>(
+      initialValue: _recentSort,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: S.of(context).recentSortLabel,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        for (final entry in labels.entries)
+          DropdownMenuItem(
+            value: entry.key,
+            child: Text(
+              entry.value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (value) {
+        if (value != null) setState(() => _recentSort = value);
+      },
+    );
+    // Use a single row where it fits, leaving room for the first recent card.
+    // Scale the breakpoint so labels and controls remain usable at large text sizes.
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    if (availableWidth >= 680 * textScale) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: search),
+          const SizedBox(width: 12),
+          Expanded(child: provider),
+          const SizedBox(width: 12),
+          Expanded(child: sorting),
+        ],
+      );
+    }
+    final fieldWidth = availableWidth < 520 * textScale
+        ? availableWidth
+        : (availableWidth - 12) / 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        search,
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            SizedBox(width: fieldWidth, child: provider),
+            SizedBox(width: fieldWidth, child: sorting),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _documentCard(Map fileInfo, BuildContext context) {
     return DocumentCard(
       name: _decodeFileInfoForDisplay(fileInfo['name']),
@@ -745,6 +1033,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
             );
           });
           if (!context.mounted) return;
+          file.recentFolderPath = fileInfo['readablePath'] is String
+              ? fileInfo['readablePath'] as String
+              : null;
+          file.recentFileName = fileInfo['readableName'] is String
+              ? fileInfo['readableName'] as String
+              : null;
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => CanvasPage(
@@ -885,6 +1179,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
   Future<void> _showSavedNotebooks({NotebookStorage? initialBackend}) async {
     NotebookStorage selected = initialBackend ?? defaultNotebookStorage;
     var folder = <String>[];
+    var folderNames = <String>[];
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -925,6 +1220,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                       setDialogState(() {
                         selected = backend;
                         folder = [];
+                        folderNames = [];
                       });
                   },
                 ),
@@ -1005,12 +1301,13 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                 title: Text(
                                   S.of(context).nextcloudParentFolder,
                                 ),
-                                onTap: () => setDialogState(
-                                  () => folder = folder.sublist(
+                                onTap: () => setDialogState(() {
+                                  folder = folder.sublist(0, folder.length - 1);
+                                  folderNames = folderNames.sublist(
                                     0,
-                                    folder.length - 1,
-                                  ),
-                                ),
+                                    folderNames.length - 1,
+                                  );
+                                }),
                               );
                             index--;
                           }
@@ -1030,9 +1327,10 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              onTap: () => setDialogState(
-                                () => folder = [...folder, item.id],
-                              ),
+                              onTap: () => setDialogState(() {
+                                folder = [...folder, item.id];
+                                folderNames = [...folderNames, item.name];
+                              }),
                             );
                           }
                           final entry = entries[index - folders.length];
@@ -1111,6 +1409,20 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                   ),
                                 );
                                 if (!this.context.mounted) return;
+                                if (backend is GoogleDriveStorage ||
+                                    backend is NextcloudStorage) {
+                                  file.recentFolderPath = recentFolderPathFor(
+                                    backend,
+                                    folderNames,
+                                  );
+                                  // Drive listings strip exactly one .xopp suffix.
+                                  // Restore that suffix even if the remaining
+                                  // title itself ends in .xopp.
+                                  file.recentFileName =
+                                      backend is GoogleDriveStorage
+                                      ? '${entry.name}.xopp'
+                                      : recentKnownFileName(backend, entry);
+                                }
                                 await Navigator.of(this.context).push(
                                   MaterialPageRoute(
                                     builder: (_) => CanvasPage(
@@ -1189,6 +1501,8 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     try {
       return Uri.decodeFull(text);
     } on FormatException {
+      return text;
+    } on ArgumentError {
       return text;
     }
   }
@@ -1294,6 +1608,12 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
           ),
         );
         if (!mounted) return;
+        file.recentFolderPath = info['readablePath'] is String
+            ? info['readablePath'] as String
+            : null;
+        file.recentFileName = info['readableName'] is String
+            ? info['readableName'] as String
+            : null;
         final result = await transferNotebook(
           context,
           file,

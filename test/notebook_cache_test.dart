@@ -641,6 +641,8 @@ void main() {
       });
       await tester.pumpWidget(XournalppMobile());
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Notebook'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Notebook'));
       Future<void> until(Finder finder) async {
         for (var i = 0; i < 100 && finder.evaluate().isEmpty; i++) {

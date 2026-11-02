@@ -49,6 +49,29 @@ class _LoadingStorage implements NotebookStorage {
 }
 
 void main() {
+  testWidgets(
+    'tablet portrait keeps the sidebar visible; phone uses a drawer',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text('Local Device'), findsOneWidget);
+      expect(find.text('Recent files'), findsOneWidget);
+      tester.view.physicalSize = const Size(390, 800);
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsNothing);
+      await tester.tap(find.byTooltip('Open navigation'));
+      await tester.pumpAndSettle();
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text('Local Device'), findsOneWidget);
+    },
+  );
+
   testWidgets('recent documents show their storage provider', (tester) async {
     SharedPreferences.setMockInitialValues({
       PreferencesKeys.kRecentFiles: jsonEncode([
