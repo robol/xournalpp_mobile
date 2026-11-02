@@ -108,36 +108,18 @@ class EditingToolBarState extends State<EditingToolBar> {
             Icon(Icons.tab_unselected),
             usePrimaryColor: true,
           ),
-          if (widget.compact)
-            IconButton(
-              onPressed: widget.onPasteSelection,
-              tooltip: 'Paste copied selection',
-              constraints: const BoxConstraints.tightFor(width: 48, height: 48),
-              icon: const Icon(Icons.content_paste),
-            )
-          else
-            FloatingActionButton(
-              heroTag: 'PasteSelection',
-              onPressed: widget.onPasteSelection,
-              tooltip: 'Paste copied selection',
-              backgroundColor: Theme.of(context).cardColor,
-              child: const Icon(Icons.content_paste),
-            ),
-          if (widget.compact)
-            IconButton(
-              onPressed: widget.onBackgroundSettings,
-              tooltip: 'Change background',
-              constraints: const BoxConstraints.tightFor(width: 48, height: 48),
-              icon: const Icon(Icons.format_paint),
-            )
-          else
-            FloatingActionButton(
-              heroTag: 'PageBackground',
-              onPressed: widget.onBackgroundSettings,
-              tooltip: 'Change background',
-              child: Icon(Icons.format_paint),
-              backgroundColor: Theme.of(context).cardColor,
-            ),
+          IconButton(
+            onPressed: widget.onPasteSelection,
+            tooltip: 'Paste copied selection',
+            constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+            icon: const Icon(Icons.content_paste),
+          ),
+          IconButton(
+            onPressed: widget.onBackgroundSettings,
+            tooltip: 'Change background',
+            constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+            icon: const Icon(Icons.format_paint),
+          ),
         ]),
       ),
     );
@@ -227,20 +209,39 @@ class EditingToolBarState extends State<EditingToolBar> {
       }
     }
 
-    if (widget.compact) {
-      final foreground = selected ? selectedForeground : colors.onSurface;
-      return Material(
-        color: selected ? selectedBackground : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(
-            color: selected ? colors.primary : Colors.transparent,
-            width: 2,
-          ),
+    final foreground = selected ? selectedForeground : colors.onSurface;
+    return Material(
+      color: selected ? selectedBackground : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: selected ? colors.primary : Colors.transparent,
+          width: 2,
         ),
-        child: IconButton(
-          onPressed: selectTool,
-          tooltip: switch (tool) {
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onLongPress: enableSettings
+            ? () {
+                setState(() => setTool(tool));
+                saveDeviceTable();
+                showCustomDialog(context);
+              }
+            : tool == EditingTool.SHAPE
+            ? () => showDialog(
+                context: context,
+                builder: (_) => ShapeSettingsDialog(
+                  settings: widget.shapeSettings,
+                  onChanged: (settings) =>
+                      widget.onShapeSettingsChanged?.call(settings),
+                ),
+              )
+            : null,
+        child: Tooltip(
+          // The IconButton's implicit long-press tooltip would consume the
+          // gesture used for tool settings. Hover and semantics remain available.
+          triggerMode: TooltipTriggerMode.manual,
+          message: switch (tool) {
             EditingTool.STYLUS => S.of(context).pen,
             EditingTool.HIGHLIGHT => S.of(context).highlighter,
             EditingTool.ERASER => S.of(context).eraser,
@@ -248,40 +249,18 @@ class EditingToolBarState extends State<EditingToolBar> {
             EditingTool.SHAPE => S.of(context).shapes,
             _ => tool.name[0] + tool.name.substring(1).toLowerCase(),
           },
-          constraints: const BoxConstraints.tightFor(width: 48, height: 48),
-          color: foreground,
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: foreground,
+          child: IconButton(
+            onPressed: selectTool,
+            constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+            color: foreground,
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: foreground,
+            ),
+            isSelected: selected,
+            icon: icon,
           ),
-          isSelected: selected,
-          icon: icon,
         ),
-      );
-    }
-    return InkWell(
-      onLongPress: enableSettings
-          ? () {
-              setState(() => setTool(tool));
-              saveDeviceTable();
-              showCustomDialog(context);
-            }
-          : tool == EditingTool.SHAPE
-          ? () => showDialog(
-              context: context,
-              builder: (_) => ShapeSettingsDialog(
-                settings: widget.shapeSettings,
-                onChanged: (settings) =>
-                    widget.onShapeSettingsChanged?.call(settings),
-              ),
-            )
-          : null,
-      child: FloatingActionButton(
-        heroTag: tool,
-        onPressed: selectTool,
-        child: icon,
-        elevation: 6,
-        backgroundColor: selected ? selectedBackground : theme.cardColor,
       ),
     );
   }

@@ -12,12 +12,58 @@ import 'package:xournalpp/src/XppFile.dart';
 import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/globals.dart';
 import 'package:xournalpp/widgets/EditingToolbar.dart';
+import 'package:xournalpp/widgets/ToolSettingDialog.dart';
 import 'package:xournalpp/widgets/ShapeTool.dart';
 import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xournalpp/widgets/XppPagesBrowser.dart';
 import 'package:xournalpp/widgets/XppPageStack.dart';
 
 void main() {
+  for (final width in [360.0, 800.0]) {
+    testWidgets(
+      'tool icons use compact styling and retain long press at $width',
+      (tester) async {
+        await tester.binding.setSurfaceSize(Size(width, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: const [
+              S.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: S.delegate.supportedLocales,
+            home: CanvasPage(file: XppFile.empty(title: 'Notebook')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final toolbar = find.byType(EditingToolBar);
+        expect(
+          find.descendant(
+            of: toolbar,
+            matching: find.byType(FloatingActionButton),
+          ),
+          findsNothing,
+        );
+        final highlighter = find.descendant(
+          of: find.byTooltip('Highlighter'),
+          matching: find.byType(IconButton),
+        );
+        await tester.tap(highlighter);
+        await tester.pump();
+        expect(tester.widget<IconButton>(highlighter).isSelected, isTrue);
+        expect(tester.getSize(highlighter), const Size(48, 48));
+        await tester.longPress(find.byTooltip('Pen'));
+        await tester.pumpAndSettle();
+        expect(find.byType(ToolSettingDialog), findsOneWidget);
+        Navigator.of(tester.element(find.byType(ToolSettingDialog))).pop();
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
   testWidgets('empty share lists do not poison the next intent', (
     tester,
   ) async {
@@ -57,13 +103,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is FloatingActionButton &&
-            widget.heroTag == EditingTool.SELECT,
-      ),
-    );
+    await tester.tap(find.byTooltip('Select'));
     await tester.pump();
     await tester.tap(find.text('Copy me'));
     await tester.pump();
@@ -125,10 +165,7 @@ void main() {
 
     final toolbar = find.byType(EditingToolBar);
     expect(
-      find.descendant(
-        of: toolbar,
-        matching: find.byType(ShapeIcon),
-      ),
+      find.descendant(of: toolbar, matching: find.byType(ShapeIcon)),
       findsOneWidget,
     );
     expect(
@@ -140,12 +177,11 @@ void main() {
       of: toolbar,
       matching: find.byWidgetPredicate(
         (widget) =>
-            widget is FloatingActionButton &&
-            widget.heroTag == 'PasteSelection',
+            widget is IconButton && widget.tooltip == 'Paste copied selection',
       ),
     );
     expect(pasteButton, findsOneWidget);
-    expect(tester.widget<FloatingActionButton>(pasteButton).onPressed, isNull);
+    expect(tester.widget<IconButton>(pasteButton).onPressed, isNull);
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNotNull);
     expect(tester.getSize(find.byType(AppBar)).height, kToolbarHeight + 64);
     final pageBrowser = find.byType(XppPagesBrowser);
@@ -154,13 +190,7 @@ void main() {
       Axis.horizontal,
     );
     expect(find.byType(BottomAppBar), findsOneWidget);
-    await tester.tap(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is FloatingActionButton &&
-            widget.heroTag == EditingTool.SELECT,
-      ),
-    );
+    await tester.tap(find.byTooltip('Select'));
     await tester.pump();
     expect(state.getTool(), EditingTool.SELECT);
 
@@ -169,10 +199,7 @@ void main() {
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNull);
     expect(tester.widget<EditingToolBar>(toolbar).compact, isTrue);
     expect(
-      find.descendant(
-        of: toolbar,
-        matching: find.byType(ShapeIcon),
-      ),
+      find.descendant(of: toolbar, matching: find.byType(ShapeIcon)),
       findsOneWidget,
     );
     expect(
