@@ -68,7 +68,10 @@ class StrokePreviewController {
     bool showSinglePoint = false,
   }) {
     _activePoints.add(point);
-    _recordActivePoint(showSinglePoint: showSinglePoint);
+    _recordActivePoint(
+      showSinglePoint: showSinglePoint,
+      continuous: fadeOutDuration != null,
+    );
 
     if (_activePoints.length >= _chunkPointCount) {
       final lastPoint = _activePoints.last;
@@ -83,7 +86,10 @@ class StrokePreviewController {
         ..add(lastPoint);
       _activePicture = null;
       activeBounds.value = null;
-      _recordActivePoint(showSinglePoint: showSinglePoint);
+      _recordActivePoint(
+        showSinglePoint: showSinglePoint,
+        continuous: fadeOutDuration != null,
+      );
       return;
     }
 
@@ -187,7 +193,10 @@ class StrokePreviewController {
     _updateFadeTimer();
   }
 
-  void _recordActivePoint({required bool showSinglePoint}) {
+  void _recordActivePoint({
+    required bool showSinglePoint,
+    required bool continuous,
+  }) {
     if (_activePoints.isEmpty) return;
     if (_activePoints.length == 1 && !showSinglePoint) return;
 
@@ -196,6 +205,30 @@ class StrokePreviewController {
     final bounds = XppStrokeBounds.fromPoints(_activePoints).rect;
     final recorder = PictureRecorder();
     final canvas = Canvas(recorder);
+
+    if (continuous && _activePoints.length > 1) {
+      final path = Path()
+        ..moveTo(
+          _activePoints.first.x! - bounds.left,
+          _activePoints.first.y! - bounds.top,
+        );
+      for (final point in _activePoints.skip(1)) {
+        path.lineTo(point.x! - bounds.left, point.y! - bounds.top);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = colorProvider()!
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = _activePoints.last.width ?? 5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+      _activePicture = recorder.endRecording();
+      previousPicture?.dispose();
+      activeBounds.value = bounds;
+      return;
+    }
 
     if (previousPicture != null && previousBounds != null) {
       canvas.save();
