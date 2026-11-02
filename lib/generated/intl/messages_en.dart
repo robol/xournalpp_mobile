@@ -135,6 +135,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "fingerPanHint": MessageLookupByLibrary.simpleMessage(
       "Finger touches pan the page instead of drawing.",
     ),
+    "fitWidth": MessageLookupByLibrary.simpleMessage("Fit width"),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Forget"),
     "forkedBy": MessageLookupByLibrary.simpleMessage(
       "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
@@ -343,6 +344,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Toolbox not implemented yet.",
     ),
     "tools": MessageLookupByLibrary.simpleMessage("Tools"),
+    "undoLastOperation": MessageLookupByLibrary.simpleMessage(
+      "Undo last operation",
+    ),
     "unfortunatelyThereWasAnErrorSavingThisFile":
         MessageLookupByLibrary.simpleMessage(
           "Unfortunately, there was an error saving this file.",
@@ -377,5 +381,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "youveBeenRedirectedToTheLocalApp": MessageLookupByLibrary.simpleMessage(
       "You\'ve been redirected to the local app.",
     ),
+    "zoomControls": MessageLookupByLibrary.simpleMessage("Zoom"),
+    "zoomIn": MessageLookupByLibrary.simpleMessage("Zoom in"),
+    "zoomOut": MessageLookupByLibrary.simpleMessage("Zoom out"),
   };
 }

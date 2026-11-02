@@ -33,6 +33,7 @@ Future<Uint8List> exportPdfDocument(
   XppFile file, {
   PdfSourceResolver? pdfResolver,
 }) async {
+  _preflightBackgrounds(file);
   final plan = _pdfSourcePlan(file);
   Uint8List? sourceBytes;
   if (plan != null) {
@@ -74,6 +75,31 @@ Future<Uint8List> exportPdfDocument(
         .toList(),
   );
   return compute(_writePdf, (snapshot, sourceBytes, plan?.pageNumbers));
+}
+
+/// Validate every page before reading external PDFs or starting the writer.
+/// Preserved XML is safe for .xopp saves, but cannot be rendered faithfully here.
+void _preflightBackgrounds(XppFile file) {
+  final pages = file.pages ?? <XppPage>[];
+  for (var index = 0; index < pages.length; index++) {
+    final background = pages[index].background;
+    if (background is! XppBackgroundPreserved &&
+        background is! XppBackgroundImage &&
+        (background == null ||
+            background is XppBackgroundSolid ||
+            background is XppBackgroundPdf ||
+            background.type == XppBackgroundType.NONE))
+      continue;
+    final kind = background is XppBackgroundPreserved
+        ? background.toXmlElement().getAttribute('type') ?? 'unknown'
+        : background is XppBackgroundImage
+        ? 'pixmap/image'
+        : background.runtimeType.toString();
+    throw PdfExportException(
+      'Page ${index + 1} has an unsupported "$kind" background. '
+      'PDF export would omit it. Save as .xopp to preserve the background.',
+    );
+  }
 }
 
 Future<XppPickedFile> _unusedPdfResolver(BuildContext context, String? path) =>

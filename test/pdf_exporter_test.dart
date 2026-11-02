@@ -17,6 +17,98 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  for (final xml in [
+    '<background type="pixmap" domain="absolute" filename="image.png" custom="keep"/>',
+    '<background type="pixmap" domain="attach" filename="image.png"/>',
+    '<background type="pixmap" domain="clone" filename="0"/>',
+    '<background type="image" filename="image.png"/>',
+    '<background type="future-background" custom="keep"/>',
+    '<background type="solid" style="future-style" color="#ffffff"/>',
+    '<background custom="missing-type"/>',
+  ]) {
+    test('PDF refuses preserved background and .xopp retains it: $xml', () async {
+      Future<XppFile> parse(Uint8List bytes) => XppFile.fromXppPickedFile(
+        XppPickedFile(bytes, fileName: 'Preserved.xopp'),
+        null,
+        (_, _) => throw StateError('No PDF read expected'),
+      );
+      final file = await parse(
+        Uint8List.fromList(
+          const GZipEncoder().encode(
+            utf8.encode(
+              '<xournal><page width="200" height="300">$xml<layer/></page></xournal>',
+            ),
+          ),
+        ),
+      );
+      final background = file.pages!.single.background;
+      expect(background, isA<XppBackgroundPreserved>());
+      final originalXml = background!.toXmlElement().toXmlString();
+      file.pages!.single.layers!.single.content!.add(
+        XppText(text: 'Annotation', offset: const Offset(10, 10), size: 12),
+      );
+      await expectLater(
+        exportPdfDocument(file),
+        throwsA(
+          isA<PdfExportException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('Page 1'),
+              contains('unsupported'),
+              contains('.xopp'),
+            ),
+          ),
+        ),
+      );
+      // Refusing PDF export must leave both the background XML and edits intact.
+      final reopened = await parse(await file.toUint8ListAsync());
+      expect(
+        reopened.pages!.single.background!.toXmlElement().toXmlString(),
+        originalXml,
+      );
+      expect(
+        (reopened.pages!.single.layers!.single.content!.single as XppText).text,
+        'Annotation',
+      );
+      file.pages!.insert(0, _pdfBackedFile('unread-source.pdf').pages!.first);
+      var reads = 0;
+      await expectLater(
+        exportPdfDocument(
+          file,
+          pdfResolver: (_) async {
+            reads++;
+            throw StateError(
+              'Preflight must run before resolving PDF resources',
+            );
+          },
+        ),
+        throwsA(
+          isA<PdfExportException>().having(
+            (e) => e.message,
+            'message',
+            contains('Page 2'),
+          ),
+        ),
+      );
+      expect(reads, 0);
+    });
+  }
+  test('PDF refuses unimplemented image background objects', () async {
+    final file = XppFile.empty();
+    file.pages!.single.background = XppBackgroundImage(filename: 'image.png');
+    await expectLater(
+      exportPdfDocument(file),
+      throwsA(
+        isA<PdfExportException>().having(
+          (e) => e.message,
+          'message',
+          contains('pixmap/image'),
+        ),
+      ),
+    );
+  });
+
   test('generated and incremental PDF xref offsets point to objects', () async {
     final generated = await exportPdfDocument(XppFile.empty());
     final path = await _writePdf(_minimalPdf());

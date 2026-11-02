@@ -1584,6 +1584,36 @@ class S {
       args: [],
     );
   }
+
+  /// `Zoom`
+  String get zoomControls {
+    return Intl.message('Zoom', name: 'zoomControls', desc: '', args: []);
+  }
+
+  /// `Zoom out`
+  String get zoomOut {
+    return Intl.message('Zoom out', name: 'zoomOut', desc: '', args: []);
+  }
+
+  /// `Fit width`
+  String get fitWidth {
+    return Intl.message('Fit width', name: 'fitWidth', desc: '', args: []);
+  }
+
+  /// `Zoom in`
+  String get zoomIn {
+    return Intl.message('Zoom in', name: 'zoomIn', desc: '', args: []);
+  }
+
+  /// `Undo last operation`
+  String get undoLastOperation {
+    return Intl.message(
+      'Undo last operation',
+      name: 'undoLastOperation',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

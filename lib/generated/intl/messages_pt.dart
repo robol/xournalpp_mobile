@@ -141,6 +141,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "fingerPanHint": MessageLookupByLibrary.simpleMessage(
       "O toque com o dedo desloca a página em vez de desenhar.",
     ),
+    "fitWidth": MessageLookupByLibrary.simpleMessage("Ajustar à largura"),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Esquecer"),
     "forkedBy": MessageLookupByLibrary.simpleMessage(
       "Este código foi derivado por xournalpp_mobile do trabalho de @TheOneWithTheBraid e baseia-se sobretudo nele.",
@@ -371,6 +372,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Caixa de ferramentas ainda não implementada.",
     ),
     "tools": MessageLookupByLibrary.simpleMessage("Ferramentas"),
+    "undoLastOperation": MessageLookupByLibrary.simpleMessage(
+      "Desfazer última operação",
+    ),
     "unfortunatelyThereWasAnErrorSavingThisFile":
         MessageLookupByLibrary.simpleMessage(
           "Infelizmente houve um erro ao salvar este arquivo.",
@@ -407,5 +411,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "youveBeenRedirectedToTheLocalApp": MessageLookupByLibrary.simpleMessage(
       "Você foi redirecionado ao aplicativo local.",
     ),
+    "zoomControls": MessageLookupByLibrary.simpleMessage("Zoom"),
+    "zoomIn": MessageLookupByLibrary.simpleMessage("Aumentar zoom"),
+    "zoomOut": MessageLookupByLibrary.simpleMessage("Diminuir zoom"),
   };
 }

@@ -8,6 +8,7 @@ class XppPagesBrowser extends StatelessWidget {
   final VoidCallback? onPageAdd;
   final VoidCallback? onPageDelete;
   final Axis direction;
+  final bool compact;
 
   const XppPagesBrowser({
     Key? key,
@@ -17,6 +18,7 @@ class XppPagesBrowser extends StatelessWidget {
     this.onPageAdd,
     this.onPageDelete,
     this.direction = Axis.horizontal,
+    this.compact = false,
   }) : super(key: key);
 
   @override
@@ -39,7 +41,7 @@ class XppPagesBrowser extends StatelessWidget {
               : null,
         ),
         SizedBox(
-          width: vertical ? 80 : 120,
+          width: vertical || compact ? 80 : 120,
           child: TextButton(
             onPressed: pageCount > 0
                 ? () => _showJumpToPageDialog(context)
@@ -62,7 +64,10 @@ class XppPagesBrowser extends StatelessWidget {
               ? () => onPageChange?.call(currentPage + 1)
               : null,
         ),
-        SizedBox(width: vertical ? 0 : 12, height: vertical ? 12 : 0),
+        SizedBox(
+          width: vertical || compact ? 0 : 12,
+          height: vertical ? 12 : 0,
+        ),
         IconButton(
           icon: const Icon(Icons.add),
           tooltip: S.of(context).addPage,

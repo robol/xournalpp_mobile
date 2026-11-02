@@ -184,5 +184,10 @@
   "safOriginalCopy": " (vor dem unterbrochenen Speichern)",
   "safEditedCopy": " (ausstehender Speichervorgang)",
   "safSaveFailed": "Der Dokumentanbieter hat das Speichern nicht bestätigt. Wiederherstellungskopien sind auf diesem Gerät gespeichert. Öffnen Sie die App erneut, um sie wiederherzustellen, und verwenden Sie dann „Speichern unter“.",
-  "thumbnailSaveWarning": "Das Notizbuch wurde gespeichert, aber sein Vorschaubild konnte nicht aktualisiert werden."
+  "thumbnailSaveWarning": "Das Notizbuch wurde gespeichert, aber sein Vorschaubild konnte nicht aktualisiert werden.",
+  "zoomControls": "Zoom",
+  "zoomOut": "Verkleinern",
+  "fitWidth": "An Breite anpassen",
+  "zoomIn": "Vergrößern",
+  "undoLastOperation": "Letzten Vorgang rückgängig machen"
 }

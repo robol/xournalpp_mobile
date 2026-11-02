@@ -184,5 +184,10 @@
   "safOriginalCopy": " (before the interrupted save)",
   "safEditedCopy": " (pending save)",
   "safSaveFailed": "The document provider did not confirm the save. Recovery copies are stored on this device. Reopen the app to recover them, then use Save As.",
-  "thumbnailSaveWarning": "The notebook was saved, but its thumbnail could not be updated."
+  "thumbnailSaveWarning": "The notebook was saved, but its thumbnail could not be updated.",
+  "zoomControls": "Zoom",
+  "zoomOut": "Zoom out",
+  "fitWidth": "Fit width",
+  "zoomIn": "Zoom in",
+  "undoLastOperation": "Undo last operation"
 }

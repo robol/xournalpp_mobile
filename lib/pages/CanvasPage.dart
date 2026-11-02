@@ -405,6 +405,7 @@ class _CanvasPageState extends State<CanvasPage>
                       builder: (context, constraints) => _buildEditor(
                         context,
                         embedToolbar: constraints.maxWidth >= 1000,
+                        compactPhone: constraints.maxWidth < 600,
                       ),
                     ),
                   ),
@@ -428,8 +429,29 @@ class _CanvasPageState extends State<CanvasPage>
     XppBackgroundPdf background,
   ) => _file!.resolvePdfSource(context, background, renderService: _pdfService);
 
-  Widget _buildEditor(BuildContext context, {required bool embedToolbar}) {
-    final editingToolbar = _buildEditingToolbar(compact: embedToolbar);
+  Widget _buildEditor(
+    BuildContext context, {
+    required bool embedToolbar,
+    required bool compactPhone,
+  }) {
+    final undoButton = IconButton(
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+      icon: const Icon(Icons.undo),
+      onPressed: _canUndo ? _undoLastOperation : null,
+      tooltip: S.of(context).undoLastOperation,
+    );
+    final tools = _buildEditingToolbar(compact: embedToolbar || compactPhone);
+    final editingToolbar = compactPhone
+        ? SizedBox(
+            height: 48,
+            child: Row(
+              children: [
+                undoButton,
+                Expanded(child: tools),
+              ],
+            ),
+          )
+        : tools;
     final documentTitle = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -437,9 +459,10 @@ class _CanvasPageState extends State<CanvasPage>
           child: Tooltip(
             message:
                 '${_file?.title ?? S.of(context).newDocument}\n'
-                '${S.of(context).doubleTapToChange}',
+                '${compactPhone ? S.of(context).renameNotebook : S.of(context).doubleTapToChange}',
             child: GestureDetector(
-              onDoubleTap: _showTitleDialog,
+              onTap: compactPhone ? _showTitleDialog : null,
+              onDoubleTap: compactPhone ? null : _showTitleDialog,
               child: Text(
                 _file?.title ?? S.of(context).newDocument,
                 maxLines: 1,
@@ -456,11 +479,12 @@ class _CanvasPageState extends State<CanvasPage>
               child: Icon(Icons.circle, color: Colors.orange, size: 8),
             ),
           ),
-        IconButton(
-          icon: const Icon(Icons.edit_outlined, size: 18),
-          tooltip: S.of(context).renameNotebook,
-          onPressed: _showTitleDialog,
-        ),
+        if (!compactPhone)
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            tooltip: S.of(context).renameNotebook,
+            onPressed: _showTitleDialog,
+          ),
       ],
     );
     return PopScope(
@@ -546,6 +570,7 @@ class _CanvasPageState extends State<CanvasPage>
         ),
         appBar: AppBar(
           toolbarHeight: kToolbarHeight,
+          titleSpacing: compactPhone ? 8 : null,
           title: embedToolbar
               ? Row(
                   children: [
@@ -556,12 +581,8 @@ class _CanvasPageState extends State<CanvasPage>
                 )
               : documentTitle,
           actions: [
-            _buildZoomControls(context),
-            IconButton(
-              icon: Icon(Icons.undo),
-              onPressed: _canUndo ? _undoLastOperation : null,
-              tooltip: 'Undo last operation',
-            ),
+            if (!compactPhone) _buildZoomControls(context),
+            if (!compactPhone) undoButton,
             savingFile
                 ? Center(
                     child: Padding(
@@ -580,6 +601,9 @@ class _CanvasPageState extends State<CanvasPage>
                   ),
             PopupMenuButton<String>(
               onSelected: (item) async {
+                if (item == S.of(context).zoomOut) _setScale(pageScale - 0.1);
+                if (item == S.of(context).fitWidth) _fitPageToWidth();
+                if (item == S.of(context).zoomIn) _setScale(pageScale + 0.1);
                 if (item == S.of(context).saveAs) saveFile(saveAs: true);
                 if (item == S.of(context).moveTo) _moveNotebook();
                 if (item == S.of(context).sharePage) shareScreenshot();
@@ -587,61 +611,88 @@ class _CanvasPageState extends State<CanvasPage>
                 if (item == _sharePdfMenuItem) sharePdf();
               },
               itemBuilder: (BuildContext context) {
-                return {
-                  S.of(context).saveAs,
-                  S.of(context).moveTo,
-                  if (!kIsWeb) S.of(context).sharePage,
-                  if (!kIsWeb) _exportPdfMenuItem,
-                  if (_sharePdfSupported) _sharePdfMenuItem,
-                }.map((String choice) {
-                  return PopupMenuItem<String>(
-                    value: choice,
-                    enabled:
-                        choice != S.of(context).moveTo ||
-                        (!savingFile &&
-                            !_transferring &&
-                            _draftActivePointers.isEmpty &&
-                            _file?.openedFromCache == false &&
-                            canTransferNotebook(
-                              _file?.storage,
-                              _file?.storageNotebook,
-                            )),
-                    child:
-                        choice == S.of(context).moveTo &&
-                            _file?.openedFromCache == true
-                        ? Tooltip(
-                            message: S.of(context).moveNeedsFreshSource,
-                            child: Text(choice),
-                          )
-                        : Text(choice),
-                  );
-                }).toList();
+                final items =
+                    {
+                      S.of(context).saveAs,
+                      S.of(context).moveTo,
+                      if (!kIsWeb) S.of(context).sharePage,
+                      if (!kIsWeb) _exportPdfMenuItem,
+                      if (_sharePdfSupported) _sharePdfMenuItem,
+                    }.map((String choice) {
+                      return PopupMenuItem<String>(
+                        value: choice,
+                        enabled:
+                            choice != S.of(context).moveTo ||
+                            (!savingFile &&
+                                !_transferring &&
+                                _draftActivePointers.isEmpty &&
+                                _file?.openedFromCache == false &&
+                                canTransferNotebook(
+                                  _file?.storage,
+                                  _file?.storageNotebook,
+                                )),
+                        child:
+                            choice == S.of(context).moveTo &&
+                                _file?.openedFromCache == true
+                            ? Tooltip(
+                                message: S.of(context).moveNeedsFreshSource,
+                                child: Text(choice),
+                              )
+                            : Text(choice),
+                      );
+                    }).toList();
+                return [
+                  ...items,
+                  if (compactPhone) ...[
+                    const PopupMenuDivider(),
+                    PopupMenuItem<String>(
+                      enabled: false,
+                      child: Text(
+                        '${S.of(context).zoomControls} (${(pageScale * 100).round()}%)',
+                      ),
+                    ),
+                    for (final label in [
+                      S.of(context).zoomOut,
+                      S.of(context).fitWidth,
+                      S.of(context).zoomIn,
+                    ])
+                      PopupMenuItem<String>(value: label, child: Text(label)),
+                  ],
+                ];
               },
             ),
           ],
           bottom: embedToolbar
               ? null
               : PreferredSize(
-                  preferredSize: const Size.fromHeight(64),
+                  preferredSize: Size.fromHeight(compactPhone ? 48 : 64),
                   child: editingToolbar,
                 ),
         ),
         bottomNavigationBar: embedToolbar
             ? null
             : BottomAppBar(
+                height: compactPhone ? 48 : null,
+                padding: compactPhone ? EdgeInsets.zero : null,
                 shape: kIsWeb ? null : CircularNotchedRectangle(),
                 child: Container(
                   color: Theme.of(context).colorScheme.surfaceContainer,
                   constraints: BoxConstraints(maxHeight: 72),
-                  child: Center(child: _buildPageBrowser()),
+                  child: Center(
+                    child: _buildPageBrowser(compact: compactPhone),
+                  ),
                 ),
               ),
       ),
     );
   }
 
-  XppPagesBrowser _buildPageBrowser({Axis direction = Axis.horizontal}) {
+  XppPagesBrowser _buildPageBrowser({
+    Axis direction = Axis.horizontal,
+    bool compact = false,
+  }) {
     return XppPagesBrowser(
+      compact: compact,
       direction: direction,
       currentPage: currentPage,
       pageCount: _file!.pages!.length,
