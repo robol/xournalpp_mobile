@@ -149,7 +149,7 @@
   "openNavigation": "Open navigation",
   "couldNotFindBackgroundPdfSelectNewOne": "Could not find the background PDF. Select a new one",
   "importPdf": "Import PDF",
-  "forkedBy": "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
+  "forkedBy": "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid",
   "whiteoutEraserNotImplemented": "Whiteout eraser (not implemented)",
   "workspaceTitle": "Your Workspace",
   "workspaceSubtitle": "A Xournal++ compatible editor.",
