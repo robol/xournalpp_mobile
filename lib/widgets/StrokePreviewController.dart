@@ -5,7 +5,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:xournalpp/layer_contents/XppStroke.dart';
 
 class StrokePreviewController {
-  static const int _chunkPointCount = 24;
+  // Was 24 in previous releases: monitor possible performances impact of this.
+  static const int _chunkPointCount = 64;
 
   final Color? Function() colorProvider;
   final ValueNotifier<int> repaint = ValueNotifier<int>(0);
@@ -221,7 +222,7 @@ class StrokePreviewController {
           ..color = colorProvider()!
           ..style = PaintingStyle.stroke
           ..strokeWidth = _activePoints.last.width ?? 5
-          ..strokeCap = StrokeCap.round
+          ..strokeCap = StrokeCap.butt
           ..strokeJoin = StrokeJoin.round,
       );
       _activePicture = recorder.endRecording();
