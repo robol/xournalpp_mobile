@@ -34,11 +34,7 @@ class _SettingsPageState extends State<SettingsPage> {
       drawer: MainDrawer(),
       appBar: AppBar(title: Text(S.of(context).settingsTitle)),
       body: ListView(
-        children: [
-          if (!kIsWeb) ...[
-            _sectionTitle(context, S.of(context).settingsCacheSection),
-            const NotebookCacheSettings(),
-          ],
+        children: [          
           if (!kIsWeb || GoogleDriveManager.supported)
             _sectionTitle(context, S.of(context).settingsCloudSection),
           if (GoogleDriveManager.supported)
@@ -85,7 +81,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: Text(
                   NextcloudManager.current == null
                       ? S.of(context).nextcloudNotConnected
-                      : '${NextcloudManager.current!.credentials.server} /${NextcloudManager.current!.folder.join('/')}',
+                      : '${NextcloudManager.current!.credentials.server}:${NextcloudManager.current!.folder.join('/')}',
                 ),
                 onTap: () => Navigator.push(
                   context,
@@ -148,7 +144,11 @@ class _SettingsPageState extends State<SettingsPage> {
             value: _simplifyStrokes,
             onChanged: _setSimplifyStrokes,
           ),
-        ],
+          if (!kIsWeb) ...[
+            _sectionTitle(context, S.of(context).settingsCacheSection),
+            const NotebookCacheSettings(),
+          ],
+        ],        
       ),
     );
   }

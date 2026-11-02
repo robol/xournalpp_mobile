@@ -149,7 +149,7 @@ class _MainDrawerState extends State<MainDrawer> {
     final folderSeparator = details?.lastIndexOf(' · ') ?? -1;
     final displayDetails = folderSeparator < 0
         ? details
-        : '${details!.substring(0, folderSeparator)}\n${details.substring(folderSeparator + 3)}';
+        : '${details!.substring(0, folderSeparator)}\n${details.substring(folderSeparator + 4)}';
     return ListTile(
       leading: backend.iconAsset == null
           ? const Icon(Icons.cloud_outlined)
