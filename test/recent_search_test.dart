@@ -272,6 +272,38 @@ void main() {
     );
     expect(file.pdfReferences, ['lecture.pdf', 'second.pdf']);
   });
+  testWidgets('recent header adapts to available width', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.kRecentFiles: jsonEncode(entries),
+    });
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    final title = find.text('Recent Notebooks & Documents');
+    final search = find.byType(TextField);
+    expect(
+      tester.getTopLeft(title).dy,
+      closeTo(
+        tester.getCenter(search).dy - tester.getSize(title).height / 2,
+        2,
+      ),
+    );
+    final border =
+        tester.widget<TextField>(search).decoration!.border
+            as OutlineInputBorder;
+    expect(border.borderRadius, BorderRadius.circular(24));
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    await tester.binding.setSurfaceSize(const Size(400, 900));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(search).dy,
+      greaterThan(tester.getBottomLeft(title).dy),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'search controls remain usable on a small phone with large text',
     (tester) async {
@@ -298,6 +330,14 @@ void main() {
           home: const OpenPage(),
         ),
       );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byIcon(Icons.filter_list));
       await tester.pumpAndSettle();
       final search = find.byType(TextField);
       await tester.ensureVisible(search);
@@ -344,6 +384,8 @@ void main() {
         ]),
       });
       await tester.pumpWidget(XournalppMobile());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.filter_list));
       await tester.pumpAndSettle();
       final field = tester.widget<DropdownButton<String>>(
         find.descendant(
@@ -473,6 +515,9 @@ void main() {
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
         '',
       );
+      await tester.ensureVisible(find.byIcon(Icons.filter_list));
+      await tester.tap(find.byIcon(Icons.filter_list));
+      await tester.pumpAndSettle();
       expect(
         tester
             .widget<DropdownButtonFormField<RecentSort>>(
@@ -492,6 +537,9 @@ void main() {
       PreferencesKeys.kRecentFiles: jsonEncode(entries),
     });
     await tester.pumpWidget(XournalppMobile());
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byIcon(Icons.filter_list));
     await tester.pumpAndSettle();
     final provider = find.byType(DropdownButtonFormField<String>);
     await tester.ensureVisible(provider);
@@ -516,6 +564,9 @@ void main() {
       tester.widget<DocumentCard>(find.byType(DocumentCard)).name,
       'alpha',
     );
+    await tester.ensureVisible(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(provider);
     await tester.tap(provider);
     await tester.pumpAndSettle();
@@ -544,6 +595,9 @@ void main() {
       const Offset(0, 700),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(provider);
     await tester.tap(provider);
     await tester.pumpAndSettle();
@@ -557,6 +611,8 @@ void main() {
     await tester.ensureVisible(sameProvider);
     await tester.tap(sameProvider);
     await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.pumpAndSettle();
     final search = find.byType(TextField);
     await tester.ensureVisible(search);
     await tester.enterText(search, 'does not exist');
@@ -566,6 +622,9 @@ void main() {
     await tester.tap(find.text('Clear filters'));
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(search).controller!.text, '');
+    await tester.ensureVisible(find.byIcon(Icons.filter_list));
+    await tester.tap(find.byIcon(Icons.filter_list));
+    await tester.pumpAndSettle();
     expect(
       tester.widget<DropdownButtonFormField<String>>(provider).initialValue,
       '',

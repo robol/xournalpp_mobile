@@ -471,21 +471,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                                   ),
                                   if (kIsWeb) DropFile(),
                                   const SizedBox(height: 32),
-                                  Text(
-                                    S.of(context).workspaceRecents,
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  if (_loadedRecent &&
-                                      recentFiles.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    _recentControls(width),
-                                  ],
+                                  _recentHeader(width),
                                 ],
                               ),
                             ),
@@ -784,7 +770,39 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
     return '$kind$availability · $shortId';
   }
 
-  Widget _recentControls(double availableWidth) {
+  Widget _recentHeader(double availableWidth) {
+    final titleStyle = TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
+    final title = Text(S.of(context).workspaceRecents, style: titleStyle);
+    if (!_loadedRecent || recentFiles.isEmpty) return title;
+
+    final painter = TextPainter(
+      text: TextSpan(text: S.of(context).workspaceRecents, style: titleStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final inline = availableWidth >= painter.width + 16 + 280;
+    painter.dispose();
+    if (inline) {
+      return Row(
+        children: [
+          title,
+          const SizedBox(width: 16),
+          Expanded(child: _recentControls()),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [title, const SizedBox(height: 12), _recentControls()],
+    );
+  }
+
+  Widget _recentControls() {
     final providers = <String>{};
     final savedLabels = <String, String>{};
     for (final entry in recentFiles.cast<Map>()) {
@@ -841,7 +859,7 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
                   setState(() => _recentQuery = '');
                 },
               ),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
       ),
       onChanged: (value) => setState(() => _recentQuery = value),
     );
@@ -914,36 +932,33 @@ class _OpenPageState extends State<OpenPage> with TickerProviderStateMixin {
         if (value != null) setState(() => _recentSort = value);
       },
     );
-    // Use a single row where it fits, leaving room for the first recent card.
-    // Scale the breakpoint so labels and controls remain usable at large text sizes.
-    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    if (availableWidth >= 680 * textScale) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: search),
-          const SizedBox(width: 12),
-          Expanded(child: provider),
-          const SizedBox(width: 12),
-          Expanded(child: sorting),
-        ],
-      );
-    }
-    final fieldWidth = availableWidth < 520 * textScale
-        ? availableWidth
-        : (availableWidth - 12) / 2;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final active = _recentBackend != null || _recentSort != RecentSort.recent;
+    return Row(
       children: [
-        search,
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            SizedBox(width: fieldWidth, child: provider),
-            SizedBox(width: fieldWidth, child: sorting),
+        Expanded(child: search),
+        const SizedBox(width: 8),
+        MenuAnchor(
+          menuChildren: [
+            SizedBox(
+              width: 260,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [provider, const SizedBox(height: 12), sorting],
+                ),
+              ),
+            ),
           ],
+          builder: (context, controller, child) => IconButton(
+            tooltip: S.of(context).recentProviderFilter,
+            icon: Badge(
+              isLabelVisible: active,
+              child: const Icon(Icons.filter_list),
+            ),
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
+          ),
         ),
       ],
     );
