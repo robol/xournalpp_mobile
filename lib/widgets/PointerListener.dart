@@ -126,6 +126,7 @@ class PointerListenerState extends State<PointerListener> {
       kPrimaryStylusButton | kSecondaryStylusButton;
 
   bool drawingEnabled = true;
+  int? _strokePointer;
 
   final StrokePointBuffer strokePoints = StrokePointBuffer();
   final EraserPreviewController eraserPreview = EraserPreviewController();
@@ -177,6 +178,7 @@ class PointerListenerState extends State<PointerListener> {
   void cancelForViewportGesture() {
     _clearShape();
     _suppressedTouchPointers.addAll(_touchPositions.keys);
+    _strokePointer = null;
     strokePoints.clear();
     eraserPreview.reset();
     _panLastPosition = null;
@@ -217,6 +219,7 @@ class PointerListenerState extends State<PointerListener> {
           if (_suppressedTouchPointers.contains(data.pointer)) return;
           widget.onPointerActivity?.call();
           if (_updatePinchZoom(data)) return;
+          if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_updatePan(data)) return;
           if (_detectTwoFingerGesture(data)) return;
           _updatePageSwipe(data);
@@ -230,7 +233,8 @@ class PointerListenerState extends State<PointerListener> {
             _updateSelectionRegion(data);
             return;
           }
-          if (isPen(data) || isHighlighter(data) || isLaser(data)) {
+          if (_strokePointer == data.pointer &&
+              (isPen(data) || isHighlighter(data) || isLaser(data))) {
             addStrokePoint(data);
           }
 
@@ -244,6 +248,7 @@ class PointerListenerState extends State<PointerListener> {
           }
           widget.onPointerActivity?.call();
           if (_startPinchZoomIfNeeded(data)) return;
+          if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_detectTwoFingerGesture(data, shouldPop: true)) {
             _startPan(data, twoFinger: true);
             return;
@@ -280,6 +285,8 @@ class PointerListenerState extends State<PointerListener> {
           }
           if (drawingEnabled &&
               (isPen(data) || isHighlighter(data) || isLaser(data))) {
+            strokePoints.clear();
+            _strokePointer = data.pointer;
             resetPreview();
             addStrokePoint(data);
           }
@@ -293,6 +300,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerUp: (data) {
           if (!mounted) return;
+          if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_suppressedTouchPointers.remove(data.pointer)) {
             _touchPositions.remove(data.pointer);
             return;
@@ -322,11 +330,13 @@ class PointerListenerState extends State<PointerListener> {
             applyEraserPath();
           } else if (activeEditingTool == EditingTool.LASER) {
             finishLaserPreview();
-          } else if (!poppedContentForCurrentPointer) {
+          } else if (!poppedContentForCurrentPointer &&
+              _strokePointer == data.pointer) {
             saveStroke(tool);
           }
           poppedContentForCurrentPointer = false;
           eraserPreview.reset();
+          _strokePointer = null;
           strokePoints.clear();
           _eraserOverridePointers.remove(data.pointer);
           if (activeEditingTool != EditingTool.LASER) {
@@ -335,6 +345,7 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerCancel: (data) {
           if (!mounted) return;
+          if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_shapePointer == data.pointer) _clearShape();
           _suppressedTouchPointers.remove(data.pointer);
           _finishPinchZoom(data);
@@ -344,6 +355,7 @@ class PointerListenerState extends State<PointerListener> {
             finishLaserPreview();
           }
           _cancelSelectionRegion();
+          _strokePointer = null;
           strokePoints.clear();
           _eraserOverridePointers.remove(data.pointer);
           poppedContentForCurrentPointer = false;
@@ -421,6 +433,7 @@ class PointerListenerState extends State<PointerListener> {
 
   void clearPoints() {
     _clearShape();
+    _strokePointer = null;
     strokePoints.clear();
     eraserPreview.reset();
     _eraserOverridePointers.clear();
@@ -484,6 +497,7 @@ class PointerListenerState extends State<PointerListener> {
     _panLastPosition = null;
     _panPointer = null;
     _twoFingerPanning = false;
+    _strokePointer = null;
     strokePoints.clear();
     eraserPreview.reset();
     resetPreview(rebuild: true);

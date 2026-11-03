@@ -15,6 +15,81 @@ import 'package:xournalpp/widgets/ToolBoxBottomSheet.dart';
 import 'package:xml/xml.dart';
 
 void main() {
+  testWidgets('mouse input cannot extend or finish an owned stylus stroke', (
+    tester,
+  ) async {
+    final saved = <Object>[];
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: PointerListener(
+          toolData: const {
+            PointerDeviceKind.stylus: EditingTool.STYLUS,
+            PointerDeviceKind.mouse: EditingTool.STYLUS,
+          },
+          strokeWidth: 2,
+          color: Colors.black,
+          onNewContent: (content) {
+            if (content != null) saved.add(content);
+          },
+          child: const SizedBox(width: 500, height: 500),
+        ),
+      ),
+    );
+    final handlers = tester
+        .widgetList<Listener>(find.byType(Listener))
+        .firstWhere(
+          (w) =>
+              w.onPointerDown != null &&
+              w.onPointerMove != null &&
+              w.onPointerUp != null,
+        );
+    handlers.onPointerDown!(
+      const PointerDownEvent(
+        pointer: 1,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(10, 10),
+      ),
+    );
+    handlers.onPointerMove!(
+      const PointerMoveEvent(
+        pointer: 1,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(20, 20),
+      ),
+    );
+    final state = tester.state<PointerListenerState>(
+      find.byType(PointerListener),
+    );
+    final count = state.strokePoints.rawPoints.length;
+    handlers.onPointerDown!(
+      const PointerDownEvent(
+        pointer: 2,
+        kind: PointerDeviceKind.mouse,
+        position: Offset(400, 400),
+      ),
+    );
+    handlers.onPointerMove!(
+      const PointerMoveEvent(
+        pointer: 2,
+        kind: PointerDeviceKind.mouse,
+        position: Offset(450, 450),
+      ),
+    );
+    handlers.onPointerUp!(
+      const PointerUpEvent(pointer: 2, kind: PointerDeviceKind.mouse),
+    );
+    expect(saved, isEmpty);
+    expect(state.strokePoints.rawPoints.length, count);
+    expect(state.strokePoints.rawPoints.last.offset, const Offset(20, 20));
+    handlers.onPointerUp!(
+      const PointerUpEvent(pointer: 1, kind: PointerDeviceKind.stylus),
+    );
+    expect(saved, hasLength(1));
+    expect(state.strokePoints.isEmpty, isTrue);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('desktop scroll pans regardless of selected tool', (
     WidgetTester tester,
   ) async {
