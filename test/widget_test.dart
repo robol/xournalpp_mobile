@@ -39,6 +39,21 @@ void main() {
         );
         await tester.pumpAndSettle();
         final toolbar = find.byType(EditingToolBar);
+        expect(tester.widget<EditingToolBar>(toolbar).compact, isTrue);
+        if (width == 360) {
+          final scroll = find.descendant(
+            of: toolbar,
+            matching: find.byType(SingleChildScrollView),
+          );
+          await tester.drag(scroll, const Offset(-250, 0));
+          await tester.pumpAndSettle();
+          final scrollable = tester.state<ScrollableState>(
+            find.descendant(of: scroll, matching: find.byType(Scrollable)),
+          );
+          expect(scrollable.position.pixels, greaterThan(0));
+          await tester.drag(scroll, const Offset(250, 0));
+          await tester.pumpAndSettle();
+        }
         expect(
           find.descendant(
             of: toolbar,
@@ -185,7 +200,8 @@ void main() {
     expect(pasteButton, findsOneWidget);
     expect(tester.widget<IconButton>(pasteButton).onPressed, isNull);
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNotNull);
-    expect(tester.getSize(find.byType(AppBar)).height, kToolbarHeight + 64);
+    expect(tester.widget<EditingToolBar>(toolbar).compact, isTrue);
+    expect(tester.getSize(find.byType(AppBar)).height, kToolbarHeight + 48);
     final pageBrowser = find.byType(XppPagesBrowser);
     expect(
       tester.widget<XppPagesBrowser>(pageBrowser).direction,

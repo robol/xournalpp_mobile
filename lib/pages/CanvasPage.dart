@@ -459,7 +459,8 @@ class _CanvasPageState extends State<CanvasPage>
       onPressed: _canUndo ? _undoLastOperation : null,
       tooltip: S.of(context).undoLastOperation,
     );
-    final tools = _buildEditingToolbar(compact: embedToolbar || compactPhone);
+    final compactToolbar = embedToolbar || compactPhone || !verticalPageBrowser;
+    final tools = _buildEditingToolbar(compact: compactToolbar);
     final editingToolbar = compactPhone
         ? SizedBox(
             height: 48,
@@ -684,7 +685,7 @@ class _CanvasPageState extends State<CanvasPage>
           bottom: embedToolbar
               ? null
               : PreferredSize(
-                  preferredSize: Size.fromHeight(compactPhone ? 48 : 64),
+                  preferredSize: Size.fromHeight(compactToolbar ? 48 : 64),
                   child: editingToolbar,
                 ),
         ),
