@@ -149,19 +149,19 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
 
     final verticalScrollable = tester
         .stateList<ScrollableState>(find.byType(Scrollable))
         .firstWhere((state) => state.position.axis == Axis.vertical);
 
-    // 760px page width, 32px between page tops, and 28px initial inset.
+    // 672px page width, 32px between page tops, and 28px initial inset.
     expect(
       verticalScrollable.position.pixels,
-      closeTo(28 + 760 * 3 + 32 * 2, 0.1),
+      closeTo(28 + 672 * 3 + 32 * 2, 0.1),
     );
   });
 
@@ -205,9 +205,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.tap(find.byIcon(Icons.keyboard_arrow_down));
     await tester.pumpAndSettle();
 
     final verticalScrollable = tester
@@ -216,7 +216,7 @@ void main() {
 
     expect(
       verticalScrollable.position.pixels,
-      closeTo(28 + 760 * 3 + 32 * 2, 0.1),
+      closeTo(28 + 672 * 3 + 32 * 2, 0.1),
     );
 
     await tester.tap(find.byIcon(Icons.remove));
@@ -224,7 +224,7 @@ void main() {
 
     expect(
       verticalScrollable.position.pixels,
-      closeTo(28 + 760 * .9 * 3 + 32 * 2, 0.1),
+      closeTo(28 + 672 * .9 * 3 + 32 * 2, 0.1),
     );
   });
 

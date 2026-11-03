@@ -201,7 +201,12 @@ void main() {
         await _open(tester);
         _vertical(tester).jumpTo(200);
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithIcon(IconButton, Icons.add).first);
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.widgetWithIcon(IconButton, Icons.add),
+          ),
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 60));
         final dynamic canvas = tester.state(find.byType(CanvasPage));

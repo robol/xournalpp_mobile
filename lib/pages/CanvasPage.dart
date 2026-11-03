@@ -422,6 +422,8 @@ class _CanvasPageState extends State<CanvasPage>
                         context,
                         embedToolbar: constraints.maxWidth >= 1000,
                         compactPhone: constraints.maxWidth < 600,
+                        verticalPageBrowser:
+                            constraints.maxWidth > constraints.maxHeight,
                       ),
                     ),
                   ),
@@ -449,6 +451,7 @@ class _CanvasPageState extends State<CanvasPage>
     BuildContext context, {
     required bool embedToolbar,
     required bool compactPhone,
+    required bool verticalPageBrowser,
   }) {
     final undoButton = IconButton(
       constraints: const BoxConstraints.tightFor(width: 48, height: 48),
@@ -559,7 +562,7 @@ class _CanvasPageState extends State<CanvasPage>
                 )*/
                     ),
                   ),
-                  if (embedToolbar)
+                  if (verticalPageBrowser)
                     Material(
                       color: Theme.of(context).colorScheme.surfaceContainer,
                       elevation: 4,
@@ -685,7 +688,7 @@ class _CanvasPageState extends State<CanvasPage>
                   child: editingToolbar,
                 ),
         ),
-        bottomNavigationBar: embedToolbar
+        bottomNavigationBar: verticalPageBrowser
             ? null
             : BottomAppBar(
                 height: compactPhone ? 48 : null,

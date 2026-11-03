@@ -125,7 +125,9 @@ void main() {
     expect(page.layers!.last.content, hasLength(3));
     final pasted = page.layers!.last.content!.last! as XppText;
     final pageRect = tester.getRect(find.byType(XppPageStack));
-    final viewportRect = tester.getRect(find.byType(SingleChildScrollView));
+    final viewportRect = tester.getRect(
+      find.byType(SingleChildScrollView).first,
+    );
     final visibleRect = pageRect.intersect(viewportRect);
     final visibleTop =
         (visibleRect.top - pageRect.top) *
@@ -145,7 +147,7 @@ void main() {
     WidgetTester tester,
   ) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(999, 800);
+    tester.view.physicalSize = const Size(800, 999);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     final title = List.filled(20, 'Long document title').join(' ');
@@ -193,6 +195,15 @@ void main() {
     await tester.tap(find.byTooltip('Select'));
     await tester.pump();
     expect(state.getTool(), EditingTool.SELECT);
+
+    tester.view.physicalSize = const Size(700, 400);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<XppPagesBrowser>(pageBrowser).direction,
+      Axis.vertical,
+    );
+    expect(find.byType(BottomAppBar), findsNothing);
+    expect(tester.getRect(pageBrowser).left, greaterThan(600));
 
     tester.view.physicalSize = const Size(1000, 800);
     await tester.pumpAndSettle();
@@ -276,7 +287,7 @@ void main() {
     await tester.pump();
     expect(state.getTool(), EditingTool.MOVE);
 
-    tester.view.physicalSize = const Size(999, 800);
+    tester.view.physicalSize = const Size(800, 999);
     await tester.pumpAndSettle();
     expect(tester.widget<AppBar>(find.byType(AppBar)).bottom, isNotNull);
     expect(
