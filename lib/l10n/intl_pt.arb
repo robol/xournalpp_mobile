@@ -216,5 +216,8 @@
   "settingsCacheSection": "Cache",
   "settingsCloudSection": "Provedores de nuvem",
   "settingsDrawingSection": "Desenho",
-  "googleDrivePendingApproval": "Indisponível até a aprovação da API pelo Google"
+  "googleDrivePendingApproval": "Indisponível até a aprovação da API pelo Google",
+  "aboutWebsite": "Site: robol.it/xournalpp",
+  "aboutPrivacyPolicy": "Política de privacidade",
+  "aboutTermsOfUse": "Termos de uso"
 }

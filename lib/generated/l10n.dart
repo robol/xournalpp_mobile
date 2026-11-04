@@ -1799,6 +1799,36 @@ class S {
       args: [],
     );
   }
+
+  /// `Website: robol.it/xournalpp`
+  String get aboutWebsite {
+    return Intl.message(
+      'Website: robol.it/xournalpp',
+      name: 'aboutWebsite',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Privacy policy`
+  String get aboutPrivacyPolicy {
+    return Intl.message(
+      'Privacy policy',
+      name: 'aboutPrivacyPolicy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Terms of use`
+  String get aboutTermsOfUse {
+    return Intl.message(
+      'Terms of use',
+      name: 'aboutTermsOfUse',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

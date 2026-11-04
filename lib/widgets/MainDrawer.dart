@@ -195,6 +195,24 @@ class _MainDrawerState extends State<MainDrawer> {
         'Xournal++ Mobile © its original authors and contributors. \nLicensed under the EUPL-1.2.',
     children: [
       OutlinedButton(
+        onPressed: () => launchUrl(Uri.parse('https://robol.it/xournalpp')),
+        child: Text(S.of(context).aboutWebsite),
+      ),
+      OutlinedButton(
+        onPressed: () => launchUrl(
+          Uri.parse('https://robol.it/xournalpp/privacy-policy.html'),
+        ),
+        child: Text(S.of(context).aboutPrivacyPolicy),
+      ),
+      OutlinedButton(
+        onPressed: () => launchUrl(
+          Uri.parse(
+            'https://robol.it/xournalpp/it.robol.xournal.mobile.tos.html',
+          ),
+        ),
+        child: Text(S.of(context).aboutTermsOfUse),
+      ),
+      OutlinedButton(
         onPressed: () =>
             launchUrl(Uri.parse('https://github.com/xournalpp/xournalpp')),
         child: Text(S.of(context).aboutXournal),

@@ -216,5 +216,8 @@
   "settingsCacheSection": "Cache",
   "settingsCloudSection": "Cloud providers",
   "settingsDrawingSection": "Drawing",
-  "googleDrivePendingApproval": "Unavailable pending Google API approval"
+  "googleDrivePendingApproval": "Unavailable pending Google API approval",
+  "aboutWebsite": "Website: robol.it/xournalpp",
+  "aboutPrivacyPolicy": "Privacy policy",
+  "aboutTermsOfUse": "Terms of use"
 }

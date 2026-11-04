@@ -29,6 +29,13 @@ class MessageLookup extends MessageLookupByLibrary {
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "abort": MessageLookupByLibrary.simpleMessage("Abort"),
     "about": MessageLookupByLibrary.simpleMessage("About"),
+    "aboutPrivacyPolicy": MessageLookupByLibrary.simpleMessage(
+      "Privacy policy",
+    ),
+    "aboutTermsOfUse": MessageLookupByLibrary.simpleMessage("Terms of use"),
+    "aboutWebsite": MessageLookupByLibrary.simpleMessage(
+      "Website: robol.it/xournalpp",
+    ),
     "aboutXournal": MessageLookupByLibrary.simpleMessage("About Xournal++"),
     "aboutXournalMobileEdition": MessageLookupByLibrary.simpleMessage(
       "About Xournal++ Mobile",
