@@ -215,5 +215,6 @@
   "sidebarLocalDevice": "Dispositivo local",
   "settingsCacheSection": "Cache",
   "settingsCloudSection": "Provedores de nuvem",
-  "settingsDrawingSection": "Desenho"
+  "settingsDrawingSection": "Desenho",
+  "googleDrivePendingApproval": "Indisponível até a aprovação da API pelo Google"
 }

@@ -34,27 +34,34 @@ class _SettingsPageState extends State<SettingsPage> {
       drawer: MainDrawer(),
       appBar: AppBar(title: Text(S.of(context).settingsTitle)),
       body: ListView(
-        children: [          
+        children: [
           if (!kIsWeb || GoogleDriveManager.supported)
             _sectionTitle(context, S.of(context).settingsCloudSection),
           if (GoogleDriveManager.supported)
             ValueListenableBuilder<int>(
               valueListenable: GoogleDriveManager.changes,
               builder: (context, _, __) => ListTile(
+                enabled: GoogleDriveManager.available,
                 leading: const Icon(Icons.add_to_drive),
                 title: const Text('Google Drive'),
                 subtitle: Text(
-                  GoogleDriveManager.current == null
+                  !googleDriveEnabled
+                      ? S.of(context).googleDrivePendingApproval
+                      : GoogleDriveManager.current == null
                       ? S.of(context).nextcloudNotConnected
                       : S.of(context).googleDriveConnected,
                 ),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const GoogleDriveSettingsPage(),
-                  ),
-                ),
-                trailing: GoogleDriveManager.current == null
+                onTap: !GoogleDriveManager.available
+                    ? null
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GoogleDriveSettingsPage(),
+                        ),
+                      ),
+                trailing:
+                    !GoogleDriveManager.available ||
+                        GoogleDriveManager.current == null
                     ? null
                     : IconButton(
                         tooltip: S.of(context).nextcloudDisconnect,
@@ -148,7 +155,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _sectionTitle(context, S.of(context).settingsCacheSection),
             const NotebookCacheSettings(),
           ],
-        ],        
+        ],
       ),
     );
   }

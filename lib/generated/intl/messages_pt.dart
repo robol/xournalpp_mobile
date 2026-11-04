@@ -150,6 +150,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Conectar ao Google Drive",
     ),
     "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Conectado"),
+    "googleDrivePendingApproval": MessageLookupByLibrary.simpleMessage(
+      "Indisponível até a aprovação da API pelo Google",
+    ),
     "graph": MessageLookupByLibrary.simpleMessage("Gráfico"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Marcador"),
     "home": MessageLookupByLibrary.simpleMessage("Início"),

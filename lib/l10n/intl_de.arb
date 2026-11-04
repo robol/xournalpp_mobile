@@ -215,5 +215,6 @@
   "sidebarLocalDevice": "Lokales Gerät",
   "settingsCacheSection": "Cache",
   "settingsCloudSection": "Cloud-Anbieter",
-  "settingsDrawingSection": "Zeichnen"
+  "settingsDrawingSection": "Zeichnen",
+  "googleDrivePendingApproval": "Bis zur Genehmigung der Google-API nicht verfügbar"
 }

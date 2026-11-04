@@ -1250,10 +1250,10 @@ class S {
     return Intl.message('Import PDF', name: 'importPdf', desc: '', args: []);
   }
 
-  /// `This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work`
+  /// `This code has been forked by xournalpp_mobile from @TheOneWithTheBraid`
   String get forkedBy {
     return Intl.message(
-      'This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work',
+      'This code has been forked by xournalpp_mobile from @TheOneWithTheBraid',
       name: 'forkedBy',
       desc: '',
       args: [],
@@ -1785,6 +1785,16 @@ class S {
     return Intl.message(
       'Drawing',
       name: 'settingsDrawingSection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unavailable pending Google API approval`
+  String get googleDrivePendingApproval {
+    return Intl.message(
+      'Unavailable pending Google API approval',
+      name: 'googleDrivePendingApproval',
       desc: '',
       args: [],
     );

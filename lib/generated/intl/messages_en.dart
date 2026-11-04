@@ -138,12 +138,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "fitWidth": MessageLookupByLibrary.simpleMessage("Fit width"),
     "forgetRecent": MessageLookupByLibrary.simpleMessage("Forget"),
     "forkedBy": MessageLookupByLibrary.simpleMessage(
-      "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid, and is mostly based on her work",
+      "This code has been forked by xournalpp_mobile from @TheOneWithTheBraid",
     ),
     "googleDriveConnect": MessageLookupByLibrary.simpleMessage(
       "Connect Google Drive",
     ),
     "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Connected"),
+    "googleDrivePendingApproval": MessageLookupByLibrary.simpleMessage(
+      "Unavailable pending Google API approval",
+    ),
     "graph": MessageLookupByLibrary.simpleMessage("Graph"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Highlighter"),
     "home": MessageLookupByLibrary.simpleMessage("Home"),

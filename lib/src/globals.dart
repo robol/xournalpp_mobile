@@ -1,3 +1,6 @@
+/// Enable once Google approves this application's Google Drive API usage.
+const bool googleDriveEnabled = false;
+
 dynamic lastIntentData;
 
 class PreferencesKeys {

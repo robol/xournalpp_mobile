@@ -156,6 +156,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Google Drive verbinden",
     ),
     "googleDriveConnected": MessageLookupByLibrary.simpleMessage("Verbunden"),
+    "googleDrivePendingApproval": MessageLookupByLibrary.simpleMessage(
+      "Bis zur Genehmigung der Google-API nicht verfügbar",
+    ),
     "graph": MessageLookupByLibrary.simpleMessage("Zeichnen"),
     "highlighter": MessageLookupByLibrary.simpleMessage("Textmarker"),
     "home": MessageLookupByLibrary.simpleMessage("Startseite"),

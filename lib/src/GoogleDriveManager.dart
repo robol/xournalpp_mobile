@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:xournalpp/src/globals.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -31,8 +32,15 @@ class GoogleDriveManager {
   static bool get supported =>
       !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || _desktop);
 
+  static bool get available => googleDriveEnabled && supported;
+
+  static void _requireAvailable() {
+    if (!available)
+      throw UnsupportedError('Google Drive is currently disabled.');
+  }
+
   static Future<void> _initialize() {
-    if (!supported)
+    if (!available)
       throw UnsupportedError(
         'Google Drive sign-in is unavailable on this platform.',
       );
@@ -55,6 +63,7 @@ class GoogleDriveManager {
   }
 
   static Future<GoogleDriveStorage> connect() async {
+    _requireAvailable();
     if (_desktop) {
       _desktopAccount = await _desktopAuth.connect();
       return _desktopStorage(_desktopAccount!, 'root');
@@ -67,6 +76,7 @@ class GoogleDriveManager {
   }
 
   static GoogleDriveStorage forFolder(String folderId) {
+    _requireAvailable();
     if (_desktop) {
       final account = _desktopAccount;
       if (account == null) throw StateError('Google account is not connected.');
@@ -108,6 +118,7 @@ class GoogleDriveManager {
     String folderName, {
     List<String>? folderPath,
   }) async {
+    _requireAvailable();
     final pathSnapshot = folderPath == null
         ? null
         : List<String>.unmodifiable(folderPath);
@@ -156,7 +167,7 @@ class GoogleDriveManager {
   }
 
   static Future<void> restore() async {
-    if (!supported || current != null) return;
+    if (!available || current != null) return;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_configKey);
     if (raw == null) return;
