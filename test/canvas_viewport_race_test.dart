@@ -89,6 +89,38 @@ Future<void> _wheel(WidgetTester tester, Offset position, double delta) =>
     );
 
 void main() {
+  testWidgets('rotation preserves page and fraction within the document', (
+    tester,
+  ) async {
+    await _open(tester);
+    // Landscape: 800px minus the 88px browser and 40px page margins.
+    const oldWidth = 672.0;
+    const pageIndex = 5;
+    const fraction = .35;
+    _vertical(
+      tester,
+    ).jumpTo(28 + pageIndex * (oldWidth + 32) + oldWidth * fraction);
+    await tester.pumpAndSettle();
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    expect(canvas.currentPage, pageIndex);
+    await tester.binding.setSurfaceSize(const Size(600, 800));
+    await tester.pumpAndSettle();
+    const newWidth = 560.0;
+    expect(
+      _vertical(tester).pixels,
+      closeTo(28 + pageIndex * (newWidth + 32) + newWidth * fraction, .1),
+    );
+    expect(canvas.currentPage, pageIndex);
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    await tester.pumpAndSettle();
+    expect(
+      _vertical(tester).pixels,
+      closeTo(28 + pageIndex * (oldWidth + 32) + oldWidth * fraction, .1),
+    );
+    expect(canvas.currentPage, pageIndex);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('geometry current-page tracking handles long documents', (
     tester,
   ) async {

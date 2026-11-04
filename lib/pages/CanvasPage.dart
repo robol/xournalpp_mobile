@@ -788,12 +788,73 @@ class _CanvasPageState extends State<CanvasPage>
   GlobalKey<XppPageStackState> get _currentPageStackKey =>
       _pageStackKeyFor(currentPage);
 
+  void _preservePositionOnResize(double newWidth) {
+    if (_lastViewportWidth <= 0 ||
+        newWidth == _lastViewportWidth ||
+        !_pagesScrollController.hasClients ||
+        _navigationTarget != null ||
+        _pinchZoomActive)
+      return;
+    final pages = _file?.pages;
+    if (pages == null || pages.isEmpty) return;
+    // Capture document coordinates before replacing the previous viewport width.
+    final oldWidth = _pageDisplayWidth(_lastViewportWidth);
+    final y = _pagesScrollController.offset;
+    final index = _geometry.pageAt(
+      y,
+      oldWidth,
+      _pageGap + _pageCardMargin * 2,
+      _pageGap + _pageCardMargin,
+    );
+    final page = pages[index];
+    final fraction =
+        (y - _pageScrollOffset(index)) /
+        _pageDisplayHeightForScale(index, pageScale);
+    final horizontalFraction = _pagesHorizontalScrollController.hasClients
+        ? (_pagesHorizontalScrollController.offset -
+                  _pageLeftForScale(pageScale)) /
+              oldWidth
+        : 0.0;
+    final generation = _pinchGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _pinchGeneration ||
+          _lastViewportWidth != newWidth ||
+          !_pagesScrollController.hasClients)
+        return;
+      final index = _geometry.indexOf(page);
+      if (index < 0) return;
+      void restore(ScrollController controller, double target) {
+        if (!controller.hasClients) return;
+        final position = controller.position;
+        final offset = target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if (position.pixels != offset) controller.jumpTo(offset);
+      }
+
+      restore(
+        _pagesScrollController,
+        _pageScrollOffset(index) +
+            fraction * _pageDisplayHeightForScale(index, pageScale),
+      );
+      restore(
+        _pagesHorizontalScrollController,
+        _pageLeftForScale(pageScale) +
+            horizontalFraction * _pageDisplayWidth(newWidth),
+      );
+      _updateCurrentPageFromScroll();
+      _strokeRasterPolicy.viewportChanged();
+    });
+  }
+
   Widget _buildScrollablePages() {
     final pages = _file?.pages ?? <XppPage>[];
     return ValueListenableBuilder<double>(
       valueListenable: _viewportScale,
       builder: (context, viewportScale, _) => LayoutBuilder(
         builder: (context, constraints) {
+          _preservePositionOnResize(constraints.maxWidth);
           _lastViewportWidth = constraints.maxWidth;
           final contentWidth = max(
             constraints.maxWidth,
