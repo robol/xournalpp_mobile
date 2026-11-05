@@ -13,6 +13,9 @@ class StylusInputPolicy extends ChangeNotifier {
   final Set<int> _interrupted = {};
   Timer? _cooldown;
 
+  bool isPrimaryTouch(int pointer) =>
+      _touches.where((id) => !rejects(id)).firstOrNull == pointer;
+
   bool get stylusActive => _styluses.isNotEmpty;
   bool get suppressTouch => stylusActive || _cooldown != null;
   bool get hasRejectedTouches => _rejected.isNotEmpty;

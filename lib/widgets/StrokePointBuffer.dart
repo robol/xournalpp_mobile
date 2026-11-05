@@ -6,6 +6,7 @@ import 'package:xournalpp/layer_contents/XppStroke.dart';
 class StrokePointBuffer {
   static const double _maxPointSpacing = 1.5;
   static const int _maxInterpolatedPointsPerInput = 32;
+  static const int _maxSmoothedPointsPerSegment = 128;
 
   final List<XppStrokePoint> rawPoints = [];
   final List<XppStrokePoint> points = [];
@@ -22,6 +23,15 @@ class StrokePointBuffer {
   }
 
   List<XppStrokePoint> add(XppStrokePoint point) {
+    if (point.x?.isFinite != true ||
+        point.y?.isFinite != true ||
+        point.width?.isFinite != true ||
+        point.width! <= 0)
+      return [];
+    if (rawPoints.isNotEmpty &&
+        rawPoints.last.offset == point.offset &&
+        rawPoints.last.width == point.width)
+      return [];
     if (rawPoints.isEmpty) {
       _smoothed.add(point);
     } else {
@@ -55,7 +65,15 @@ class StrokePointBuffer {
     final distance = (end.offset - start.offset).distance;
     final steps = min(
       _maxInterpolatedPointsPerInput,
-      max(1, (distance / _maxPointSpacing).ceil()),
+      distance.isFinite
+          ? max(
+              1,
+              min(
+                _maxInterpolatedPointsPerInput.toDouble(),
+                distance / _maxPointSpacing,
+              ).ceil(),
+            )
+          : _maxInterpolatedPointsPerInput,
     );
 
     return [
@@ -65,14 +83,23 @@ class StrokePointBuffer {
 
   void _appendDense(List<XppStrokePoint> dense, XppStrokePoint end) {
     final start = dense.last;
-    final steps = max(
-      1,
-      ((end.offset - start.offset).distance / _maxPointSpacing).ceil(),
-    );
+    final distance = (end.offset - start.offset).distance;
+    final steps = distance.isFinite
+        ? max(
+            1,
+            min(
+              _maxSmoothedPointsPerSegment.toDouble(),
+              distance / _maxPointSpacing,
+            ).ceil(),
+          )
+        : _maxSmoothedPointsPerSegment;
     for (var step = 1; step <= steps; step++) {
       dense.add(_lerpStrokePoint(start, end, step / steps));
     }
   }
+
+  double _safeLerp(double a, double b, double t) =>
+      (b - a).isFinite ? lerpDouble(a, b, t)! : a * (1 - t) + b * t;
 
   XppStrokePoint _lerpStrokePoint(
     XppStrokePoint start,
@@ -80,9 +107,9 @@ class StrokePointBuffer {
     double t,
   ) {
     return XppStrokePoint(
-      x: lerpDouble(start.x!, end.x!, t),
-      y: lerpDouble(start.y!, end.y!, t),
-      width: lerpDouble(start.width!, end.width!, t),
+      x: _safeLerp(start.x!, end.x!, t),
+      y: _safeLerp(start.y!, end.y!, t),
+      width: _safeLerp(start.width!, end.width!, t),
     );
   }
 }

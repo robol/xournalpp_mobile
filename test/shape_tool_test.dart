@@ -64,7 +64,30 @@ void main() {
       );
     }
   });
-  testWidgets('pinch cancels a shape without committing it', (tester) async {
+  testWidgets('accepted pinch cancels a shape without committing it', (
+    tester,
+  ) async {
+    var commits = 0;
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: PointerListener(
+          toolData: const {PointerDeviceKind.touch: EditingTool.SHAPE},
+          onNewShape: (_) => commits++,
+          child: const SizedBox(width: 200, height: 200),
+        ),
+      ),
+    );
+    final first = await tester.startGesture(const Offset(20, 20));
+    await first.moveTo(const Offset(80, 80));
+    final second = await tester.startGesture(const Offset(120, 120));
+    await second.moveBy(const Offset(30, 0));
+    await first.up();
+    await second.up();
+    await tester.pump();
+    expect(commits, 0);
+  });
+  testWidgets('accidental second contact preserves a shape', (tester) async {
     var commits = 0;
     await tester.pumpWidget(
       Directionality(
@@ -82,7 +105,7 @@ void main() {
     await first.up();
     await second.up();
     await tester.pump();
-    expect(commits, 0);
+    expect(commits, 1);
   });
   test('square and circle use equal sides and an unfilled outline', () {
     for (final kind in [ShapeKind.square, ShapeKind.circle]) {

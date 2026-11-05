@@ -251,6 +251,9 @@ class _CanvasPageState extends State<CanvasPage>
 
   void _refreshStylusPolicy() {
     if (!mounted) return;
+    for (final key in _pointerListenerKeys.values) {
+      key.currentState?.cancelRejectedPointers();
+    }
     _setZoomableState();
     setState(() {});
   }
@@ -936,6 +939,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _handleViewportPointerDown(PointerDownEvent event) {
+    if (!event.position.dx.isFinite || !event.position.dy.isFinite) return;
     if (event.kind == PointerDeviceKind.stylus ||
         event.kind == PointerDeviceKind.invertedStylus) {
       _stylusPolicy.down(event);
@@ -966,6 +970,7 @@ class _CanvasPageState extends State<CanvasPage>
 
     _viewportTouchPositions[event.pointer] = event.position;
     if (_viewportPinchZooming) {
+      if (!_viewportPinchAccepted) return;
       for (final key in _pointerListenerKeys.values) {
         key.currentState?.cancelForViewportGesture();
       }
@@ -984,12 +989,10 @@ class _CanvasPageState extends State<CanvasPage>
     _viewportPinchAccepted = false;
     _viewportPinchIntent.begin(metrics.distance, metrics.focalPoint);
     setState(() {});
-    for (final key in _pointerListenerKeys.values) {
-      key.currentState?.cancelForViewportGesture();
-    }
   }
 
   void _handleViewportPointerMove(PointerMoveEvent event) {
+    if (!event.position.dx.isFinite || !event.position.dy.isFinite) return;
     if (_stylusPolicy.rejects(event.pointer) || _stylusPolicy.stylusActive)
       return;
     if (event.kind == PointerDeviceKind.touch &&
@@ -1013,6 +1016,9 @@ class _CanvasPageState extends State<CanvasPage>
       if (!_viewportPinchIntent.accepts(metrics.distance, metrics.focalPoint))
         return;
       _viewportPinchAccepted = true;
+      for (final key in _pointerListenerKeys.values) {
+        key.currentState?.cancelForViewportGesture();
+      }
       _handlePinchZoomStart(previousFocalPoint);
     }
     _lastViewportPinchDistance = metrics.distance;

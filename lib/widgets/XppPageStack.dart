@@ -1,3 +1,4 @@
+import 'package:xournalpp/widgets/ContentTapScope.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:math';
@@ -252,19 +253,26 @@ class XppPageStackState extends State<XppPageStack>
     required IconData icon,
     required VoidCallback onPressed,
   }) {
-    return SizedBox.square(
-      dimension: 48,
-      child: Material(
-        color: color,
-        shape: const CircleBorder(),
-        elevation: 3,
-        child: IconButton(
-          padding: EdgeInsets.zero,
-          iconSize: 24,
-          color: Colors.white,
-          tooltip: tooltip,
-          icon: Icon(icon),
-          onPressed: onPressed,
+    ContentTapToken? tapToken;
+    return Listener(
+      onPointerDown: (event) =>
+          tapToken = ContentTapScope.of(context)?.register(event),
+      child: SizedBox.square(
+        dimension: 48,
+        child: Material(
+          color: color,
+          shape: const CircleBorder(),
+          elevation: 3,
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            iconSize: 24,
+            color: Colors.white,
+            tooltip: tooltip,
+            icon: Icon(icon),
+            onPressed: () {
+              if (tapToken?.cancelled != true) onPressed();
+            },
+          ),
         ),
       ),
     );
@@ -496,6 +504,8 @@ class _XppLayerStackState extends State<XppLayerStack> {
     });
     flushPendingStrokes();
     if (selectionMode && selectableStrokes.isNotEmpty) {
+      ContentTapToken? tapToken;
+      int? tapPointer;
       final index = ContentSpatialIndex(selectableStrokes);
       children.add(
         Positioned.fill(
@@ -509,12 +519,26 @@ class _XppLayerStackState extends State<XppLayerStack> {
                 final candidates = index.query(
                   Rect.fromCircle(center: event.localPosition, radius: 6),
                 );
-                if (candidates.isNotEmpty)
+                if (candidates.isNotEmpty) {
+                  final token = ContentTapScope.of(context)?.register(event);
+                  if (tapPointer == null) {
+                    tapPointer = event.pointer;
+                    tapToken = token;
+                  }
                   widget.onContentPointerDown?.call(event);
+                }
               },
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
+                onTapCancel: () {
+                  tapPointer = null;
+                  tapToken = null;
+                },
                 onTapUp: (event) {
+                  final cancelled = tapToken?.cancelled == true;
+                  tapPointer = null;
+                  tapToken = null;
+                  if (cancelled) return;
                   final candidates = index.query(
                     Rect.fromCircle(center: event.localPosition, radius: 6),
                   );

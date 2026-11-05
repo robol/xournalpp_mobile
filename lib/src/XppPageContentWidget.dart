@@ -1,3 +1,4 @@
+import 'package:xournalpp/widgets/ContentTapScope.dart';
 import 'package:flutter/material.dart';
 
 class XppPageContentWidget extends StatefulWidget {
@@ -25,6 +26,8 @@ class XppPageContentWidget extends StatefulWidget {
 }
 
 class _XppPageContentWidgetState extends State<XppPageContentWidget> {
+  ContentTapToken? _tapToken;
+  int? _tapPointer;
   @override
   Widget build(BuildContext context) {
     final child = widget.selected
@@ -41,12 +44,27 @@ class _XppPageContentWidgetState extends State<XppPageContentWidget> {
 
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: widget.onPointerDown,
+      onPointerDown: (event) {
+        final token = ContentTapScope.of(context)?.register(event);
+        if (_tapPointer == null) {
+          _tapPointer = event.pointer;
+          _tapToken = token;
+        }
+        widget.onPointerDown?.call(event);
+      },
       child: GestureDetector(
         behavior: widget.selectionMode
             ? HitTestBehavior.translucent
             : HitTestBehavior.deferToChild,
+        onTapCancel: () {
+          _tapPointer = null;
+          _tapToken = null;
+        },
         onTap: () {
+          final cancelled = _tapToken?.cancelled == true;
+          _tapPointer = null;
+          _tapToken = null;
+          if (cancelled) return;
           if (widget.selectionMode) {
             widget.onSelect?.call();
             return;
