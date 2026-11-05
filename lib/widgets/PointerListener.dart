@@ -257,7 +257,22 @@ class PointerListenerState extends State<PointerListener> {
 
   Widget _buildPointerTree(Widget child) {
     return MouseRegion(
+      onExit: (event) {
+        if (widget.stylusPolicy == null) _inputPolicy.exitProximity(event);
+      },
       onHover: (event) {
+        if (widget.stylusPolicy == null) _inputPolicy.hover(event);
+        cancelRejectedPointers();
+        if (widget.stylusPolicy == null &&
+            _inputPolicy.suppressTouch &&
+            _pinchZooming) {
+          _pinchZooming = false;
+          _touchPositions.clear();
+          _lastPinchDistance = null;
+          _lastPinchFocalPoint = null;
+          if (_pinchAccepted) widget.onPinchZoomEnd?.call();
+          _pinchAccepted = false;
+        }
         if (_stylusPointer != null && !_isStylus(event)) return;
         notifyDeviceChange(event);
       },

@@ -249,8 +249,29 @@ class _CanvasPageState extends State<CanvasPage>
     ..addListener(_refreshStylusPolicy);
   bool get _suppressPalmInput => _stylusPolicy.suppressTouch;
 
+  bool _touchWasSuppressed = false;
   void _refreshStylusPolicy() {
     if (!mounted) return;
+    final suppressed = _stylusPolicy.suppressTouch;
+    _viewportTouchPositions.removeWhere(
+      (pointer, _) => _stylusPolicy.rejects(pointer),
+    );
+    if (suppressed && _viewportPinchZooming) {
+      _viewportPinchZooming = false;
+      _viewportPinchAccepted = false;
+      _lastViewportPinchDistance = null;
+      _lastViewportPinchFocalPoint = null;
+      if (_pinchZoomActive) _handlePinchZoomEnd();
+    }
+    if (suppressed && !_touchWasSuppressed) {
+      for (final controller in [
+        _pagesScrollController,
+        _pagesHorizontalScrollController,
+      ]) {
+        if (controller.hasClients) controller.jumpTo(controller.offset);
+      }
+    }
+    _touchWasSuppressed = suppressed;
     for (final key in _pointerListenerKeys.values) {
       key.currentState?.cancelRejectedPointers();
     }
@@ -465,6 +486,24 @@ class _CanvasPageState extends State<CanvasPage>
   ) => _file!.resolvePdfSource(context, background, renderService: _pdfService);
 
   Widget _buildEditor(
+    BuildContext context, {
+    required bool embedToolbar,
+    required bool compactPhone,
+    required bool verticalPageBrowser,
+  }) => MouseRegion(
+    onExit: _stylusPolicy.exitProximity,
+    child: Listener(
+      onPointerHover: _stylusPolicy.hover,
+      child: _buildEditorContent(
+        context,
+        embedToolbar: embedToolbar,
+        compactPhone: compactPhone,
+        verticalPageBrowser: verticalPageBrowser,
+      ),
+    ),
+  );
+
+  Widget _buildEditorContent(
     BuildContext context, {
     required bool embedToolbar,
     required bool compactPhone,

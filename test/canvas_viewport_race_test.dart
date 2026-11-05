@@ -89,6 +89,134 @@ Future<void> _wheel(WidgetTester tester, Offset position, double delta) =>
     );
 
 void main() {
+  testWidgets('stylus hover interrupts an already accepted pinch', (t) async {
+    await _open(t);
+    final dynamic canvas = t.state(find.byType(CanvasPage));
+    final first = await t.startGesture(const Offset(250, 300), pointer: 251);
+    final second = await t.startGesture(const Offset(450, 300), pointer: 252);
+    await second.moveBy(const Offset(40, 0));
+    await t.pump();
+    final scale = canvas.pageScale;
+    expect(scale, greaterThan(1));
+    await t.sendEventToBinding(
+      const PointerAddedEvent(
+        device: 79,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    await t.sendEventToBinding(
+      const PointerHoverEvent(
+        device: 79,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    await second.moveBy(const Offset(60, 0));
+    await t.pump();
+    expect(canvas.pageScale, scale);
+    await first.up();
+    await second.up();
+    await t.sendEventToBinding(
+      const PointerRemovedEvent(
+        device: 79,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'stylus hover blocks pinch until exit cooldown and fresh contacts',
+    (t) async {
+      await _open(t);
+      final dynamic canvas = t.state(find.byType(CanvasPage));
+      final scale = canvas.pageScale;
+      await t.sendEventToBinding(
+        const PointerAddedEvent(
+          device: 77,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 20),
+        ),
+      );
+      await t.sendEventToBinding(
+        const PointerHoverEvent(
+          device: 77,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 20),
+        ),
+      );
+      await t.pump();
+      final first = await t.startGesture(const Offset(250, 300), pointer: 231);
+      final second = await t.startGesture(const Offset(450, 300), pointer: 232);
+      await second.moveBy(const Offset(50, 0));
+      await t.pump();
+      expect(canvas.pageScale, scale);
+      await t.sendEventToBinding(
+        const PointerRemovedEvent(
+          device: 77,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 20),
+        ),
+      );
+      await t.pump(const Duration(milliseconds: 501));
+      await second.moveBy(const Offset(30, 0));
+      await t.pump();
+      expect(canvas.pageScale, scale);
+      await first.up();
+      await second.up();
+      final third = await t.startGesture(const Offset(250, 300), pointer: 233);
+      final fourth = await t.startGesture(const Offset(450, 300), pointer: 234);
+      await fourth.moveBy(const Offset(40, 0));
+      await t.pump();
+      expect(canvas.pageScale, greaterThan(scale));
+      await third.up();
+      await fourth.up();
+      await t.pumpAndSettle();
+      await t.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('focus loss clears hovering stylus proximity', (t) async {
+    await _open(t);
+    final dynamic canvas = t.state(find.byType(CanvasPage));
+    await t.sendEventToBinding(
+      const PointerAddedEvent(
+        device: 78,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    await t.sendEventToBinding(
+      const PointerHoverEvent(
+        device: 78,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    canvas.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await t.sendEventToBinding(
+      const PointerRemovedEvent(
+        device: 78,
+        kind: PointerDeviceKind.stylus,
+        position: Offset(400, 250),
+      ),
+    );
+    canvas.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await t.pump();
+    final scale = canvas.pageScale;
+    final first = await t.startGesture(const Offset(250, 300), pointer: 241);
+    final second = await t.startGesture(const Offset(450, 300), pointer: 242);
+    await second.moveBy(const Offset(40, 0));
+    await t.pump();
+    expect(canvas.pageScale, greaterThan(scale));
+    await first.up();
+    await second.up();
+    await t.pumpAndSettle();
+    await t.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'focus loss releases an active pinch and accepts fresh finger gestures',
     (tester) async {

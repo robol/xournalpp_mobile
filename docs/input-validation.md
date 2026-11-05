@@ -36,5 +36,12 @@ workspace. The following checks have not been performed here:
 - Mobile browser: browser focus changes and touch pinch.
 - Long handwriting sessions: visible continuity, frame times, and memory use.
 
-Hover-based palm rejection remains disabled. Android native stylus normalization
-is unchanged; altering it requires a reproducible hardware failure.
+Stylus hover samples now suppress touch across the editor, including the toolbar.
+An exit starts the 500 ms cooldown. Missing exits expire after two seconds without
+a hover sample, then start the cooldown. Rejected contacts remain rejected until
+release. Devices without hover retain the contact-only 500 ms fallback.
+
+Flutter hover/exit routing is covered by synthetic tests. Physical-device hover
+reliability remains unverified; Android native stylus normalization is unchanged.
+A native hover bridge should be considered only if device evidence shows Flutter
+does not deliver usable hover events.
