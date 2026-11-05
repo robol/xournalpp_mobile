@@ -12,7 +12,7 @@ class StylusInputPolicy extends ChangeNotifier {
   final Set<int> _rejected = {};
   final Set<int> _interrupted = {};
   Timer? _cooldown;
-  static const proximityTimeout = Duration(seconds: 2);
+  static const proximityTimeout = stylusTouchCooldown;
   final Map<int, Timer> _proximityTimers = {};
   bool get stylusNearby => _proximityTimers.isNotEmpty;
 
@@ -29,10 +29,8 @@ class StylusInputPolicy extends ChangeNotifier {
     _proximityTimers.remove(event.device)?.cancel();
     _proximityTimers[event.device] = Timer(
       proximityTimeout,
-      () => _leaveProximity(event.device),
+      () => _leaveProximity(event.device, stale: true),
     );
-    _cooldown?.cancel();
-    _cooldown = null;
     _rejected.addAll(_touches);
     if (!wasNearby || rejectedBefore != _rejected.length) notifyListeners();
   }
@@ -41,11 +39,13 @@ class StylusInputPolicy extends ChangeNotifier {
     if (_isStylus(event)) _leaveProximity(event.device);
   }
 
-  void _leaveProximity(int device) {
+  void _leaveProximity(int device, {bool stale = false}) {
     final timer = _proximityTimers.remove(device);
     if (timer == null) return;
     timer.cancel();
-    if (!stylusNearby) _startCooldown();
+    // A stale hover has already consumed the safety window. Do not add a
+    // second delay; an independent pen-release cooldown still applies.
+    if (!stylusNearby && !stale) _startCooldown();
     notifyListeners();
   }
 

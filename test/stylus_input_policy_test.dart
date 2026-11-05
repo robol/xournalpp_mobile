@@ -28,7 +28,11 @@ void main() {
           kind: PointerDeviceKind.stylus,
         ),
       );
-      await t.pump(const Duration(milliseconds: 600));
+      await t.pump(const Duration(milliseconds: 300));
+      policy.hover(
+        const PointerHoverEvent(device: 7, kind: PointerDeviceKind.stylus),
+      );
+      await t.pump(const Duration(milliseconds: 300));
       expect(policy.suppressTouch, isTrue);
       policy.hover(
         const PointerHoverEvent(device: 7, kind: PointerDeviceKind.stylus),
@@ -58,8 +62,6 @@ void main() {
       );
       await t.pump(StylusInputPolicy.proximityTimeout);
       expect(policy.stylusNearby, isFalse);
-      expect(policy.suppressTouch, isTrue);
-      await t.pump(const Duration(milliseconds: 500));
       expect(policy.suppressTouch, isFalse);
       policy.down(
         const PointerDownEvent(pointer: 1, kind: PointerDeviceKind.stylus),
@@ -89,7 +91,7 @@ void main() {
       policy.hover(
         const PointerHoverEvent(device: 7, kind: PointerDeviceKind.stylus),
       );
-      await t.pump(const Duration(seconds: 1));
+      await t.pump(const Duration(milliseconds: 250));
       policy.hover(
         const PointerHoverEvent(device: 7, kind: PointerDeviceKind.stylus),
       );
@@ -99,7 +101,7 @@ void main() {
           kind: PointerDeviceKind.invertedStylus,
         ),
       );
-      await t.pump(const Duration(milliseconds: 1100));
+      await t.pump(const Duration(milliseconds: 275));
       expect(policy.stylusNearby, isTrue);
       policy.exitProximity(
         const PointerExitEvent(device: 7, kind: PointerDeviceKind.stylus),

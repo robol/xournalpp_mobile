@@ -242,6 +242,20 @@ class _CanvasPageState extends State<CanvasPage>
   bool _transferring = false;
   bool _pinchZoomActive = false;
   bool _viewportPinchZooming = false;
+  int? _firstPanPointer;
+  Offset? _firstPanOrigin;
+  Offset? _firstPanLast;
+  bool _firstPanAccepted = false;
+  VelocityTracker? _firstPanVelocity;
+
+  void _resetFirstPan() {
+    _firstPanPointer = null;
+    _firstPanOrigin = null;
+    _firstPanLast = null;
+    _firstPanAccepted = false;
+    _firstPanVelocity = null;
+  }
+
   bool _viewportPinchAccepted = false;
   final _viewportPinchIntent = PinchIntent();
   final Map<int, Offset> _viewportTouchPositions = {};
@@ -263,6 +277,7 @@ class _CanvasPageState extends State<CanvasPage>
       _lastViewportPinchFocalPoint = null;
       if (_pinchZoomActive) _handlePinchZoomEnd();
     }
+    if (suppressed) _resetFirstPan();
     if (suppressed && !_touchWasSuppressed) {
       for (final controller in [
         _pagesScrollController,
@@ -1008,6 +1023,20 @@ class _CanvasPageState extends State<CanvasPage>
     _noteViewportInteraction();
 
     _viewportTouchPositions[event.pointer] = event.position;
+    if (_viewportTouchPositions.length == 1 &&
+        _canPanViewport &&
+        _pagesScrollController.hasClients &&
+        !_pagesScrollController.position.physics.allowUserScrolling) {
+      // The previous input mode had removed Scrollable's drag recognizer.
+      // It cannot join a contact that already began, so handle that contact
+      // until release. Subsequent contacts use the normal recognizer.
+      _firstPanPointer = event.pointer;
+      _firstPanOrigin = event.position;
+      _firstPanLast = event.position;
+      _firstPanVelocity = VelocityTracker.withKind(PointerDeviceKind.touch)
+        ..addPosition(event.timeStamp, event.position);
+    }
+    if (_viewportTouchPositions.length > 1) _resetFirstPan();
     if (_viewportPinchZooming) {
       if (!_viewportPinchAccepted) return;
       for (final key in _pointerListenerKeys.values) {
@@ -1038,6 +1067,20 @@ class _CanvasPageState extends State<CanvasPage>
         _viewportTouchPositions.containsKey(event.pointer)) {
       _viewportTouchPositions[event.pointer] = event.position;
       _noteViewportInteraction();
+    }
+    if (_firstPanPointer == event.pointer &&
+        _viewportTouchPositions.length == 1 &&
+        _canPanViewport) {
+      _firstPanVelocity?.addPosition(event.timeStamp, event.position);
+      final distance = event.position - _firstPanOrigin!;
+      if (!_firstPanAccepted && distance.distance > kTouchSlop) {
+        _firstPanAccepted = true;
+        _panPages(distance - distance / distance.distance * kTouchSlop);
+      } else if (_firstPanAccepted) {
+        _panPages(event.position - _firstPanLast!);
+      }
+      _firstPanLast = event.position;
+      return;
     }
     if (!_viewportPinchZooming) return;
 
@@ -1073,6 +1116,26 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _handleViewportPointerUp(PointerEvent event) {
+    if (_firstPanPointer == event.pointer) {
+      final velocity = event is PointerUpEvent && _firstPanAccepted
+          ? _firstPanVelocity?.getVelocity().pixelsPerSecond
+          : null;
+      _resetFirstPan();
+      if (velocity != null && !_stylusPolicy.rejects(event.pointer)) {
+        void fling(ScrollController controller, double speed) {
+          if (!controller.hasClients || speed.abs() < kMinFlingVelocity) return;
+          final position = controller.position;
+          if (position is ScrollPositionWithSingleContext) {
+            position.goBallistic(
+              (-speed).clamp(-kMaxFlingVelocity, kMaxFlingVelocity).toDouble(),
+            );
+          }
+        }
+
+        fling(_pagesScrollController, velocity.dy);
+        fling(_pagesHorizontalScrollController, velocity.dx);
+      }
+    }
     final rejected = _stylusPolicy.rejects(event.pointer);
     _stylusPolicy.up(event);
     if (rejected ||
@@ -1836,6 +1899,7 @@ class _CanvasPageState extends State<CanvasPage>
       _lastViewportPinchDistance = null;
       _lastViewportPinchFocalPoint = null;
       _viewportTouchPositions.clear();
+      _resetFirstPan();
       _stylusPolicy.interrupt();
       for (final key in _pointerListenerKeys.values) {
         key.currentState?.resetInput();

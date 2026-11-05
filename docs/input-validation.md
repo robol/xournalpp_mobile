@@ -37,11 +37,19 @@ workspace. The following checks have not been performed here:
 - Long handwriting sessions: visible continuity, frame times, and memory use.
 
 Stylus hover samples now suppress touch across the editor, including the toolbar.
-An exit starts the 500 ms cooldown. Missing exits expire after two seconds without
-a hover sample, then start the cooldown. Rejected contacts remain rejected until
+An explicit exit starts a 500 ms cooldown. Missing exits expire after 500 ms
+without a hover sample, without starting another cooldown. The independent
+500 ms pen-release cooldown still applies, so these windows overlap rather
+than stacking. Rejected contacts remain rejected until
 release. Devices without hover retain the contact-only 500 ms fallback.
 
 Flutter hover/exit routing is covered by synthetic tests. Physical-device hover
 reliability remains unverified; Android native stylus normalization is unchanged.
 A native hover bridge should be considered only if device evidence shows Flutter
 does not deliver usable hover events.
+
+When a fresh finger starts panning immediately after stylus suppression ends,
+the prior frame may still have scrolling disabled. That contact is handled by
+the viewport until release, with touch slop and fling velocity; subsequent
+contacts use Scrollable normally. This avoids losing the first drag while
+recognizers are re-enabled.

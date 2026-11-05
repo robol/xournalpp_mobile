@@ -89,6 +89,78 @@ Future<void> _wheel(WidgetTester tester, Offset position, double delta) =>
     );
 
 void main() {
+  testWidgets(
+    'fresh touch can pan after pen release with a missing hover exit',
+    (t) async {
+      await _open(t);
+      t.widget<EditingToolBar>(find.byType(EditingToolBar)).onNewDeviceMap!({
+        PointerDeviceKind.touch: EditingTool.MOVE,
+        PointerDeviceKind.stylus: EditingTool.STYLUS,
+      });
+      await t.pump();
+
+      await t.sendEventToBinding(
+        const PointerAddedEvent(
+          device: 85,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await t.sendEventToBinding(
+        const PointerHoverEvent(
+          device: 85,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await t.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 260,
+          device: 85,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await t.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 260,
+          device: 85,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await t.pump(const Duration(milliseconds: 501));
+      final before = _vertical(t).pixels;
+      final finger = await t.startGesture(const Offset(400, 300), pointer: 261);
+      await t.pump();
+      await finger.moveBy(const Offset(0, -80));
+      await t.pump();
+      expect(_vertical(t).pixels, greaterThan(before));
+      expect(_vertical(t).pixels - before, lessThanOrEqualTo(80));
+      await finger.up();
+      await t.pumpAndSettle();
+      final beforeSecond = _vertical(t).pixels;
+      final nextFinger = await t.startGesture(
+        const Offset(400, 300),
+        pointer: 262,
+      );
+      await t.pump();
+      await nextFinger.moveBy(const Offset(0, -80));
+      await t.pump();
+      expect(_vertical(t).pixels, greaterThan(beforeSecond));
+      expect(_vertical(t).pixels - beforeSecond, lessThanOrEqualTo(80));
+      await nextFinger.up();
+      await t.sendEventToBinding(
+        const PointerRemovedEvent(
+          device: 85,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await t.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('stylus hover interrupts an already accepted pinch', (t) async {
     await _open(t);
     final dynamic canvas = t.state(find.byType(CanvasPage));
