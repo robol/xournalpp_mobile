@@ -176,6 +176,8 @@ class _IncrementalPdfWriter {
   late final int _rootObject;
   late final List<_PdfPageInfo> _pages;
   final Map<int, _PdfObject> _objectCache = {};
+  bool _usesXrefStreams = false;
+  int _sourceSize = 0;
 
   _IncrementalPdfWriter(this._bytes) {
     _text = latin1.decode(_bytes);
@@ -291,25 +293,72 @@ class _IncrementalPdfWriter {
     );
 
     final xrefOffset = _bytes.length + appendedLength;
-    builder.write('xref\n');
-    final sortedObjects = newOffsets.keys.toList()..sort();
-    for (final objectNumber in sortedObjects) {
-      builder.write('$objectNumber 1\n');
-      builder.write(
-        '${newOffsets[objectNumber]!.toString().padLeft(10, '0')} 00000 n \n',
-      );
-    }
-    builder.write('trailer\n');
-    final trailerEntries = {
-      'Size': '${max(nextObject, _maxObjectNumber + 1)}',
+    final trailerEntries = <String, String>{
       'Root': '$_rootObject 0 R',
       if (_trailer['Info'] != null) 'Info': _trailer['Info']!,
       if (_trailer['ID'] != null) 'ID': _trailer['ID']!,
       'Prev': '$_previousXrefOffset',
     };
-    builder.write('<< ');
-    trailerEntries.forEach((key, value) => builder.write('/$key $value '));
-    builder.write('>>\n');
+    if (_usesXrefStreams) {
+      final xrefObject = nextObject++;
+      newOffsets[xrefObject] = xrefOffset;
+      final sorted = newOffsets.keys.toList()..sort();
+      final index = <int>[];
+      for (final number in sorted) {
+        if (index.isNotEmpty &&
+            index[index.length - 2] + index.last == number) {
+          index[index.length - 1]++;
+        } else {
+          index.addAll([number, 1]);
+        }
+      }
+      final entries = BytesBuilder();
+      for (final number in sorted) {
+        final offset = newOffsets[number]!;
+        if (offset < 0 || offset > 0xffffffff) {
+          throw const PdfExportException(
+            'PDF xref stream offset exceeds four-byte width.',
+          );
+        }
+        // The writer only emits generation-zero, uncompressed objects.
+        entries.add([
+          1,
+          (offset >> 24) & 255,
+          (offset >> 16) & 255,
+          (offset >> 8) & 255,
+          offset & 255,
+          0,
+          0,
+        ]);
+      }
+      final data = entries.toBytes();
+      final dictionary = <String, String>{
+        'Type': '/XRef',
+        'Size': '${max(nextObject, _sourceSize)}',
+        ...trailerEntries,
+        'W': '[1 4 2]',
+        'Index': '[${index.join(' ')}]',
+        'Length': '${data.length}',
+      };
+      appendObject(
+        '$xrefObject 0 obj\n'
+        '<< ${dictionary.entries.map((e) => '/${e.key} ${e.value}').join(' ')} >>\n'
+        'stream\n${latin1.decode(data)}\nendstream\nendobj\n',
+      );
+    } else {
+      builder.write('xref\n');
+      final sortedObjects = newOffsets.keys.toList()..sort();
+      for (final objectNumber in sortedObjects) {
+        builder.write('$objectNumber 1\n');
+        builder.write(
+          '${newOffsets[objectNumber]!.toString().padLeft(10, '0')} 00000 n \n',
+        );
+      }
+      builder.write('trailer\n');
+      builder.write('<< /Size ${max(nextObject, _maxObjectNumber + 1)} ');
+      trailerEntries.forEach((key, value) => builder.write('/$key $value '));
+      builder.write('>>\n');
+    }
     builder.write('startxref\n$xrefOffset\n%%EOF\n');
 
     return Uint8List.fromList([
@@ -353,7 +402,7 @@ class _IncrementalPdfWriter {
     final trailerSize = int.tryParse(_trailer['Size'] ?? '');
     _maxObjectNumber = max(
       maxObject,
-      trailerSize == null ? 0 : trailerSize - 1,
+      max(_sourceSize - 1, trailerSize == null ? 0 : trailerSize - 1),
     );
   }
 
@@ -411,6 +460,7 @@ class _IncrementalPdfWriter {
     final trailer = _dictionaryEntries(
       _text.substring(trailerStart, trailerEnd),
     );
+    _sourceSize = max(_sourceSize, _integerValue(trailer['Size']) ?? 0);
     final previousXrefOffset = _integerValue(trailer['Prev']);
     final previousTrailer = previousXrefOffset == null
         ? <String, String>{}
@@ -424,7 +474,21 @@ class _IncrementalPdfWriter {
 
     localFreeObjects.forEach(onFreeObject);
     localOffsets.forEach(onObject);
-    return {...previousTrailer, ...trailer};
+    final hybridOffset = _integerValue(trailer['XRefStm']);
+    var hybridTrailer = <String, String>{};
+    if (hybridOffset != null) {
+      if (!visitedOffsets.add(hybridOffset))
+        throw const PdfExportException('Cyclic PDF xref chain.');
+      hybridTrailer = _parseXrefStreamAt(
+        hybridOffset,
+        visitedOffsets: visitedOffsets,
+        onObject: onObject,
+        onCompressedObject: onCompressedObject,
+        onFreeObject: onFreeObject,
+        followPrevious: false,
+      );
+    }
+    return {...previousTrailer, ...hybridTrailer, ...trailer};
   }
 
   Map<String, String> _parseXrefStreamAt(
@@ -434,6 +498,7 @@ class _IncrementalPdfWriter {
     required void Function(int objectNumber, _CompressedObjectRef ref)
     onCompressedObject,
     required void Function(int objectNumber) onFreeObject,
+    bool followPrevious = true,
   }) {
     final xrefObject = _objectAtOffset(offset: xrefOffset);
     final trailer = _dictionaryEntries(xrefObject.dictionary);
@@ -441,7 +506,11 @@ class _IncrementalPdfWriter {
       throw const PdfExportException('Unsupported PDF xref structure.');
     }
 
-    final previousXrefOffset = _integerValue(trailer['Prev']);
+    _sourceSize = max(_sourceSize, _integerValue(trailer['Size']) ?? 0);
+    _usesXrefStreams = true;
+    final previousXrefOffset = followPrevious
+        ? _integerValue(trailer['Prev'])
+        : null;
     final previousTrailer = previousXrefOffset == null
         ? <String, String>{}
         : _parseXrefSectionAt(

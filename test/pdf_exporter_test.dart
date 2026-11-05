@@ -17,6 +17,160 @@ import 'package:xournalpp/src/XppPage.dart';
 import 'package:xournalpp/src/XppPickedFile.dart';
 
 void main() {
+  test(
+    'PDF 1.7 classic-only source keeps a classic incremental table',
+    () async {
+      final source = Uint8List.fromList(
+        latin1.encode(
+          latin1.decode(_minimalPdf()).replaceFirst('%PDF-1.4', '%PDF-1.7'),
+        ),
+      );
+      final exported = await exportPdfDocument(
+        _pdfBackedFile(await _writePdf(source)),
+      );
+      expect(
+        latin1.decode(exported).substring(_lastXref(exported)),
+        startsWith('xref\n'),
+      );
+    },
+  );
+
+  for (final compressed in [false, true]) {
+    test(
+      'stream output and repeated export with compressed objects: $compressed',
+      () async {
+        final source = _xrefStreamPdf(useObjectStream: compressed);
+        final first = await exportPdfDocument(
+          _pdfBackedFile(await _writePdf(source)),
+        );
+        _checkStreamRevision(source, first);
+        final second = await exportPdfDocument(
+          _pdfBackedFile(await _writePdf(first)),
+        );
+        _checkStreamRevision(first, second);
+      },
+    );
+  }
+  test(
+    'hybrid references and mixed revision chains retain stream output',
+    () async {
+      for (final hybrid in [false, true]) {
+        final source = _classicTail(
+          _xrefStreamPdf(useObjectStream: true),
+          hybrid: hybrid,
+        );
+        _checkStreamRevision(
+          source,
+          await exportPdfDocument(_pdfBackedFile(await _writePdf(source))),
+        );
+      }
+    },
+  );
+  test(
+    'linearized source retains final startxref rather than last physical section',
+    () async {
+      final source = Uint8List.fromList(
+        await File('test/fixtures/linearized-xref-stream.pdf').readAsBytes(),
+      );
+      final text = latin1.decode(source);
+      expect(text, contains('/Linearized'));
+      expect(_lastXref(source), lessThan(text.lastIndexOf('/Type /XRef')));
+      _checkStreamRevision(
+        source,
+        await exportPdfDocument(_pdfBackedFile(await _writePdf(source))),
+      );
+    },
+  );
+  final qpdf = Platform.environment['PDF_EXPORT_QPDF'] ?? 'qpdf';
+  final gs = Platform.environment['PDF_EXPORT_GS'] ?? 'gs';
+  final missing = [
+    for (final tool in [qpdf, gs])
+      if (!_toolAvailable(tool)) tool,
+  ];
+  test(
+    'independent qpdf and Ghostscript validation and rendering over two exports',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'xpp-independent-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      var source = Uint8List.fromList(
+        await File('test/fixtures/linearized-xref-stream.pdf').readAsBytes(),
+      );
+      for (var revision = 0; revision < 3; revision++) {
+        final input = File(directory.path + '/revision-$revision.pdf');
+        await input.writeAsBytes(source);
+        final check = await Process.run(qpdf, ['--check', input.path]);
+        expect(
+          check.exitCode,
+          0,
+          reason: check.stdout.toString() + check.stderr.toString(),
+        );
+        final render = await Process.run(gs, [
+          '-q',
+          '-dBATCH',
+          '-dNOPAUSE',
+          '-sDEVICE=pngalpha',
+          '-r72',
+          '-sOutputFile=' + directory.path + '/$revision-%d.png',
+          input.path,
+        ]);
+        expect(render.exitCode, 0, reason: render.stderr.toString());
+        expect(
+          render.stdout.toString() + render.stderr.toString(),
+          isNot(
+            matches(
+              RegExp(r'repair|recover|warning|error', caseSensitive: false),
+            ),
+          ),
+        );
+        for (var page = 1; page <= 2; page++) {
+          final raster = img.decodePng(
+            await File(directory.path + '/$revision-$page.png').readAsBytes(),
+          )!;
+          var green = 0;
+          var blue = 0;
+          for (final pixel in raster) {
+            if (pixel.g > 100 && pixel.r < 80 && pixel.b < 80) green++;
+            if (pixel.b > 100 && pixel.r < 80 && pixel.g < 100) blue++;
+          }
+          expect(green, greaterThan(1000));
+          if (revision > 0) expect(blue, greaterThan(20));
+        }
+        if (revision == 2) break;
+        List<XppStroke> ink() => revision == 0
+            ? [
+                XppStrokePen(
+                  color: const Color(0xff0000ff),
+                  points: [
+                    XppStrokePoint(x: 20, y: 30, width: 3),
+                    XppStrokePoint(x: 110, y: 90, width: 3),
+                  ],
+                ),
+              ]
+            : [];
+        final notebook = _pdfBackedFile(input.path, content: ink());
+        notebook.pages!.add(
+          XppPage(
+            pageSize: XppPageSize(width: 200, height: 200),
+            background: XppBackgroundPdf(
+              filename: input.path,
+              page: 2,
+              onUnavailable: (_, __) async => throw StateError('fixture'),
+            ),
+            layers: [XppLayer(content: ink())],
+          ),
+        );
+        final output = await exportPdfDocument(notebook);
+        _checkStreamRevision(source, output);
+        source = output;
+      }
+    },
+    skip: missing.isEmpty
+        ? false
+        : 'Independent PDF tools unavailable: ' + missing.join(', '),
+  );
+
   for (final xml in [
     '<background type="pixmap" domain="absolute" filename="image.png" custom="keep"/>',
     '<background type="pixmap" domain="attach" filename="image.png"/>',
@@ -109,34 +263,39 @@ void main() {
     );
   });
 
-  test('generated and incremental PDF xref offsets point to objects', () async {
-    final generated = await exportPdfDocument(XppFile.empty());
-    final path = await _writePdf(_minimalPdf());
-    final incremental = await exportPdfDocument(_pdfBackedFile(path));
-    for (final bytes in [generated, incremental]) {
-      final text = latin1.decode(bytes);
-      final start = RegExp(r'startxref\s+(\d+)\s+%%EOF').allMatches(text).last;
-      final offset = int.parse(start.group(1)!);
-      expect(text.substring(offset), startsWith('xref\n'));
-      final section = text.substring(offset, text.indexOf('trailer', offset));
-      final lines = section.split('\n');
-      var i = 1;
-      while (i < lines.length && lines[i].isNotEmpty) {
-        final header = lines[i++].split(' ');
-        final first = int.parse(header[0]);
-        final count = int.parse(header[1]);
-        for (var j = 0; j < count; j++) {
-          final entry = lines[i++];
-          if (entry[17] != 'n') continue;
-          final objectOffset = int.parse(entry.substring(0, 10));
-          expect(
-            text.substring(objectOffset),
-            startsWith('${first + j} 0 obj\n'),
-          );
+  test(
+    'generated and classic-source incremental PDF xref offsets point to objects',
+    () async {
+      final generated = await exportPdfDocument(XppFile.empty());
+      final path = await _writePdf(_minimalPdf());
+      final incremental = await exportPdfDocument(_pdfBackedFile(path));
+      for (final bytes in [generated, incremental]) {
+        final text = latin1.decode(bytes);
+        final start = RegExp(
+          r'startxref\s+(\d+)\s+%%EOF',
+        ).allMatches(text).last;
+        final offset = int.parse(start.group(1)!);
+        expect(text.substring(offset), startsWith('xref\n'));
+        final section = text.substring(offset, text.indexOf('trailer', offset));
+        final lines = section.split('\n');
+        var i = 1;
+        while (i < lines.length && lines[i].isNotEmpty) {
+          final header = lines[i++].split(' ');
+          final first = int.parse(header[0]);
+          final count = int.parse(header[1]);
+          for (var j = 0; j < count; j++) {
+            final entry = lines[i++];
+            if (entry[17] != 'n') continue;
+            final objectOffset = int.parse(entry.substring(0, 10));
+            expect(
+              text.substring(objectOffset),
+              startsWith('${first + j} 0 obj\n'),
+            );
+          }
         }
       }
-    }
-  });
+    },
+  );
   test('exports opaque filled strokes and rejects translucent fills', () async {
     final file = XppFile.empty();
     final stroke = XppStrokePen(
@@ -591,7 +750,7 @@ Uint8List _minimalPdf({bool encrypted = false}) {
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] '
         '/Resources << >> /Contents 4 0 R >>',
-    '<< /Length 31 >>\nstream\nq 1 1 1 rg 0 0 200 200 re f Q\nendstream',
+    '<< /Length 30 >>\nstream\nq 1 1 1 rg 0 0 200 200 re f Q\nendstream',
   ];
 
   for (var i = 0; i < objects.length; i++) {
@@ -693,7 +852,7 @@ Uint8List _plainXrefStreamPdf() {
     3:
         '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] '
         '/Resources << >> /Contents 4 0 R >>',
-    4: '<< /Length 31 >>\nstream\nq 1 1 1 rg 0 0 200 200 re f Q\nendstream',
+    4: '<< /Length 30 >>\nstream\nq 1 1 1 rg 0 0 200 200 re f Q\nendstream',
   };
 
   objects.forEach((objectNumber, body) {
@@ -724,7 +883,7 @@ Uint8List _xrefStreamPdfWithObjectStream() {
   final contentOffset = latin1.encode(buffer.toString()).length;
   buffer.write(
     '4 0 obj\n'
-    '<< /Length 31 >>\n'
+    '<< /Length 30 >>\n'
     'stream\nq 1 1 1 rg 0 0 200 200 re f Q\nendstream\n'
     'endobj\n',
   );
@@ -807,4 +966,108 @@ List<int> _uintBytes(int value, int width) {
     for (var shift = (width - 1) * 8; shift >= 0; shift -= 8)
       (value >> shift) & 0xff,
   ];
+}
+
+bool _toolAvailable(String executable) {
+  try {
+    return Process.runSync(executable, ['--version']).exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
+}
+
+int _lastXref(Uint8List bytes) => int.parse(
+  RegExp(
+    r'startxref\s+(\d+)\s+%%EOF\s*$',
+  ).firstMatch(latin1.decode(bytes))!.group(1)!,
+);
+
+void _checkStreamRevision(Uint8List source, Uint8List output) {
+  expect(output.sublist(0, source.length), source);
+  final text = latin1.decode(output);
+  final offset = _lastXref(output);
+  final header = RegExp(
+    r'^(\d+) 0 obj\n(<<.*?>>)\nstream\n',
+    dotAll: true,
+  ).matchAsPrefix(text.substring(offset))!;
+  final self = int.parse(header.group(1)!);
+  final dictionary = header.group(2)!;
+  expect(dictionary, contains('/Type /XRef'));
+  expect(dictionary, contains('/W [1 4 2]'));
+  expect(dictionary, contains('/Prev ' + _lastXref(source).toString()));
+  for (final key in ['XRefStm', 'Filter', 'DecodeParms']) {
+    expect(dictionary, isNot(contains('/$key ')));
+  }
+  final sourceText = latin1.decode(source);
+  for (final key in ['Root', 'Info']) {
+    final ref = RegExp('/$key ' + r'(\d+ \d+ R)').firstMatch(sourceText);
+    if (ref != null) expect(dictionary, contains('/$key ' + ref.group(1)!));
+  }
+  final id = RegExp(r'/ID\s*(\[[^\]]*\])').firstMatch(sourceText);
+  if (id != null) expect(dictionary, contains('/ID ' + id.group(1)!));
+  final index = RegExp(r'/Index \[([^\]]*)\]')
+      .firstMatch(dictionary)!
+      .group(1)!
+      .trim()
+      .split(RegExp(r'\s+'))
+      .map(int.parse)
+      .toList();
+  final length = int.parse(
+    RegExp(r'/Length (\d+)').firstMatch(dictionary)!.group(1)!,
+  );
+  final size = int.parse(
+    RegExp(r'/Size (\d+)').firstMatch(dictionary)!.group(1)!,
+  );
+  final expected = <int, int>{};
+  for (final object in RegExp(
+    r'^(\d+) 0 obj\n',
+    multiLine: true,
+  ).allMatches(text.substring(source.length))) {
+    expected[int.parse(object.group(1)!)] = source.length + object.start;
+  }
+  expect(expected[self], offset);
+  final numbers = <int>[];
+  for (var i = 0; i < index.length; i += 2) {
+    expect(index[i + 1], greaterThan(0));
+    if (numbers.isNotEmpty) expect(index[i], greaterThan(numbers.last));
+    numbers.addAll(List.generate(index[i + 1], (j) => index[i] + j));
+  }
+  expect(numbers, expected.keys.toList()..sort());
+  expect(length, numbers.length * 7);
+  final data = ByteData.sublistView(
+    output,
+    offset + header.end,
+    offset + header.end + length,
+  );
+  for (var i = 0; i < numbers.length; i++) {
+    expect(data.getUint8(i * 7), 1);
+    expect(data.getUint32(i * 7 + 1), expected[numbers[i]]);
+    expect(data.getUint16(i * 7 + 5), 0);
+  }
+  expect(
+    text.substring(offset + header.end + length),
+    startsWith('\nendstream\nendobj\nstartxref\n$offset\n%%EOF'),
+  );
+  expect(size, greaterThan(numbers.last));
+  for (final m in RegExp(r'/Size (\d+)').allMatches(sourceText)) {
+    expect(size, greaterThanOrEqualTo(int.parse(m.group(1)!)));
+  }
+  expect(text.substring(source.length), isNot(contains('\nxref\n')));
+  expect(text.substring(source.length), isNot(contains('\ntrailer\n')));
+}
+
+Uint8List _classicTail(Uint8List source, {required bool hybrid}) {
+  final buffer = StringBuffer(latin1.decode(source));
+  final previous = _lastXref(source);
+  final size = int.parse(
+    RegExp(r'/Size (\d+)').firstMatch(latin1.decode(source))!.group(1)!,
+  );
+  final offset = buffer.length;
+  final link = hybrid ? '/XRefStm $previous' : '/Prev $previous';
+  buffer.write(
+    'xref\n0 1\n0000000000 65535 f \ntrailer\n'
+    '<< /Size $size /Root 1 0 R $link >>\n'
+    'startxref\n$offset\n%%EOF\n',
+  );
+  return Uint8List.fromList(latin1.encode(buffer.toString()));
 }
