@@ -89,6 +89,318 @@ Future<void> _wheel(WidgetTester tester, Offset position, double delta) =>
     );
 
 void main() {
+  testWidgets(
+    'focus loss releases an active pinch and accepts fresh finger gestures',
+    (tester) async {
+      await _open(tester);
+      final dynamic canvas = tester.state(find.byType(CanvasPage));
+      Future<void> down(int id, double x) => tester.sendEventToBinding(
+        PointerDownEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      Future<void> move(int id, double x) => tester.sendEventToBinding(
+        PointerMoveEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      Future<void> up(int id, double x) => tester.sendEventToBinding(
+        PointerUpEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      await down(221, 250);
+      await down(222, 450);
+      await move(222, 480);
+      await tester.pump();
+      final scale = canvas.pageScale;
+      expect(scale, greaterThan(1));
+      canvas.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      canvas.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await move(222, 550);
+      await tester.pumpAndSettle();
+      expect(canvas.pageScale, scale);
+      await up(221, 250);
+      await up(222, 550);
+      await down(223, 250);
+      await down(224, 450);
+      await move(224, 480);
+      await tester.pump();
+      expect(canvas.pageScale, greaterThan(scale));
+      await up(223, 250);
+      await up(224, 480);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('nearby contacts and small jitter cannot start zoom', (
+    tester,
+  ) async {
+    await _open(tester);
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    final scale = canvas.pageScale;
+    Future<void> down(int id, double x) => tester.sendEventToBinding(
+      PointerDownEvent(
+        pointer: id,
+        kind: PointerDeviceKind.touch,
+        position: Offset(x, 300),
+      ),
+    );
+    Future<void> move(int id, double x) => tester.sendEventToBinding(
+      PointerMoveEvent(
+        pointer: id,
+        kind: PointerDeviceKind.touch,
+        position: Offset(x, 300),
+      ),
+    );
+    Future<void> up(int id, double x) => tester.sendEventToBinding(
+      PointerUpEvent(
+        pointer: id,
+        kind: PointerDeviceKind.touch,
+        position: Offset(x, 300),
+      ),
+    );
+    await down(201, 300);
+    await down(202, 301);
+    await move(202, 350);
+    await tester.pump();
+    expect(canvas.pageScale, scale);
+    await up(201, 300);
+    await up(202, 350);
+    await down(203, 250);
+    await down(204, 450);
+    await move(204, 453);
+    await tester.pump();
+    expect(canvas.pageScale, scale);
+    await move(204, 470);
+    await tester.pump();
+    expect(canvas.pageScale, greaterThan(scale));
+    await up(203, 250);
+    await up(204, 470);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('focus loss cancels unfinished ink and permits fresh pen input', (
+    tester,
+  ) async {
+    final file = await _open(tester);
+    final dynamic canvas = tester.state(find.byType(CanvasPage));
+    Future<void> down(int id) => tester.sendEventToBinding(
+      PointerDownEvent(
+        pointer: id,
+        kind: PointerDeviceKind.stylus,
+        position: const Offset(400, 250),
+      ),
+    );
+    Future<void> move(int id) => tester.sendEventToBinding(
+      PointerMoveEvent(
+        pointer: id,
+        kind: PointerDeviceKind.stylus,
+        position: const Offset(420, 270),
+      ),
+    );
+    Future<void> up(int id) => tester.sendEventToBinding(
+      PointerUpEvent(
+        pointer: id,
+        kind: PointerDeviceKind.stylus,
+        position: const Offset(420, 270),
+      ),
+    );
+    await down(210);
+    await move(210);
+    await up(210);
+    await tester.pump();
+    expect(file.pages!.first.layers!.first.content, hasLength(1));
+    await down(211);
+    await move(211);
+    canvas.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    canvas.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pump();
+    await move(211);
+    await up(211);
+    expect(file.pages!.first.layers!.first.content, hasLength(1));
+    await down(212);
+    await move(212);
+    await up(212);
+    await tester.pumpAndSettle();
+    expect(file.pages!.first.layers!.first.content, hasLength(2));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'pinch waits 500ms after stylus release and requires fresh contacts',
+    (tester) async {
+      await _open(tester);
+      final dynamic canvas = tester.state(find.byType(CanvasPage));
+      final scale = canvas.pageScale;
+      await tester.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 100,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 100,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 499));
+      Future<void> down(int id, double x) => tester.sendEventToBinding(
+        PointerDownEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      Future<void> move(int id, double x) => tester.sendEventToBinding(
+        PointerMoveEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      Future<void> up(int id, double x) => tester.sendEventToBinding(
+        PointerUpEvent(
+          pointer: id,
+          kind: PointerDeviceKind.touch,
+          position: Offset(x, 300),
+        ),
+      );
+      await down(101, 250);
+      await down(102, 450);
+      await move(101, 200);
+      await move(102, 500);
+      await tester.pump();
+      expect(canvas.pageScale, scale);
+      await tester.pump(const Duration(milliseconds: 101));
+      await move(101, 180);
+      await move(102, 520);
+      await tester.pump();
+      expect(canvas.pageScale, scale);
+      await up(101, 180);
+      await up(102, 520);
+      await down(103, 250);
+      await down(104, 450);
+      await move(103, 200);
+      await move(104, 500);
+      await tester.pump();
+      expect(canvas.pageScale, greaterThan(scale));
+      await up(103, 200);
+      await up(104, 500);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  for (final palmFirst in [false, true]) {
+    testWidgets('stylus draws despite palm pinch, palm first: $palmFirst', (
+      tester,
+    ) async {
+      final file = await _open(tester);
+      _vertical(tester).jumpTo(100);
+      await tester.pumpAndSettle();
+      final before = _vertical(tester).pixels;
+      final dynamic canvas = tester.state(find.byType(CanvasPage));
+      final scale = canvas.pageScale;
+      Future<void> palmsDown() async {
+        await tester.sendEventToBinding(
+          const PointerDownEvent(
+            pointer: 81,
+            kind: PointerDeviceKind.touch,
+            position: Offset(300, 300),
+          ),
+        );
+        await tester.sendEventToBinding(
+          const PointerDownEvent(
+            pointer: 82,
+            kind: PointerDeviceKind.touch,
+            position: Offset(450, 300),
+          ),
+        );
+      }
+
+      if (palmFirst) await palmsDown();
+      await tester.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 80,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(400, 250),
+        ),
+      );
+      await tester.pump();
+      if (!palmFirst) await palmsDown();
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 81,
+          kind: PointerDeviceKind.touch,
+          position: Offset(200, 350),
+          delta: Offset(-100, 50),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 82,
+          kind: PointerDeviceKind.touch,
+          position: Offset(550, 350),
+          delta: Offset(100, 50),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 80,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(420, 270),
+          delta: Offset(20, 20),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 80,
+          kind: PointerDeviceKind.stylus,
+          position: Offset(420, 270),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 81,
+          kind: PointerDeviceKind.touch,
+          position: Offset(200, 400),
+          delta: Offset(0, 50),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 81,
+          kind: PointerDeviceKind.touch,
+          position: Offset(200, 400),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 82,
+          kind: PointerDeviceKind.touch,
+          position: Offset(550, 350),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(file.pages!.first.layers!.first.content, hasLength(1));
+      expect(_vertical(tester).pixels, closeTo(before, .1));
+      expect(canvas.pageScale, scale);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
   testWidgets('rotation preserves page and fraction within the document', (
     tester,
   ) async {

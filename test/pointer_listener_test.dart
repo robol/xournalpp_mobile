@@ -546,6 +546,27 @@ void main() {
         ),
       );
       await tester.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 90,
+          kind: PointerDeviceKind.touch,
+          position: Offset(60, 60),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 91,
+          kind: PointerDeviceKind.touch,
+          position: Offset(80, 60),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 90,
+          kind: PointerDeviceKind.touch,
+          position: Offset(40, 80),
+        ),
+      );
+      await tester.sendEventToBinding(
         const PointerMoveEvent(
           pointer: 2,
           position: Offset(50, 50),
@@ -558,6 +579,21 @@ void main() {
           pointer: 2,
           position: Offset(50, 50),
           kind: PointerDeviceKind.stylus,
+        ),
+      );
+
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 90,
+          kind: PointerDeviceKind.touch,
+          position: Offset(40, 80),
+        ),
+      );
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 91,
+          kind: PointerDeviceKind.touch,
+          position: Offset(80, 60),
         ),
       );
 

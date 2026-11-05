@@ -1,3 +1,5 @@
+import 'package:xournalpp/widgets/PinchIntent.dart';
+import 'package:xournalpp/widgets/StylusInputPolicy.dart';
 import 'package:xournalpp/src/RecentProvider.dart';
 import 'package:xournalpp/widgets/NotebookActions.dart';
 import 'package:xournalpp/src/NotebookCache.dart';
@@ -240,7 +242,19 @@ class _CanvasPageState extends State<CanvasPage>
   bool _transferring = false;
   bool _pinchZoomActive = false;
   bool _viewportPinchZooming = false;
+  bool _viewportPinchAccepted = false;
+  final _viewportPinchIntent = PinchIntent();
   final Map<int, Offset> _viewportTouchPositions = {};
+  late final _stylusPolicy = StylusInputPolicy()
+    ..addListener(_refreshStylusPolicy);
+  bool get _suppressPalmInput => _stylusPolicy.suppressTouch;
+
+  void _refreshStylusPolicy() {
+    if (!mounted) return;
+    _setZoomableState();
+    setState(() {});
+  }
+
   double? _lastViewportPinchDistance;
   Offset? _lastViewportPinchFocalPoint;
   bool _allowPop = false;
@@ -922,6 +936,29 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _handleViewportPointerDown(PointerDownEvent event) {
+    if (event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus) {
+      _stylusPolicy.down(event);
+      _viewportTouchPositions.clear();
+      if (_viewportPinchZooming) {
+        _viewportPinchZooming = false;
+        _lastViewportPinchDistance = null;
+        _lastViewportPinchFocalPoint = null;
+        if (_viewportPinchAccepted) _handlePinchZoomEnd();
+        _viewportPinchAccepted = false;
+      }
+      for (final controller in [
+        _pagesScrollController,
+        _pagesHorizontalScrollController,
+      ]) {
+        if (controller.hasClients) controller.jumpTo(controller.offset);
+      }
+      _setZoomableState();
+      setState(() {});
+      return;
+    }
+    _stylusPolicy.down(event);
+    if (_stylusPolicy.rejects(event.pointer)) return;
     _cancelPageNavigation();
     if (!_viewportPinchZooming) _supersedeViewportCorrection();
     if (event.kind != PointerDeviceKind.touch) return;
@@ -944,13 +981,17 @@ class _CanvasPageState extends State<CanvasPage>
     _viewportPinchZooming = true;
     _lastViewportPinchDistance = metrics.distance;
     _lastViewportPinchFocalPoint = metrics.focalPoint;
-    _handlePinchZoomStart(metrics.focalPoint);
+    _viewportPinchAccepted = false;
+    _viewportPinchIntent.begin(metrics.distance, metrics.focalPoint);
+    setState(() {});
     for (final key in _pointerListenerKeys.values) {
       key.currentState?.cancelForViewportGesture();
     }
   }
 
   void _handleViewportPointerMove(PointerMoveEvent event) {
+    if (_stylusPolicy.rejects(event.pointer) || _stylusPolicy.stylusActive)
+      return;
     if (event.kind == PointerDeviceKind.touch &&
         _viewportTouchPositions.containsKey(event.pointer)) {
       _viewportTouchPositions[event.pointer] = event.position;
@@ -968,8 +1009,17 @@ class _CanvasPageState extends State<CanvasPage>
       return;
     }
 
+    if (!_viewportPinchAccepted) {
+      if (!_viewportPinchIntent.accepts(metrics.distance, metrics.focalPoint))
+        return;
+      _viewportPinchAccepted = true;
+      _handlePinchZoomStart(previousFocalPoint);
+    }
     _lastViewportPinchDistance = metrics.distance;
     _lastViewportPinchFocalPoint = metrics.focalPoint;
+    if (metrics.distance < PinchIntent.minimumSeparation ||
+        previousDistance < PinchIntent.minimumSeparation)
+      return;
     _handlePinchZoomUpdate(
       scaleDelta: metrics.distance / previousDistance,
       globalFocalPoint: metrics.focalPoint,
@@ -978,6 +1028,12 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _handleViewportPointerUp(PointerEvent event) {
+    final rejected = _stylusPolicy.rejects(event.pointer);
+    _stylusPolicy.up(event);
+    if (rejected ||
+        event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus)
+      return;
     if (event.kind == PointerDeviceKind.touch) {
       _viewportTouchPositions.remove(event.pointer);
     }
@@ -985,6 +1041,8 @@ class _CanvasPageState extends State<CanvasPage>
     if (!_viewportPinchZooming) return;
     if (_viewportTouchPositions.length >= 2) {
       final metrics = _currentViewportPinchMetrics();
+      if (metrics != null)
+        _viewportPinchIntent.begin(metrics.distance, metrics.focalPoint);
       _lastViewportPinchDistance = metrics?.distance;
       _lastViewportPinchFocalPoint = metrics?.focalPoint;
       if (metrics != null) {
@@ -997,7 +1055,9 @@ class _CanvasPageState extends State<CanvasPage>
     _viewportPinchZooming = false;
     _lastViewportPinchDistance = null;
     _lastViewportPinchFocalPoint = null;
-    _handlePinchZoomEnd();
+    if (_viewportPinchAccepted) _handlePinchZoomEnd();
+    _viewportPinchAccepted = false;
+    setState(() {});
   }
 
   _ViewportPinchMetrics? _currentViewportPinchMetrics() {
@@ -1062,6 +1122,7 @@ class _CanvasPageState extends State<CanvasPage>
                 simplifyStrokes: simplifyStrokes,
                 stylusPressureSensitivity: stylusPressureSensitivity,
                 canPanViewportListenable: _canPanViewportListenable,
+                stylusPolicy: _stylusPolicy,
                 onPointerActivity: () => _activatePageForEditing(pageIndex),
                 onPan: _panPages,
                 onDeviceChange: _handleDeviceChange,
@@ -1722,6 +1783,25 @@ class _CanvasPageState extends State<CanvasPage>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
+      _cancelPageNavigation();
+      if (_pinchZoomActive) _handlePinchZoomEnd();
+      _supersedeViewportCorrection();
+      _viewportPinchZooming = false;
+      _viewportPinchAccepted = false;
+      _lastViewportPinchDistance = null;
+      _lastViewportPinchFocalPoint = null;
+      _viewportTouchPositions.clear();
+      _stylusPolicy.interrupt();
+      for (final key in _pointerListenerKeys.values) {
+        key.currentState?.resetInput();
+      }
+      for (final controller in [
+        _pagesScrollController,
+        _pagesHorizontalScrollController,
+      ]) {
+        if (controller.hasClients) controller.jumpTo(controller.offset);
+      }
+      _draftActivePointers.clear();
       _draftTimer?.cancel();
       _draftTimer = null;
       _checkpointDraft();
@@ -2002,6 +2082,7 @@ class _CanvasPageState extends State<CanvasPage>
   }
 
   void _handleDeviceChange({int? device, PointerDeviceKind? kind}) {
+    if (_stylusPolicy.stylusActive && _isNonStylusPointerKind(kind)) return;
     final hadDeviceTool = _toolData.keys.contains(kind);
     final deviceChanged = _currentDevice != kind;
 
@@ -2036,11 +2117,12 @@ class _CanvasPageState extends State<CanvasPage>
   EditingTool? get _activeTool => _toolData[_currentDevice];
 
   ScrollPhysics get _viewportScrollPhysics =>
-      _canPanViewport && !_pinchZoomActive
+      _canPanViewport && !_pinchZoomActive && !_viewportPinchZooming
       ? const ClampingScrollPhysics()
       : const NeverScrollableScrollPhysics();
 
   bool get _canPanViewport {
+    if (_suppressPalmInput || _stylusPolicy.hasRejectedTouches) return false;
     return _activeTool == EditingTool.MOVE ||
         (drawWithStylusOnly && _isNonStylusPointerKind(_currentDevice));
   }
@@ -3762,6 +3844,7 @@ class _CanvasPageState extends State<CanvasPage>
 
   @override
   void dispose() {
+    _stylusPolicy.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _strokeRasterPolicy.dispose();
     _draftTimer?.cancel();

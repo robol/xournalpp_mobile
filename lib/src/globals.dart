@@ -1,3 +1,6 @@
+/// Prevent palm contacts from starting gestures just after a pen lifts.
+const stylusTouchCooldown = Duration(milliseconds: 500);
+
 /// Enable once Google approves this application's Google Drive API usage.
 const bool googleDriveEnabled = false;
 

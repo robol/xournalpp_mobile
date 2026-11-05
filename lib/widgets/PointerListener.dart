@@ -1,3 +1,5 @@
+import 'package:xournalpp/widgets/PinchIntent.dart';
+import 'package:xournalpp/widgets/StylusInputPolicy.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
@@ -26,6 +28,7 @@ class PointerListener extends StatefulWidget {
   final Color? highlighterColor;
   final Color? laserColor;
   final bool drawWithStylusOnly;
+  final StylusInputPolicy? stylusPolicy;
   final bool simplifyStrokes;
   final bool stylusPressureSensitivity;
   final ValueListenable<bool>? canPanViewportListenable;
@@ -67,6 +70,7 @@ class PointerListener extends StatefulWidget {
     this.highlighterColor,
     this.laserColor,
     this.drawWithStylusOnly = false,
+    this.stylusPolicy,
     this.simplifyStrokes = true,
     this.stylusPressureSensitivity = true,
     this.canPanViewportListenable,
@@ -127,6 +131,20 @@ class PointerListenerState extends State<PointerListener> {
 
   bool drawingEnabled = true;
   int? _strokePointer;
+  final Set<int> _downPointers = {};
+  int? _stylusPointer;
+  final _localStylusPolicy = StylusInputPolicy();
+  StylusInputPolicy get _inputPolicy =>
+      widget.stylusPolicy ?? _localStylusPolicy;
+  void _releasePolicy(PointerEvent event) {
+    if (widget.stylusPolicy == null) _inputPolicy.up(event);
+  }
+
+  bool _isStylus(PointerEvent event) =>
+      event.kind == PointerDeviceKind.stylus ||
+      event.kind == PointerDeviceKind.invertedStylus;
+  bool _drawingAllowed(PointerEvent event) =>
+      _isStylus(event) || drawingEnabled;
 
   final StrokePointBuffer strokePoints = StrokePointBuffer();
   final EraserPreviewController eraserPreview = EraserPreviewController();
@@ -159,6 +177,8 @@ class PointerListenerState extends State<PointerListener> {
   final Set<int> _eraserOverridePointers = {};
   final Map<int, Offset> _touchPositions = {};
   bool _pinchZooming = false;
+  bool _pinchAccepted = false;
+  final _pinchIntent = PinchIntent();
   double? _lastPinchDistance;
   Offset? _lastPinchFocalPoint;
   final Set<int> _suppressedTouchPointers = {};
@@ -209,22 +229,26 @@ class PointerListenerState extends State<PointerListener> {
   Widget _buildPointerTree(Widget child) {
     return MouseRegion(
       onHover: (event) {
+        if (_stylusPointer != null && !_isStylus(event)) return;
         notifyDeviceChange(event);
       },
       opaque: false,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerMove: (data) {
-          if (!mounted) return;
-          if (_suppressedTouchPointers.contains(data.pointer)) return;
+          if (!mounted || !_downPointers.contains(data.pointer)) return;
+          if (_suppressedTouchPointers.contains(data.pointer) ||
+              _inputPolicy.rejects(data.pointer))
+            return;
+          if (_stylusPointer != null && _stylusPointer != data.pointer) return;
           widget.onPointerActivity?.call();
-          if (_updatePinchZoom(data)) return;
+          if (!_isStylus(data) && _updatePinchZoom(data)) return;
           if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_updatePan(data)) return;
           if (_detectTwoFingerGesture(data)) return;
           _updatePageSwipe(data);
           notifyDeviceChange(data);
-          if (!drawingEnabled) return;
+          if (!_drawingAllowed(data)) return;
           if (_shapePointer == data.pointer) {
             _setStateIfMounted(() => _shapeEnd = data.localPosition);
             return;
@@ -242,6 +266,34 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerDown: (data) {
           if (!mounted) return;
+          _inputPolicy.down(data);
+          if (_inputPolicy.rejects(data.pointer)) {
+            _suppressedTouchPointers.add(data.pointer);
+            return;
+          }
+          if (_stylusPointer != null && _stylusPointer != data.pointer) {
+            if (data.kind == PointerDeviceKind.touch)
+              _suppressedTouchPointers.add(data.pointer);
+            return;
+          }
+          _downPointers.add(data.pointer);
+          if (_isStylus(data)) {
+            _suppressedTouchPointers.addAll(_touchPositions.keys);
+            _touchPositions.clear();
+            if (_pinchZooming) {
+              _pinchZooming = false;
+              _lastPinchDistance = null;
+              _lastPinchFocalPoint = null;
+              if (_pinchAccepted) widget.onPinchZoomEnd?.call();
+              _pinchAccepted = false;
+            }
+            clearPoints();
+            _panLastPosition = null;
+            _panPointer = null;
+            _twoFingerPanning = false;
+            poppedContentForCurrentPointer = false;
+            _stylusPointer = data.pointer;
+          }
           if (widget.viewportGesturesExternallyManaged &&
               data.kind == PointerDeviceKind.touch) {
             _touchPositions[data.pointer] = data.position;
@@ -268,7 +320,7 @@ class PointerListenerState extends State<PointerListener> {
           }
           _startPageSwipe(data);
           notifyDeviceChange(data);
-          if (drawingEnabled &&
+          if (_drawingAllowed(data) &&
               activeEditingTool == EditingTool.SHAPE &&
               _shapePointer == null) {
             _setStateIfMounted(() {
@@ -283,14 +335,14 @@ class PointerListenerState extends State<PointerListener> {
             _startSelectionRegion(data);
             return;
           }
-          if (drawingEnabled &&
+          if (_drawingAllowed(data) &&
               (isPen(data) || isHighlighter(data) || isLaser(data))) {
             strokePoints.clear();
             _strokePointer = data.pointer;
             resetPreview();
             addStrokePoint(data);
           }
-          if (drawingEnabled && isEraser(data)) {
+          if (_drawingAllowed(data) && isEraser(data)) {
             eraserPreview.start();
             eraseAt(data);
           }
@@ -300,6 +352,20 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerUp: (data) {
           if (!mounted) return;
+          final wasDown = _downPointers.remove(data.pointer);
+          final rejected = _inputPolicy.rejects(data.pointer);
+          _releasePolicy(data);
+          if (!wasDown || rejected) {
+            _suppressedTouchPointers.remove(data.pointer);
+            return;
+          }
+          if (_stylusPointer != null && _stylusPointer != data.pointer) {
+            _suppressedTouchPointers.remove(data.pointer);
+            return;
+          }
+          if (_stylusPointer == data.pointer) {
+            _stylusPointer = null;
+          }
           if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_suppressedTouchPointers.remove(data.pointer)) {
             _touchPositions.remove(data.pointer);
@@ -345,6 +411,20 @@ class PointerListenerState extends State<PointerListener> {
         },
         onPointerCancel: (data) {
           if (!mounted) return;
+          final wasDown = _downPointers.remove(data.pointer);
+          final rejected = _inputPolicy.rejects(data.pointer);
+          _releasePolicy(data);
+          if (!wasDown || rejected) {
+            _suppressedTouchPointers.remove(data.pointer);
+            return;
+          }
+          if (_stylusPointer != null && _stylusPointer != data.pointer) {
+            _suppressedTouchPointers.remove(data.pointer);
+            return;
+          }
+          if (_stylusPointer == data.pointer) {
+            _stylusPointer = null;
+          }
           if (_strokePointer != null && _strokePointer != data.pointer) return;
           if (_shapePointer == data.pointer) _clearShape();
           _suppressedTouchPointers.remove(data.pointer);
@@ -431,6 +511,25 @@ class PointerListenerState extends State<PointerListener> {
   // method can be called using
   //   key.currentState.clearPoints();
 
+  /// Cancel unfinished input without committing it to the notebook.
+  void resetInput() {
+    if (widget.stylusPolicy == null) _inputPolicy.interrupt();
+    _downPointers.clear();
+    _stylusPointer = null;
+    _panLastPosition = null;
+    _panPointer = null;
+    _twoFingerPanning = false;
+    _pageSwipeStart = null;
+    _pageSwipePointerDevice = null;
+    pointerTimestamps.clear();
+    _suppressedTouchPointers.clear();
+    _contentPointerDownDevices.clear();
+    poppedContentForCurrentPointer = false;
+    clearPoints();
+    _pinchAccepted = false;
+    strokePreview.clear();
+  }
+
   void clearPoints() {
     _clearShape();
     _strokePointer = null;
@@ -508,7 +607,8 @@ class PointerListenerState extends State<PointerListener> {
     _pinchZooming = true;
     _lastPinchDistance = metrics.distance;
     _lastPinchFocalPoint = metrics.focalPoint;
-    widget.onPinchZoomStart?.call(metrics.focalPoint);
+    _pinchAccepted = false;
+    _pinchIntent.begin(metrics.distance, metrics.focalPoint);
     return true;
   }
 
@@ -529,8 +629,17 @@ class PointerListenerState extends State<PointerListener> {
       return true;
     }
 
+    if (!_pinchAccepted) {
+      if (!_pinchIntent.accepts(metrics.distance, metrics.focalPoint))
+        return true;
+      _pinchAccepted = true;
+      widget.onPinchZoomStart?.call(previousFocalPoint);
+    }
     _lastPinchDistance = metrics.distance;
     _lastPinchFocalPoint = metrics.focalPoint;
+    if (metrics.distance < PinchIntent.minimumSeparation ||
+        previousDistance < PinchIntent.minimumSeparation)
+      return true;
     widget.onPinchZoomUpdate?.call(
       scaleDelta: metrics.distance / previousDistance,
       globalFocalPoint: metrics.focalPoint,
@@ -547,6 +656,8 @@ class PointerListenerState extends State<PointerListener> {
     if (!_pinchZooming) return false;
     if (_touchPositions.length >= 2) {
       final metrics = _currentPinchMetrics();
+      if (metrics != null)
+        _pinchIntent.begin(metrics.distance, metrics.focalPoint);
       _lastPinchDistance = metrics?.distance;
       _lastPinchFocalPoint = metrics?.focalPoint;
       return true;
@@ -555,7 +666,8 @@ class PointerListenerState extends State<PointerListener> {
     _pinchZooming = false;
     _lastPinchDistance = null;
     _lastPinchFocalPoint = null;
-    widget.onPinchZoomEnd?.call();
+    if (_pinchAccepted) widget.onPinchZoomEnd?.call();
+    _pinchAccepted = false;
     return true;
   }
 
@@ -938,6 +1050,7 @@ class PointerListenerState extends State<PointerListener> {
 
   @override
   void dispose() {
+    _localStylusPolicy.dispose();
     strokePreview.dispose();
     eraserPreview.dispose();
     super.dispose();

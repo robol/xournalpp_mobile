@@ -62,6 +62,8 @@ void main() {
       EditingTool tool = EditingTool.STYLUS,
     }) async {
       XppStroke? saved;
+      // Each pressure case is independent of the previous pen/palm lifecycle.
+      await tester.pumpWidget(const SizedBox());
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,

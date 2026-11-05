@@ -97,6 +97,10 @@ class StrokePreviewController {
     repaint.value++;
   }
 
+  void clear() {
+    _reset(clearFading: true);
+  }
+
   void reset() {
     _reset(clearFading: false);
   }
